@@ -440,3 +440,50 @@ void HybridSystem::printStats()
 
 string HybridSystem::SetOutputFileName(string tracefilename) { return ""; }
 
+bool HybridSystem::is_hit(uint64_t address)
+{
+	uint64_t addr = ALIGN(address);
+
+	if (addr >= (TOTAL_PAGES * PAGE_SIZE))
+	{
+		cout << "ERROR: Address out of bounds" << endl;
+		exit(1);
+	}
+
+	// Compute the set number and tag
+	uint64_t set_index = SET_INDEX(addr);
+	uint64_t tag = TAG(addr);
+
+	list<uint64_t> set_address_list;
+	for (uint64_t i=0; i<SET_SIZE; i++)
+	{
+		uint64_t next_address = (i * NUM_SETS + set_index) * PAGE_SIZE;
+		set_address_list.push_back(next_address);
+	}
+
+	bool hit = false;
+	uint64_t cache_address;
+	uint64_t cur_address;
+	cache_line cur_line;
+	for (list<uint64_t>::iterator it = set_address_list.begin(); it != set_address_list.end(); ++it)
+	{
+		cur_address = *it;
+		if (cache.count(cur_address) == 0)
+		{
+			// If i is not allocated yet, allocate it.
+			cache[cur_address] = *(new cache_line());
+		}
+
+		cur_line = cache[cur_address];
+
+		if (cur_line.valid && (cur_line.tag == tag))
+		{
+			hit = true;
+			cache_address = cur_address;
+			break;
+		}
+	}
+
+	return hit;
+
+}

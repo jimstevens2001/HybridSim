@@ -7,12 +7,14 @@
 #include <list>
 #include <unordered_map>
 #include <unordered_set>
+#include <cstdlib>
+#include <ctime>
 #include <stdint.h>
 
 #include <DRAMSim/MemorySystem.h>
 
 // Default values for alternate code.
-#define DEBUG_CACHE 1
+#define DEBUG_CACHE 0
 #define SINGLE_WORD 0
 
 // GLOBAL CONSTANTS (move to ini file eventually)
