@@ -1,0 +1,5 @@
+HybridSim
+
+Simulation of hybrid memory system utilizing a DRAM and a FlashDIMM
+
+To use, the headers and .so files for DRAMSim and FlashDIMMSim must be available.

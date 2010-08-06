@@ -1,0 +1,442 @@
+#include "HybridSystem.h"
+
+using namespace HybridSim;
+using namespace std;
+
+
+HybridSystem::HybridSystem(uint id)
+{
+	systemID = id;
+	dram = new MemorySystem(0, dram_ini, sys_ini, ".", "resultsfilename"); 
+	flash = new MemorySystem(1, flash_ini, sys_ini, ".", "resultsfilename"); 
+
+	// Set up the callbacks for DRAM.
+	typedef DRAMSim::Callback <HybridSystem, void, uint, uint64_t, uint64_t> dramsim_callback_t;
+	DRAMSim::TransactionCompleteCB *read_cb = new dramsim_callback_t(this, &HybridSystem::DRAMReadCallback);
+	DRAMSim::TransactionCompleteCB *write_cb = new dramsim_callback_t(this, &HybridSystem::DRAMWriteCallback);
+	dram->RegisterCallbacks(read_cb, write_cb, NULL);
+
+	// Set up the callbacks for DRAM.
+	read_cb = new dramsim_callback_t(this, &HybridSystem::FlashReadCallback);
+	write_cb = new dramsim_callback_t(this, &HybridSystem::FlashWriteCallback);
+	flash->RegisterCallbacks(read_cb, write_cb, NULL);
+}
+
+void HybridSystem::update()
+{
+	// Process the transaction queue.
+	// This will fill the dram_queue and flash_queue.
+	while(!trans_queue.empty())
+	{
+		ProcessTransaction(trans_queue.front());
+		trans_queue.pop_front();
+	}
+
+	// Process DRAM transaction queue until it is empty or addTransaction returns false.
+	bool not_full = true;
+	while(not_full && !dram_queue.empty())
+	{
+		not_full = dram->addTransaction(dram_queue.front());
+		if (not_full)
+			dram_queue.pop_front();
+	}
+
+	// Process Flash transaction queue until it is empty or addTransaction returns false.
+	not_full = true;
+	while(not_full && !flash_queue.empty())
+	{
+		not_full = flash->addTransaction(flash_queue.front());
+		if (not_full)
+			flash_queue.pop_front();
+	}
+
+	// Update the memories.
+	dram->update();
+	flash->update();
+
+	// Increment the cycle count.
+	step();
+}
+
+bool HybridSystem::addTransaction(Transaction &trans)
+{
+	trans_queue.push_back(trans);
+
+	return true; // TODO: Figure out when this could be false.
+}
+
+void HybridSystem::ProcessTransaction(Transaction &trans)
+{
+	uint64_t addr = ALIGN(trans.address);
+#if DEBUG_CACHE
+	cout << currentClockCycle << ": " << "Starting transaction for address " << addr << endl;
+#endif
+
+	if (addr >= (TOTAL_PAGES * PAGE_SIZE))
+	{
+		cout << "ERROR: Address out of bounds" << endl;
+		exit(1);
+	}
+
+	// Compute the set number and tag
+	uint64_t set_index = SET_INDEX(addr);
+	uint64_t tag = TAG(addr);
+
+	list<uint64_t> set_address_list;
+	for (uint64_t i=0; i<SET_SIZE; i++)
+	{
+		uint64_t next_address = (i * NUM_SETS + set_index) * PAGE_SIZE;
+		set_address_list.push_back(next_address);
+	}
+
+	bool hit = false;
+	uint64_t cache_address;
+	uint64_t cur_address;
+	cache_line cur_line;
+	for (list<uint64_t>::iterator it = set_address_list.begin(); it != set_address_list.end(); ++it)
+	{
+		cur_address = *it;
+		if (cache.count(cur_address) == 0)
+		{
+			// If i is not allocated yet, allocate it.
+			cache[cur_address] = *(new cache_line());
+		}
+
+		cur_line = cache[cur_address];
+
+		if (cur_line.valid && (cur_line.tag == tag))
+		{
+			hit = true;
+			cache_address = cur_address;
+#if DEBUG_CACHE
+			cout << currentClockCycle << ": " << "HIT: " << cur_address << " " << " " << cur_line.str() << endl;
+#endif
+			break;
+		}
+
+	}
+
+	if (hit)
+	{
+		if (trans.transactionType == DATA_READ)
+			CacheRead(addr, cache_address);
+		else if(trans.transactionType == DATA_WRITE)
+			CacheWrite(addr, cache_address);
+	}
+
+	if (!hit)
+	{
+		// Select a victim offset within the set (LRU)
+		uint64_t victim = *(set_address_list.begin());
+		uint64_t min_ts = 0;
+		bool min_init = false;
+
+		for (list<uint64_t>::iterator it=set_address_list.begin(); it != set_address_list.end(); it++)
+		{
+			cur_address = *it;
+			cur_line = cache[cur_address];
+			if ((cur_line.ts < min_ts) || (!min_init))
+			{
+				victim = cur_address;	
+				min_ts = cur_line.ts;
+				min_init = true;
+			}
+		}
+
+		cache_address = victim;
+		cur_line = cache[cache_address];
+
+#if DEBUG_CACHE
+		cout << currentClockCycle << ": " << "MISS: victim is cache_address " << cache_address << endl;
+		cout << cur_line.str() << endl;
+#endif
+
+		Pending p;
+		p.flash_addr = addr;
+		p.cache_addr = cache_address;
+		p.victim_tag = cur_line.tag;
+		p.type = trans.transactionType;
+
+		if (cur_line.dirty)
+		{
+			VictimRead(p);
+		}
+		else
+		{
+			LineRead(p);
+		}
+	}
+}
+
+void HybridSystem::VictimRead(Pending p)
+{
+#if DEBUG_CACHE
+	cout << currentClockCycle << ": " << "Performing VICTIM_READ for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
+#endif
+
+	// flash_addr is the original Flash address requested from the top level Transaction.
+	// victim is the base address of the DRAM page to read.
+	// victim_tag is the cache tag for the victim page (used to compute the victim's flash address).
+
+#if SINGLE_WORD
+	// Schedule a read from DRAM to get the line being evicted.
+	Transaction t = Transaction(DATA_READ, p.cache_addr, NULL);
+	dram_queue.push_back(t);
+#else
+	// Schedule reads for the entire page.
+	p.init_wait(p.cache_addr);
+	for(uint64_t i=0; i<PAGE_SIZE/BURST_SIZE; i++)
+	{
+		Transaction t = Transaction(DATA_READ, p.cache_addr + i*BURST_SIZE, NULL);
+		dram_queue.push_back(t);
+	}
+#endif
+
+	// Add a record in the DRAM's pending table.
+	p.op = VICTIM_READ;
+	dram_pending[p.cache_addr] = p;
+}
+
+void HybridSystem::VictimWrite(Pending p)
+{
+#if DEBUG_CACHE
+	cout << currentClockCycle << ": " << "Performing VICTIM_WRITE for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
+#endif
+
+	// Compute victim flash address.
+	// This is where the victim line is stored in the Flash address space.
+	uint64_t victim_flash_addr = (p.victim_tag * NUM_SETS + SET_INDEX(p.flash_addr)) * PAGE_SIZE; 
+
+#if SINGLE_WORD
+	// Schedule a write to Flash to save the evicted line.
+	Transaction t = Transaction(DATA_WRITE, victim_flash_addr, NULL);
+	flash_queue.push_back(t);
+#else
+	// Schedule reads for the entire page.
+	for(uint64_t i=0; i<PAGE_SIZE/BURST_SIZE; i++)
+	{
+		Transaction t = Transaction(DATA_WRITE, victim_flash_addr + i*BURST_SIZE, NULL);
+		flash_queue.push_back(t);
+	}
+#endif
+
+	// No pending event schedule necessary (might add later for debugging though).
+}
+
+void HybridSystem::LineRead(Pending p)
+{
+#if DEBUG_CACHE
+	cout << currentClockCycle << ": " << "Performing LINE_READ for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
+#endif
+
+	uint64_t page_addr = PAGE_ADDRESS(p.flash_addr);
+
+#if SINGLE_WORD
+	// Schedule a read from Flash to get the new line 
+	Transaction t = Transaction(DATA_READ, page_addr, NULL);
+	flash_queue.push_back(t);
+#else
+	// Schedule reads for the entire page.
+	p.init_wait(page_addr);
+	for(uint64_t i=0; i<PAGE_SIZE/BURST_SIZE; i++)
+	{
+		Transaction t = Transaction(DATA_READ, page_addr + i*BURST_SIZE, NULL);
+		flash_queue.push_back(t);
+	}
+#endif
+
+	// Add a record in the Flash's pending table.
+	p.op = LINE_READ;
+	flash_pending[page_addr] = p;
+}
+
+void HybridSystem::CacheRead(uint64_t flash_addr, uint64_t cache_addr)
+{
+#if DEBUG_CACHE
+	cout << currentClockCycle << ": " << "Performing CACHE_READ for (" << flash_addr << ", " << cache_addr << ")\n";
+#endif
+
+	// Compute the actual DRAM address of the data word we care about.
+	uint64_t data_addr = cache_addr + PAGE_OFFSET(flash_addr);
+
+	Transaction t = Transaction(DATA_READ, data_addr, NULL);
+	dram_queue.push_back(t);
+
+	// Add a record in the DRAM's pending table.
+	Pending p;
+	p.op = CACHE_READ;
+	p.flash_addr = flash_addr;
+	p.cache_addr = cache_addr;
+	p.type = DATA_READ;
+	dram_pending[cache_addr] = p;
+}
+
+void HybridSystem::CacheWrite(uint64_t flash_addr, uint64_t cache_addr)
+{
+#if DEBUG_CACHE
+	cout << currentClockCycle << ": " << "Performing CACHE_WRITE for (" << flash_addr << ", " << cache_addr << ")\n";
+#endif
+
+	// Compute the actual DRAM address of the data word we care about.
+	uint64_t data_addr = cache_addr + PAGE_OFFSET(flash_addr);
+
+	Transaction t = Transaction(DATA_WRITE, data_addr, NULL);
+	dram_queue.push_back(t);
+
+	// Update the cache state
+	cache_line cur_line = cache[cache_addr];
+	cur_line.dirty = true;
+	cur_line.valid = true;
+	cur_line.ts = currentClockCycle;
+	cache[cache_addr] = cur_line;
+#if DEBUG_CACHE
+	cout << cur_line.str() << endl;
+#endif
+
+	// Call the top level callback.
+	// This is done immediately rather than waiting for callback.
+	if (WriteDone != NULL)
+		(*WriteDone)(systemID, flash_addr, currentClockCycle);
+}
+
+void HybridSystem::RegisterCallbacks(
+	    TransactionCompleteCB *readDone,
+	    TransactionCompleteCB *writeDone,
+	    void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower))
+{
+	// Save the external callbacks.
+	ReadDone = readDone;
+	WriteDone = writeDone;
+
+}
+
+
+void HybridSystem::DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle)
+{
+	if (dram_pending.count(PAGE_ADDRESS(addr)) != 0)
+	{
+		// Get the pending object for this transaction.
+		Pending p = dram_pending[PAGE_ADDRESS(addr)];
+
+		// Remove this pending object from dram_pending
+		dram_pending.erase(PAGE_ADDRESS(addr));
+
+		if (p.op == VICTIM_READ)
+		{
+#if DEBUG_CACHE
+			cout << currentClockCycle << ": " << "VICTIM_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ") offset="
+				<< PAGE_OFFSET(addr) << " num_left=" << p.wait->size() << "\n";
+#endif
+
+#if SINGLE_WORD
+#else
+			// Remove the read that just finished from the wait set.
+			p.wait->erase(addr);
+
+			if (!p.wait->empty())
+			{
+				// If not done with this line, then re-enter pending map.
+				dram_pending[PAGE_ADDRESS(addr)] = p;
+				return;
+			}
+
+			// The line has completed. Delete the wait set object and move on.
+			p.delete_wait();
+#endif
+
+#if DEBUG_CACHE
+			cout << "The read to DRAM line " << PAGE_ADDRESS(addr) << " has completed.\n";
+#endif
+
+			// Schedule a write to the flash to simulate the transfer
+			VictimWrite(p);
+
+			// Schedule a read to the flash to get the new line (can be done in parallel)
+			LineRead(p);
+		}
+		else if (p.op == CACHE_READ)
+		{
+#if DEBUG_CACHE
+			cout << currentClockCycle << ": " << "CACHE_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
+#endif
+
+			// Read operation has completed, call the top level callback.
+			if (ReadDone != NULL)
+				(*ReadDone)(systemID, addr, cycle);
+		}
+	}
+}
+
+void HybridSystem::DRAMWriteCallback(uint id, uint64_t addr, uint64_t cycle)
+{
+	// Nothing to do (it doesn't matter when the DRAM write finishes for the cache controller, as long as it happens).
+}
+
+void HybridSystem::FlashReadCallback(uint id, uint64_t addr, uint64_t cycle)
+{
+	if (flash_pending.count(PAGE_ADDRESS(addr)) != 0)
+	{
+		// Get the pending object.
+		Pending p = flash_pending[PAGE_ADDRESS(addr)];
+
+		// Remove this pending object from flash_pending
+		flash_pending.erase(PAGE_ADDRESS(addr));
+
+		if (p.op == LINE_READ)
+		{
+#if DEBUG_CACHE
+			cout << currentClockCycle << ": " << "LINE_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ") offset="
+				<< PAGE_OFFSET(addr) << " num_left=" << p.wait->size() << "\n";
+#endif
+
+#if SINGLE_WORD
+#else
+			// Remove the read that just finished from the wait set.
+			p.wait->erase(addr);
+
+			if (!p.wait->empty())
+			{
+				// If not done with this line, then re-enter pending map.
+				flash_pending[PAGE_ADDRESS(addr)] = p;
+				return;
+			}
+
+			// The line has completed. Delete the wait set object and move on.
+			p.delete_wait();
+#endif
+
+#if DEBUG_CACHE
+			cout << "The read to Flash line " << PAGE_ADDRESS(addr) << " has completed.\n";
+#endif
+
+			// Update the cache state
+			cache_line cur_line = cache[p.cache_addr];
+                        cur_line.tag = TAG(p.flash_addr);
+                        cur_line.dirty = false;
+                        cur_line.valid = true;
+                        cur_line.ts = currentClockCycle;
+			cache[p.cache_addr] = cur_line;
+
+
+			// Schedule the final operation (CACHE_READ or CACHE_WRITE)
+			if (p.type == DATA_READ)
+				CacheRead(p.flash_addr, p.cache_addr);
+			else if(p.type == DATA_WRITE)
+				CacheWrite(p.flash_addr, p.cache_addr);
+			
+		}
+	}
+}
+
+void HybridSystem::FlashWriteCallback(uint id, uint64_t addr, uint64_t cycle)
+{
+	// Nothing to do (it doesn't matter when the flash write finishes for the cache controller, as long as it happens).
+}
+
+void HybridSystem::printStats() 
+{
+	dram->printStats();
+}
+
+string HybridSystem::SetOutputFileName(string tracefilename) { return ""; }
+
