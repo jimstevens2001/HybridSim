@@ -7,8 +7,13 @@ using namespace std;
 HybridSystem::HybridSystem(uint id)
 {
 	systemID = id;
-	dram = new MemorySystem(0, dram_ini, sys_ini, ".", "resultsfilename"); 
-	flash = new MemorySystem(1, flash_ini, sys_ini, ".", "resultsfilename"); 
+	dram = new DRAMSim::MemorySystem(0, dram_ini, sys_ini, ".", "resultsfilename"); 
+
+#if FDSIM
+	flash = new FDSim::FlashDIMM(0,"ini/samsung_K9XXG08UXM.ini","ini/def_system.ini","","");
+#else
+	flash = new DRAMSim::MemorySystem(1, flash_ini, sys_ini, ".", "resultsfilename"); 
+#endif
 
 	// Set up the callbacks for DRAM.
 	typedef DRAMSim::Callback <HybridSystem, void, uint, uint64_t, uint64_t> dramsim_callback_t;
@@ -17,9 +22,16 @@ HybridSystem::HybridSystem(uint id)
 	dram->RegisterCallbacks(read_cb, write_cb, NULL);
 
 	// Set up the callbacks for DRAM.
+#if FDSIM
+	typedef FDSim::Callback <HybridSystem, void, uint, uint64_t, uint64_t> fdsim_callback_t;
+	FDSim::Callback_t *f_read_cb = new fdsim_callback_t(this, &HybridSystem::FlashReadCallback);
+	FDSim::Callback_t *f_write_cb = new fdsim_callback_t(this, &HybridSystem::FlashWriteCallback);
+	flash->RegisterCallbacks(f_read_cb, f_write_cb);
+#else
 	read_cb = new dramsim_callback_t(this, &HybridSystem::FlashReadCallback);
 	write_cb = new dramsim_callback_t(this, &HybridSystem::FlashWriteCallback);
 	flash->RegisterCallbacks(read_cb, write_cb, NULL);
+#endif
 }
 
 void HybridSystem::update()
@@ -45,7 +57,14 @@ void HybridSystem::update()
 	not_full = true;
 	while(not_full && !flash_queue.empty())
 	{
+#if FDSIM
+		// put some code to deal with FDSim interactions here
+		DRAMSim::Transaction t = flash_queue.front();
+		FDSim::FlashTransaction ft = FDSim::FlashTransaction(static_cast<FDSim::TransactionType>(t.transactionType), t.address, t.data);
+		not_full = flash->add(ft);
+#else
 		not_full = flash->addTransaction(flash_queue.front());
+#endif
 		if (not_full)
 			flash_queue.pop_front();
 	}
@@ -180,14 +199,14 @@ void HybridSystem::VictimRead(Pending p)
 
 #if SINGLE_WORD
 	// Schedule a read from DRAM to get the line being evicted.
-	Transaction t = Transaction(DATA_READ, p.cache_addr, NULL);
+	DRAMSim::Transaction t = DRAMSim::Transaction(DATA_READ, p.cache_addr, NULL);
 	dram_queue.push_back(t);
 #else
 	// Schedule reads for the entire page.
 	p.init_wait(p.cache_addr);
 	for(uint64_t i=0; i<PAGE_SIZE/BURST_SIZE; i++)
 	{
-		Transaction t = Transaction(DATA_READ, p.cache_addr + i*BURST_SIZE, NULL);
+		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_READ, p.cache_addr + i*BURST_SIZE, NULL);
 		dram_queue.push_back(t);
 	}
 #endif
@@ -209,13 +228,13 @@ void HybridSystem::VictimWrite(Pending p)
 
 #if SINGLE_WORD
 	// Schedule a write to Flash to save the evicted line.
-	Transaction t = Transaction(DATA_WRITE, victim_flash_addr, NULL);
+	DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, victim_flash_addr, NULL);
 	flash_queue.push_back(t);
 #else
 	// Schedule reads for the entire page.
 	for(uint64_t i=0; i<PAGE_SIZE/BURST_SIZE; i++)
 	{
-		Transaction t = Transaction(DATA_WRITE, victim_flash_addr + i*BURST_SIZE, NULL);
+		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, victim_flash_addr + i*BURST_SIZE, NULL);
 		flash_queue.push_back(t);
 	}
 #endif
@@ -233,14 +252,14 @@ void HybridSystem::LineRead(Pending p)
 
 #if SINGLE_WORD
 	// Schedule a read from Flash to get the new line 
-	Transaction t = Transaction(DATA_READ, page_addr, NULL);
+	DRAMSim::Transaction t = DRAMSim::Transaction(DATA_READ, page_addr, NULL);
 	flash_queue.push_back(t);
 #else
 	// Schedule reads for the entire page.
 	p.init_wait(page_addr);
 	for(uint64_t i=0; i<PAGE_SIZE/BURST_SIZE; i++)
 	{
-		Transaction t = Transaction(DATA_READ, page_addr + i*BURST_SIZE, NULL);
+		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_READ, page_addr + i*BURST_SIZE, NULL);
 		flash_queue.push_back(t);
 	}
 #endif
@@ -259,7 +278,7 @@ void HybridSystem::CacheRead(uint64_t flash_addr, uint64_t cache_addr)
 	// Compute the actual DRAM address of the data word we care about.
 	uint64_t data_addr = cache_addr + PAGE_OFFSET(flash_addr);
 
-	Transaction t = Transaction(DATA_READ, data_addr, NULL);
+	DRAMSim::Transaction t = DRAMSim::Transaction(DATA_READ, data_addr, NULL);
 	dram_queue.push_back(t);
 
 	// Add a record in the DRAM's pending table.
@@ -280,7 +299,7 @@ void HybridSystem::CacheWrite(uint64_t flash_addr, uint64_t cache_addr)
 	// Compute the actual DRAM address of the data word we care about.
 	uint64_t data_addr = cache_addr + PAGE_OFFSET(flash_addr);
 
-	Transaction t = Transaction(DATA_WRITE, data_addr, NULL);
+	DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, data_addr, NULL);
 	dram_queue.push_back(t);
 
 	// Update the cache state
@@ -300,8 +319,8 @@ void HybridSystem::CacheWrite(uint64_t flash_addr, uint64_t cache_addr)
 }
 
 void HybridSystem::RegisterCallbacks(
-	    TransactionCompleteCB *readDone,
-	    TransactionCompleteCB *writeDone,
+	    DRAMSim::TransactionCompleteCB *readDone,
+	    DRAMSim::TransactionCompleteCB *writeDone,
 	    void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower))
 {
 	// Save the external callbacks.

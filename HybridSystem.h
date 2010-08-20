@@ -14,8 +14,8 @@ namespace HybridSim
 		void update();
 		bool addTransaction(Transaction &trans);
 		void RegisterCallbacks(
-			    TransactionCompleteCB *readDone,
-			    TransactionCompleteCB *writeDone,
+			    DRAMSim::TransactionCompleteCB *readDone,
+			    DRAMSim::TransactionCompleteCB *writeDone,
 			    void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower));
 		void DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle);
 		void DRAMWriteCallback(uint id, uint64_t addr, uint64_t cycle);
@@ -31,7 +31,7 @@ namespace HybridSim
 //		void LineRead(uint64_t flash_addr, TransactionType type); 
 
 		// Helper functions
-		void ProcessTransaction(Transaction &trans);
+		void ProcessTransaction(DRAMSim::Transaction &trans);
 
 		void VictimRead(Pending p);
 		void VictimWrite(Pending p);
@@ -43,12 +43,17 @@ namespace HybridSim
 		bool is_hit(uint64_t address);
 
 		// State
-		TransactionCompleteCB *ReadDone;
-		TransactionCompleteCB *WriteDone;
+		DRAMSim::TransactionCompleteCB *ReadDone;
+		DRAMSim::TransactionCompleteCB *WriteDone;
 		uint systemID;
 
-		MemorySystem *dram;
-		MemorySystem *flash;
+		DRAMSim::MemorySystem *dram;
+
+#if FDSIM
+		FDSim::FlashDIMM *flash;
+#else
+		DRAMSim::MemorySystem *flash;
+#endif
 
 		unordered_map<uint64_t, cache_line> cache;
 

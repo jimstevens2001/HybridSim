@@ -1,6 +1,11 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+// Default values for alternate code.
+#define DEBUG_CACHE 0
+#define SINGLE_WORD 0
+#define FDSIM 0
+
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -12,13 +17,15 @@
 #include <stdint.h>
 
 #include <DRAMSim/MemorySystem.h>
+//#include <DRAMSim/DRAMSim.h>
 
-// Default values for alternate code.
-#define DEBUG_CACHE 0
-#define SINGLE_WORD 0
+#if FDSIM
+#include "FDSim.h"
+#endif
+
+using namespace std;
 
 // GLOBAL CONSTANTS (move to ini file eventually)
-
 
 const uint64_t WORD_SIZE = 8; // This should never change, but is just paranoia just in case we need 32-bit words.
 const uint64_t PAGE_SIZE = 1024; // in bytes, so 128 64-bit words
@@ -27,8 +34,18 @@ const uint64_t SET_SIZE = 64; // associativity of cache
 const uint64_t BURST_SIZE = 64; // number of bytes in a single transaction, this means with PAGE_SIZE=1024, 16 transactions are needed
 
 // Number of pages total and number of pages in the cache
-const uint64_t TOTAL_PAGES = 4194304; // 4 GB
+const uint64_t TOTAL_PAGES = 2097152; // 2 GB
+//const uint64_t TOTAL_PAGES = 4194304; // 4 GB
 const uint64_t CACHE_PAGES = 1048576; // 1 GB
+
+// INI files
+const string dram_ini = "ini/DDR3_micron_8M_8B_x8_sg15.ini";
+const string flash_ini = "ini/DDR3_micron_16M_8B_x8_sg15.ini";
+const string sys_ini = "ini/system.ini";
+
+
+
+// Derived constants/macros
 
 const uint64_t NUM_SETS = CACHE_PAGES / SET_SIZE;
 
@@ -39,10 +56,6 @@ const uint64_t NUM_SETS = CACHE_PAGES / SET_SIZE;
 #define TAG(addr) (PAGE_NUMBER(addr) / NUM_SETS)
 #define ALIGN(addr) (addr / BURST_SIZE) * BURST_SIZE;
 
-// INI files
-const string dram_ini = "ini/DDR3_micron_8M_8B_x8_sg15.ini";
-const string flash_ini = "ini/DDR3_micron_32M_8B_x8_sg15.ini";
-const string sys_ini = "ini/system.ini";
 
 class cache_line
 {
@@ -74,7 +87,7 @@ class Pending
 	uint64_t flash_addr;
 	uint64_t cache_addr;
 	uint64_t victim_tag;
-	TransactionType type; // DATA_READ or DATA_WRITE
+	DRAMSim::TransactionType type; // DATA_READ or DATA_WRITE
 	unordered_set<uint64_t> *wait;
 
 	Pending() : op(VICTIM_READ), flash_addr(0), cache_addr(0), victim_tag(0), type(DATA_READ), wait(0) {};
