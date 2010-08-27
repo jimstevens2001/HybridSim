@@ -12,7 +12,9 @@ namespace HybridSim
 		public:
 		HybridSystem(uint id);
 		void update();
+		bool addTransaction(bool isWrite, uint64_t addr);
 		bool addTransaction(Transaction &trans);
+		bool WillAcceptTransaction();
 		void RegisterCallbacks(
 			    DRAMSim::TransactionCompleteCB *readDone,
 			    DRAMSim::TransactionCompleteCB *writeDone,
@@ -24,6 +26,8 @@ namespace HybridSim
 
 		void printStats();
 		string SetOutputFileName(string tracefilename);
+
+		HybridSystem *getMemorySystemInstance(uint id);
 
 		// Functions that schedule pending operations (second part to these operations is in the callbacks).
 //		void VictimRead(uint64_t flash_addr, uint64_t victim_cache_addr, uint64_t victim_tag, TransactionType type);

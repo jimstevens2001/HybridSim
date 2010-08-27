@@ -4,7 +4,7 @@
 // Default values for alternate code.
 #define DEBUG_CACHE 0
 #define SINGLE_WORD 0
-#define FDSIM 0
+#define FDSIM 1
 
 #include <iostream>
 #include <string>

@@ -7,13 +7,16 @@ using namespace std;
 HybridSystem::HybridSystem(uint id)
 {
 	systemID = id;
-	dram = new DRAMSim::MemorySystem(0, dram_ini, sys_ini, ".", "resultsfilename"); 
+	cout << "Creating DRAM\n";
+	dram = new DRAMSim::MemorySystem(0, dram_ini, sys_ini, "/home/jims/hybridsim", "resultsfilename"); 
 
+	cout << "Creating Flash\n";
 #if FDSIM
-	flash = new FDSim::FlashDIMM(0,"ini/samsung_K9XXG08UXM.ini","ini/def_system.ini","","");
+	flash = new FDSim::FlashDIMM(1,"ini/samsung_K9XXG08UXM.ini","ini/def_system.ini","/home/jims/hybridsim","");
 #else
-	flash = new DRAMSim::MemorySystem(1, flash_ini, sys_ini, ".", "resultsfilename"); 
+	flash = new DRAMSim::MemorySystem(1, flash_ini, sys_ini, "/home/jims/hybridsim", "resultsfilename"); 
 #endif
+	cout << "Done with creating memories\n";
 
 	// Set up the callbacks for DRAM.
 	typedef DRAMSim::Callback <HybridSystem, void, uint, uint64_t, uint64_t> dramsim_callback_t;
@@ -33,6 +36,13 @@ HybridSystem::HybridSystem(uint id)
 	flash->RegisterCallbacks(read_cb, write_cb, NULL);
 #endif
 }
+
+// static allocator for the library interface
+HybridSystem *getMemorySystemInstance(uint id)
+{
+        return new HybridSystem(id);
+}
+
 
 void HybridSystem::update()
 {
@@ -77,11 +87,33 @@ void HybridSystem::update()
 	step();
 }
 
+bool HybridSystem::addTransaction(bool isWrite, uint64_t addr)
+{
+	DRAMSim::TransactionType type;
+	if (isWrite)
+	{
+		type = DATA_WRITE;
+	}
+	else
+	{
+		type = DATA_READ;
+	}
+	DRAMSim::Transaction t = DRAMSim::Transaction(type, addr, NULL);
+	return addTransaction(t);
+}
+
 bool HybridSystem::addTransaction(Transaction &trans)
 {
 	trans_queue.push_back(trans);
 
 	return true; // TODO: Figure out when this could be false.
+}
+
+bool HybridSystem::WillAcceptTransaction()
+{
+	// Always true for now since MARSS expects this.
+	// Might change later.
+	return true;
 }
 
 void HybridSystem::ProcessTransaction(Transaction &trans)
