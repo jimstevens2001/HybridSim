@@ -8,13 +8,13 @@ HybridSystem::HybridSystem(uint id)
 {
 	systemID = id;
 	cout << "Creating DRAM\n";
-	dram = new DRAMSim::MemorySystem(0, dram_ini, sys_ini, "/home/jims/hybridsim", "resultsfilename"); 
+	dram = new DRAMSim::MemorySystem(0, dram_ini, sys_ini, ".", "resultsfilename"); 
 
 	cout << "Creating Flash\n";
 #if FDSIM
-	flash = new FDSim::FlashDIMM(1,"ini/samsung_K9XXG08UXM.ini","ini/def_system.ini","/home/jims/hybridsim","");
+	flash = new FDSim::FlashDIMM(1,"ini/samsung_K9XXG08UXM.ini","ini/def_system.ini",".","");
 #else
-	flash = new DRAMSim::MemorySystem(1, flash_ini, sys_ini, "/home/jims/hybridsim", "resultsfilename"); 
+	flash = new DRAMSim::MemorySystem(1, flash_ini, sys_ini, ".", "resultsfilename"); 
 #endif
 	cout << "Done with creating memories\n";
 
