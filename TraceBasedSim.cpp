@@ -75,6 +75,7 @@ int some_object::add_one_and_run()
 	for (uint64_t i=0; i<num_init; i++)
 	{
 		Transaction t = Transaction(DATA_READ, i*PAGE_SIZE, NULL);
+		cout << i << "calling HybridSystem::addTransaction\n";
 		mem->addTransaction(t);
 		if (i%10000 == 0)
 			cout << i << "/" << num_init << endl;

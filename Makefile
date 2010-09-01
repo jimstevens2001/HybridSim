@@ -19,11 +19,11 @@ ifdef PROFILE
 CXXFLAGS = -pg
 endif 
 
-INCLUDES=${INCLUDEDIR}
 DRAM_LIB=${INCLUDEDIR}/DRAMSim
 FLASH_LIB=${INCLUDEDIR}/FlashDIMMSim
+
+INCLUDES=${INCLUDEDIR}
 LIBS=-L${DRAM_LIB} -L${FLASH_LIB} -ldramsim -lfdsim -Wl,-rpath=${DRAM_LIB} -Wl,-rpath=${FLASH_LIB} 
-#LIBS=-L${DRAM_LIB} -ldramsim -Wl,-rpath=${DRAM_LIB}
 
 EXE_NAME=HybridSim
 LIB_NAME=libhybridsim.so
@@ -37,7 +37,7 @@ all: ${EXE_NAME}
 
 #   $@ target name, $^ target deps, $< matched pattern
 $(EXE_NAME): $(OBJ)
-	$(CXX) $(CXXFLAGS) ${LIBS} -o $@ $^ 
+	$(CXX) -g $(CXXFLAGS) ${LIBS} -o $@ $^ 
 	@echo "Built $@ successfully" 
 
 ${LIB_NAME}: ${POBJ}
@@ -54,7 +54,7 @@ ${LIB_NAME}: ${POBJ}
 
 # build all .cpp files to .o files
 %.o : %.cpp
-	g++ $(CXXFLAGS) -I$(INCLUDES) -std=c++0x -o $@ -c $<
+	g++ -g $(CXXFLAGS) -I$(INCLUDES) -std=c++0x -o $@ -c $<
 
 MBOBSim.o: TraceBasedSim.cpp
 	g++ ${CXXFLAGS} -DMBOB_SYSTEM -o $@ -c $<

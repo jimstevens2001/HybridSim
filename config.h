@@ -20,7 +20,8 @@
 //#include <DRAMSim/DRAMSim.h>
 
 #if FDSIM
-#include "FDSim.h"
+//#include "FDSim.h"
+#include <FlashDIMMSim/FlashDIMM.h>
 #endif
 
 using namespace std;

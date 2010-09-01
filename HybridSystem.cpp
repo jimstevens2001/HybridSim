@@ -104,7 +104,9 @@ bool HybridSystem::addTransaction(bool isWrite, uint64_t addr)
 
 bool HybridSystem::addTransaction(Transaction &trans)
 {
+	cout << "enter HybridSystem::addTransaction\n";
 	trans_queue.push_back(trans);
+	cout << "pushed\n";
 
 	return true; // TODO: Figure out when this could be false.
 }
