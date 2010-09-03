@@ -75,23 +75,24 @@ int some_object::add_one_and_run()
 	for (uint64_t i=0; i<num_init; i++)
 	{
 		Transaction t = Transaction(DATA_READ, i*PAGE_SIZE, NULL);
-		cout << i << "calling HybridSystem::addTransaction\n";
+		//cout << i << "calling HybridSystem::addTransaction\n";
 		mem->addTransaction(t);
 		if (i%10000 == 0)
 			cout << i << "/" << num_init << endl;
 	}
 	cout << "Running transactions to preload cache with data...\n";
-	for (uint64_t i=0; i<num_init*1000; i++)
+	int factor = 10000;
+	for (uint64_t i=0; i<num_init*factor; i++)
 	{
 		mem->update();
 		if (i%1000000 == 0)
-			cout << i << "/" << num_init*1000 << endl;
+			cout << i << "/" << num_init*factor << endl;
 	}
 
 	uint64_t cur_addr = 0;
 
 	const uint64_t NUM_ACCESSES = 1000;
-	const int MISS_RATE = 99;
+	const int MISS_RATE = 10;
 
 	for (uint64_t i=0; i<NUM_ACCESSES; i++)
 	{
@@ -102,12 +103,24 @@ int some_object::add_one_and_run()
 		if (rand() % 100 < MISS_RATE)
 			want_hit = false;
 
+		//if (mem->get_valid_pages().size() == 0)
+		//	want_hit = false;
+
+		if (want_hit)
+			cur_addr = mem->get_hit();
+		else
+			cur_addr = (rand() % TOTAL_PAGES) * PAGE_SIZE;
+
 		cout << mem->currentClockCycle << ": want_hit=" << want_hit << " cur_addr=" << cur_addr << endl;
 
 		// Pick the address that will give a hit or a miss.
+		int k=0;
 		while(mem->is_hit(cur_addr) != want_hit)
 		{
 			cur_addr = (rand() % TOTAL_PAGES) * PAGE_SIZE;
+			k++;
+			cout << "k=" << k << " want_hit=" << want_hit << " cur_addr=" << cur_addr << " is_hit=" << mem->is_hit(cur_addr) << "\n";
+			
 		}
 		//cur_addr = (cur_addr + PAGE_SIZE) % (TOTAL_PAGES * PAGE_SIZE);
 		
@@ -120,7 +133,7 @@ int some_object::add_one_and_run()
 			<< " tag=" << TAG(cur_addr) << endl;
 #endif
 
-		for (int j=0; j<1; j++)
+		for (int j=0; j<factor; j++)
 		{
 			mem->update();
 		}
@@ -135,6 +148,8 @@ int some_object::add_one_and_run()
 
 	cout << "\n\n" << mem->currentClockCycle << ": completed " << complete << "\n\n";
 	cout << "dram_pending=" << mem->dram_pending.size() << " flash_pending=" << mem->flash_pending.size() << "\n\n";
+	cout << "dram_queue=" << mem->dram_queue.size() << " flash_queue=" << mem->flash_queue.size() << "\n\n";
+	cout << "pending_pages=" << mem->pending_pages.size() << "\n\n";
 
 	return 0;
 }

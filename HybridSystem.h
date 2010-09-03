@@ -45,6 +45,8 @@ namespace HybridSim
 
 		// Testing function
 		bool is_hit(uint64_t address);
+		uint64_t get_hit();
+		list<uint64_t> get_valid_pages();
 
 		// State
 		DRAMSim::TransactionCompleteCB *ReadDone;
@@ -64,7 +66,9 @@ namespace HybridSim
 		unordered_map<uint64_t, Pending> dram_pending;
 		unordered_map<uint64_t, Pending> flash_pending;
 
-		list<Transaction> trans_queue; // Queue for the cache controller
+		set<uint64_t> pending_pages; // If a page is in the pending set, then skip subsequent transactions to the page.
+
+		list<Transaction> trans_queue; // Entry queue for the cache controller.
 		list<Transaction> dram_queue; // Buffer to wait for DRAM
 		list<Transaction> flash_queue; // Buffer to wait for Flash
 

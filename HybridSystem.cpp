@@ -48,10 +48,58 @@ void HybridSystem::update()
 {
 	// Process the transaction queue.
 	// This will fill the dram_queue and flash_queue.
-	while(!trans_queue.empty())
+	//if (trans_queue.size() > 0)
+	//if (currentClockCycle % 1000 == 0)
+	if (false)
 	{
-		ProcessTransaction(trans_queue.front());
-		trans_queue.pop_front();
+		cout << currentClockCycle << ": ";
+		cout << trans_queue.size() << "/" << pending_pages.size() << " is length of trans_queue/pending_pages (";
+//		set<uint64_t>::iterator it;
+//		for (it=pending_pages.begin(); it != pending_pages.end(); ++it)
+//		{
+//			cout << " " << *it;
+//		}
+		cout << ")\n(";
+		list<Transaction>::iterator it2;
+		for (it2=trans_queue.begin(); it2 != trans_queue.end(); ++it2)
+		{
+			cout << " " << (*it2).address;
+		}
+		cout << ")\n";
+		cout << "dram_queue=" << dram_queue.size() << " flash_queue=" << flash_queue.size() << "\n";
+		cout << "dram_pending=" << dram_pending.size() << " flash_pending=" << flash_pending.size() << "\n\n";
+	}
+	list<Transaction>::iterator it = trans_queue.begin();
+	//while(!trans_queue.empty())
+	//for (list<Transaction>::iterator it = trans_queue.begin(); it != trans_queue.end(); ++it)
+	while(it != trans_queue.end())
+	{
+		//ProcessTransaction(trans_queue.front());
+		//trans_queue.pop_front();
+
+		// Compute the page address.
+		uint64_t page_addr = PAGE_ADDRESS((*it).address);
+
+		if (pending_pages.count(page_addr) == 0)
+		//if (true)
+		{
+	//		cout << "PAGE NOT IN PENDING" << page_addr << "\n";
+			// Add to the pending 
+			pending_pages.insert(page_addr);
+
+			// Process the transaction.
+			ProcessTransaction(*it);
+
+			// Delete this item and skip to the next.
+			it = trans_queue.erase(it);
+		}
+		else
+		{
+			// Skip to the next and do nothing else.
+	//		cout << "PAGE IN PENDING" << page_addr << "\n";
+			++it;
+			//it = trans_queue.end();
+		}
 	}
 
 	// Process DRAM transaction queue until it is empty or addTransaction returns false.
@@ -104,9 +152,9 @@ bool HybridSystem::addTransaction(bool isWrite, uint64_t addr)
 
 bool HybridSystem::addTransaction(Transaction &trans)
 {
-	cout << "enter HybridSystem::addTransaction\n";
+	//cout << "enter HybridSystem::addTransaction\n";
 	trans_queue.push_back(trans);
-	cout << "pushed\n";
+	//cout << "pushed\n";
 
 	return true; // TODO: Figure out when this could be false.
 }
@@ -210,6 +258,8 @@ void HybridSystem::ProcessTransaction(Transaction &trans)
 		p.victim_tag = cur_line.tag;
 		p.type = trans.transactionType;
 
+		// If the cur_line is dirty, then do a victim writeback process (starting with VictimRead).
+		// Otherwise, read the line.
 		if (cur_line.dirty)
 		{
 			VictimRead(p);
@@ -349,7 +399,18 @@ void HybridSystem::CacheWrite(uint64_t flash_addr, uint64_t cache_addr)
 	// Call the top level callback.
 	// This is done immediately rather than waiting for callback.
 	if (WriteDone != NULL)
+	{
+		// Call the callback.
 		(*WriteDone)(systemID, flash_addr, currentClockCycle);
+	}
+
+	// Erase the page from the pending set.
+	int num = pending_pages.erase(PAGE_ADDRESS(flash_addr));
+	if (num != 1)
+	{
+		cout << "pending_pages.erase() was called after CACHE_WRITE and num was 0.\n\n";
+		exit(1);
+	}
 }
 
 void HybridSystem::RegisterCallbacks(
@@ -415,7 +476,18 @@ void HybridSystem::DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle)
 
 			// Read operation has completed, call the top level callback.
 			if (ReadDone != NULL)
+			{
+				// Call the callback.
 				(*ReadDone)(systemID, addr, cycle);
+			}
+
+			// Erase the page from the pending set.
+			int num = pending_pages.erase(PAGE_ADDRESS(p.flash_addr));
+			if (num != 1)
+			{
+				cout << "pending_pages.erase() was called after CACHE_READ and num was 0.\n\n";
+				exit(1);
+			}
 		}
 	}
 }
@@ -493,6 +565,69 @@ void HybridSystem::printStats()
 
 string HybridSystem::SetOutputFileName(string tracefilename) { return ""; }
 
+list<uint64_t> HybridSystem::get_valid_pages()
+{
+	//cout << "IN get_valid_pages()\n";
+	list<uint64_t> valid_pages;
+
+	unordered_map<uint64_t, cache_line>::iterator it;
+	for (it = cache.begin(); it != cache.end(); ++it)
+	{
+		uint64_t addr = (*it).first;
+		cache_line line = (*it).second;
+
+		//cout << addr << " : " << line.str() << "\n";
+
+		if (line.valid)
+		{
+			valid_pages.push_back(addr);
+		}
+	}
+
+	return valid_pages;
+}
+
+uint64_t HybridSystem::get_hit()
+{
+	list<uint64_t> valid_pages = get_valid_pages();
+
+	// Pick an element number to grab.
+	int size = valid_pages.size();
+	//cout << "size=" << size << "\n";
+	srand (time(NULL));
+	//cout << "pending=" << pending_pages.size() << " flash_pending size=" << flash_pending.size() << "\n";
+	int x = rand() % size;
+	//cout << "x=" << x << "\n";
+
+
+	int i = 0;
+	list<uint64_t>::iterator it2 = valid_pages.begin();
+	while((i != x) && (it2 != valid_pages.end()))
+	{
+		i++;
+		it2++;
+	}
+
+	uint64_t cache_addr = (*it2);
+
+	// Compute flash address
+	cache_line c = cache[cache_addr];
+	uint64_t ret_addr = (c.tag * NUM_SETS + SET_INDEX(cache_addr)) * PAGE_SIZE;
+
+	//cout << "cache_addr=" << cache_addr << " ";
+	//cout << "ret_addr=" << ret_addr << " tag=" << TAG(ret_addr) << " cache set=" << SET_INDEX(cache_addr) << " ret set=" << SET_INDEX(ret_addr) << "\n";
+	//cout << c.str() << "\n";
+
+	// Check assertion.
+	if (!is_hit(ret_addr))
+	{
+		cout << "get_hit generated a non-hit!!\n";
+		exit(1);
+	}
+
+	return ret_addr;
+}
+
 bool HybridSystem::is_hit(uint64_t address)
 {
 	uint64_t addr = ALIGN(address);
@@ -507,12 +642,15 @@ bool HybridSystem::is_hit(uint64_t address)
 	uint64_t set_index = SET_INDEX(addr);
 	uint64_t tag = TAG(addr);
 
+	//cout << "set address list: ";
 	list<uint64_t> set_address_list;
 	for (uint64_t i=0; i<SET_SIZE; i++)
 	{
 		uint64_t next_address = (i * NUM_SETS + set_index) * PAGE_SIZE;
 		set_address_list.push_back(next_address);
+		//cout << next_address << " ";
 	}
+	//cout << "\n";
 
 	bool hit = false;
 	uint64_t cache_address;
@@ -531,6 +669,7 @@ bool HybridSystem::is_hit(uint64_t address)
 
 		if (cur_line.valid && (cur_line.tag == tag))
 		{
+	//		cout << "HIT!!!\n";
 			hit = true;
 			cache_address = cur_address;
 			break;

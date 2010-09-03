@@ -62,4 +62,4 @@ MBOBSim.o: TraceBasedSim.cpp
 %.po : %.cpp
 	g++ -I$(INCLUDES) -std=c++0x -O3 -ffast-math -fPIC -DNO_OUTPUT -DNO_STORAGE -o $@ -c $<
 clean: 
-	rm -rf ${REBUILDABLES} *.dep out results *.log
+	rm -rf ${REBUILDABLES} *.dep out results *.log callgrind*
