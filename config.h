@@ -64,7 +64,8 @@ const uint64_t NUM_SETS = CACHE_PAGES / SET_SIZE;
 #define PAGE_OFFSET(addr) (addr % PAGE_SIZE)
 #define SET_INDEX(addr) (PAGE_NUMBER(addr) % NUM_SETS)
 #define TAG(addr) (PAGE_NUMBER(addr) / NUM_SETS)
-#define ALIGN(addr) (addr / BURST_SIZE) * BURST_SIZE;
+//#define ALIGN(addr) (addr / BURST_SIZE) * BURST_SIZE;
+#define ALIGN(addr) (((addr / BURST_SIZE) * BURST_SIZE) % (TOTAL_PAGES * PAGE_SIZE))
 
 
 class cache_line
@@ -94,6 +95,7 @@ class Pending
 {
 	public:
 	PendingOperation op; // What operation is being performed.
+	uint64_t orig_addr;
 	uint64_t flash_addr;
 	uint64_t cache_addr;
 	uint64_t victim_tag;

@@ -40,8 +40,8 @@ namespace HybridSim
 		void VictimRead(Pending p);
 		void VictimWrite(Pending p);
 		void LineRead(Pending p);
-		void CacheRead(uint64_t flash_addr, uint64_t cache_addr);
-		void CacheWrite(uint64_t flash_addr, uint64_t cache_addr);
+		void CacheRead(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr);
+		void CacheWrite(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr);
 
 		// Testing function
 		bool is_hit(uint64_t address);

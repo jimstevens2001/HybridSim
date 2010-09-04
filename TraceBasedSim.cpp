@@ -71,6 +71,13 @@ int some_object::add_one_and_run()
 
 	srand (time(NULL));
 
+	mem->addTransaction(false, 140708070030063);
+	for (uint64_t i=0; i<10000; i++)
+	{
+		mem->update();
+	}
+	
+
 	cout << "Preparing transactions to preload cache with data...\n";
 	uint64_t num_init = 10000;
 	for (uint64_t i=0; i<num_init; i++)

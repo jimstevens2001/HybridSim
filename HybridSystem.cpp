@@ -80,13 +80,14 @@ void HybridSystem::update()
 		//trans_queue.pop_front();
 
 		// Compute the page address.
-		uint64_t page_addr = PAGE_ADDRESS((*it).address);
+		uint64_t page_addr = PAGE_ADDRESS(ALIGN((*it).address));
 
 		if (pending_pages.count(page_addr) == 0)
 		//if (true)
 		{
 			//cout << "PAGE NOT IN PENDING" << page_addr << "\n";
 			// Add to the pending 
+			//cout << "Inserted " << page_addr << " into pending pages set\n";
 			pending_pages.insert(page_addr);
 
 			// Process the transaction.
@@ -184,14 +185,22 @@ bool HybridSystem::WillAcceptTransaction()
 void HybridSystem::ProcessTransaction(DRAMSim::Transaction &trans)
 {
 	uint64_t addr = ALIGN(trans.address);
+
+//	if (addr != trans.address)
+//	{
+//		cout << "Assertion fail: aligned address and oriignal address are different.\n";
+//		cout << "aligned=0x" << hex << addr << " orig=0x" << trans.address << "\n";
+//		abort();
+//	}
+
 #if DEBUG_CACHE
 	cout << currentClockCycle << ": " << "Starting transaction for address " << addr << endl;
 #endif
 
 	if (addr >= (TOTAL_PAGES * PAGE_SIZE))
 	{
-		cout << "ERROR: Address out of bounds" << endl;
-		exit(1);
+		cout << "ERROR: Address out of bounds - orig:" << trans.address << " aligned:" << addr << "\n";
+		abort();
 	}
 
 	// Compute the set number and tag
@@ -235,9 +244,9 @@ void HybridSystem::ProcessTransaction(DRAMSim::Transaction &trans)
 	if (hit)
 	{
 		if (trans.transactionType == DATA_READ)
-			CacheRead(addr, cache_address);
+			CacheRead(trans.address, addr, cache_address);
 		else if(trans.transactionType == DATA_WRITE)
-			CacheWrite(addr, cache_address);
+			CacheWrite(trans.address, addr, cache_address);
 	}
 
 	if (!hit)
@@ -268,6 +277,7 @@ void HybridSystem::ProcessTransaction(DRAMSim::Transaction &trans)
 #endif
 
 		Pending p;
+		p.orig_addr = trans.address;
 		p.flash_addr = addr;
 		p.cache_addr = cache_address;
 		p.victim_tag = cur_line.tag;
@@ -368,7 +378,7 @@ void HybridSystem::LineRead(Pending p)
 	flash_pending[page_addr] = p;
 }
 
-void HybridSystem::CacheRead(uint64_t flash_addr, uint64_t cache_addr)
+void HybridSystem::CacheRead(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr)
 {
 #if DEBUG_CACHE
 	cout << currentClockCycle << ": " << "Performing CACHE_READ for (" << flash_addr << ", " << cache_addr << ")\n";
@@ -383,13 +393,14 @@ void HybridSystem::CacheRead(uint64_t flash_addr, uint64_t cache_addr)
 	// Add a record in the DRAM's pending table.
 	Pending p;
 	p.op = CACHE_READ;
+	p.orig_addr = orig_addr;
 	p.flash_addr = flash_addr;
 	p.cache_addr = cache_addr;
 	p.type = DATA_READ;
 	dram_pending[cache_addr] = p;
 }
 
-void HybridSystem::CacheWrite(uint64_t flash_addr, uint64_t cache_addr)
+void HybridSystem::CacheWrite(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr)
 {
 #if DEBUG_CACHE
 	cout << currentClockCycle << ": " << "Performing CACHE_WRITE for (" << flash_addr << ", " << cache_addr << ")\n";
@@ -416,15 +427,16 @@ void HybridSystem::CacheWrite(uint64_t flash_addr, uint64_t cache_addr)
 	if (WriteDone != NULL)
 	{
 		// Call the callback.
-		(*WriteDone)(systemID, flash_addr, currentClockCycle);
+		(*WriteDone)(systemID, orig_addr, currentClockCycle);
 	}
 
 	// Erase the page from the pending set.
 	int num = pending_pages.erase(PAGE_ADDRESS(flash_addr));
 	if (num != 1)
 	{
-		cout << "pending_pages.erase() was called after CACHE_WRITE and num was 0.\n\n";
-		exit(1);
+		cout << "pending_pages.erase() was called after CACHE_WRITE and num was 0.\n";
+		cout << "orig:" << orig_addr << " aligned:" << flash_addr << "\n\n";
+		abort();
 	}
 }
 
@@ -493,15 +505,16 @@ void HybridSystem::DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle)
 			if (ReadDone != NULL)
 			{
 				// Call the callback.
-				(*ReadDone)(systemID, addr, cycle);
+				(*ReadDone)(systemID, p.orig_addr, cycle);
 			}
 
 			// Erase the page from the pending set.
 			int num = pending_pages.erase(PAGE_ADDRESS(p.flash_addr));
 			if (num != 1)
 			{
-				cout << "pending_pages.erase() was called after CACHE_READ and num was 0.\n\n";
-				exit(1);
+				cout << "pending_pages.erase() was called after CACHE_READ and num was 0.\n";
+				cout << "orig:" << p.orig_addr << " aligned:" << p.flash_addr << "\n\n";
+				abort();
 			}
 		}
 	}
@@ -560,9 +573,9 @@ void HybridSystem::FlashReadCallback(uint id, uint64_t addr, uint64_t cycle)
 
 			// Schedule the final operation (CACHE_READ or CACHE_WRITE)
 			if (p.type == DATA_READ)
-				CacheRead(p.flash_addr, p.cache_addr);
+				CacheRead(p.orig_addr, p.flash_addr, p.cache_addr);
 			else if(p.type == DATA_WRITE)
-				CacheWrite(p.flash_addr, p.cache_addr);
+				CacheWrite(p.orig_addr, p.flash_addr, p.cache_addr);
 			
 		}
 	}
@@ -606,6 +619,12 @@ uint64_t HybridSystem::get_hit()
 {
 	list<uint64_t> valid_pages = get_valid_pages();
 
+	if (valid_pages.size() == 0)
+	{
+		cout << "valid pages list is empty.\n";
+		abort();
+	}
+
 	// Pick an element number to grab.
 	int size = valid_pages.size();
 	//cout << "size=" << size << "\n";
@@ -637,7 +656,7 @@ uint64_t HybridSystem::get_hit()
 	if (!is_hit(ret_addr))
 	{
 		cout << "get_hit generated a non-hit!!\n";
-		exit(1);
+		abort();
 	}
 
 	return ret_addr;
@@ -650,7 +669,7 @@ bool HybridSystem::is_hit(uint64_t address)
 	if (addr >= (TOTAL_PAGES * PAGE_SIZE))
 	{
 		cout << "ERROR: Address out of bounds" << endl;
-		exit(1);
+		abort();
 	}
 
 	// Compute the set number and tag
