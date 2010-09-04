@@ -1,20 +1,21 @@
 #include "HybridSystem.h"
 
-using namespace HybridSim;
 using namespace std;
 
+namespace HybridSim {
 
 HybridSystem::HybridSystem(uint id)
 {
 	systemID = id;
 	cout << "Creating DRAM\n";
-	dram = new DRAMSim::MemorySystem(0, dram_ini, sys_ini, ".", "resultsfilename"); 
+	//dram = new DRAMSim::MemorySystem(0, dram_ini, sys_ini, ".", "resultsfilename"); 
+	dram = DRAMSim::getMemorySystemInstance(0, dram_ini, sys_ini, "../HybridSim", "resultsfilename"); 
 
 	cout << "Creating Flash\n";
 #if FDSIM
-	flash = new FDSim::FlashDIMM(1,"ini/samsung_K9XXG08UXM.ini","ini/def_system.ini",".","");
+	flash = new FDSim::FlashDIMM(1,"ini/samsung_K9XXG08UXM.ini","ini/def_system.ini","../HybridSim","");
 #else
-	flash = new DRAMSim::MemorySystem(1, flash_ini, sys_ini, ".", "resultsfilename"); 
+	flash = DRAMSim::getMemorySystemInstance(1, flash_ini, sys_ini, "../HybridSim", "resultsfilename2"); 
 #endif
 	cout << "Done with creating memories\n";
 
@@ -48,6 +49,7 @@ void HybridSystem::update()
 {
 	// Process the transaction queue.
 	// This will fill the dram_queue and flash_queue.
+
 	//if (trans_queue.size() > 0)
 	//if (currentClockCycle % 1000 == 0)
 	if (false)
@@ -60,7 +62,7 @@ void HybridSystem::update()
 //			cout << " " << *it;
 //		}
 		cout << ")\n(";
-		list<Transaction>::iterator it2;
+		list<DRAMSim::Transaction>::iterator it2;
 		for (it2=trans_queue.begin(); it2 != trans_queue.end(); ++it2)
 		{
 			cout << " " << (*it2).address;
@@ -69,7 +71,7 @@ void HybridSystem::update()
 		cout << "dram_queue=" << dram_queue.size() << " flash_queue=" << flash_queue.size() << "\n";
 		cout << "dram_pending=" << dram_pending.size() << " flash_pending=" << flash_pending.size() << "\n\n";
 	}
-	list<Transaction>::iterator it = trans_queue.begin();
+	list<DRAMSim::Transaction>::iterator it = trans_queue.begin();
 	//while(!trans_queue.empty())
 	//for (list<Transaction>::iterator it = trans_queue.begin(); it != trans_queue.end(); ++it)
 	while(it != trans_queue.end())
@@ -83,7 +85,7 @@ void HybridSystem::update()
 		if (pending_pages.count(page_addr) == 0)
 		//if (true)
 		{
-	//		cout << "PAGE NOT IN PENDING" << page_addr << "\n";
+			//cout << "PAGE NOT IN PENDING" << page_addr << "\n";
 			// Add to the pending 
 			pending_pages.insert(page_addr);
 
@@ -106,7 +108,13 @@ void HybridSystem::update()
 	bool not_full = true;
 	while(not_full && !dram_queue.empty())
 	{
-		not_full = dram->addTransaction(dram_queue.front());
+		DRAMSim::Transaction tmp = dram_queue.front();
+		bool isWrite;
+		if (tmp.transactionType == DATA_WRITE)
+			isWrite = true;
+		else
+			isWrite = false;
+		not_full = dram->addTransaction(isWrite, tmp.address);
 		if (not_full)
 			dram_queue.pop_front();
 	}
@@ -121,7 +129,14 @@ void HybridSystem::update()
 		FDSim::FlashTransaction ft = FDSim::FlashTransaction(static_cast<FDSim::TransactionType>(t.transactionType), t.address, t.data);
 		not_full = flash->add(ft);
 #else
-		not_full = flash->addTransaction(flash_queue.front());
+		//not_full = flash->addTransaction(flash_queue.front());
+		DRAMSim::Transaction tmp = flash_queue.front();
+		bool isWrite;
+		if (tmp.transactionType == DATA_WRITE)
+			isWrite = true;
+		else
+			isWrite = false;
+		not_full = flash->addTransaction(isWrite, tmp.address);
 #endif
 		if (not_full)
 			flash_queue.pop_front();
@@ -150,7 +165,7 @@ bool HybridSystem::addTransaction(bool isWrite, uint64_t addr)
 	return addTransaction(t);
 }
 
-bool HybridSystem::addTransaction(Transaction &trans)
+bool HybridSystem::addTransaction(DRAMSim::Transaction &trans)
 {
 	//cout << "enter HybridSystem::addTransaction\n";
 	trans_queue.push_back(trans);
@@ -166,7 +181,7 @@ bool HybridSystem::WillAcceptTransaction()
 	return true;
 }
 
-void HybridSystem::ProcessTransaction(Transaction &trans)
+void HybridSystem::ProcessTransaction(DRAMSim::Transaction &trans)
 {
 	uint64_t addr = ALIGN(trans.address);
 #if DEBUG_CACHE
@@ -414,8 +429,8 @@ void HybridSystem::CacheWrite(uint64_t flash_addr, uint64_t cache_addr)
 }
 
 void HybridSystem::RegisterCallbacks(
-	    DRAMSim::TransactionCompleteCB *readDone,
-	    DRAMSim::TransactionCompleteCB *writeDone,
+	    TransactionCompleteCB *readDone,
+	    TransactionCompleteCB *writeDone,
 	    void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower))
 {
 	// Save the external callbacks.
@@ -560,7 +575,7 @@ void HybridSystem::FlashWriteCallback(uint id, uint64_t addr, uint64_t cycle)
 
 void HybridSystem::printStats() 
 {
-	dram->printStats();
+	//dram->printStats();
 }
 
 string HybridSystem::SetOutputFileName(string tracefilename) { return ""; }
@@ -679,3 +694,5 @@ bool HybridSystem::is_hit(uint64_t address)
 	return hit;
 
 }
+
+} // Namespace HybridSim

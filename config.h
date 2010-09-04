@@ -4,7 +4,7 @@
 // Default values for alternate code.
 #define DEBUG_CACHE 0
 #define SINGLE_WORD 0
-#define FDSIM 1
+#define FDSIM 0
 
 #include <iostream>
 #include <string>
@@ -17,12 +17,20 @@
 #include <ctime>
 #include <stdint.h>
 
-#include <DRAMSim/MemorySystem.h>
-//#include <DRAMSim/DRAMSim.h>
+//#include <MemorySystem.h>
+#include <DRAMSim.h>
+
+// Additional things I reuse from DRAMSim repo (for internal use only).
+#include <Transaction.h>
+#include <SimulatorObject.h>
+using DRAMSim::SimulatorObject;
+using DRAMSim::TransactionType;
+using DRAMSim::DATA_READ;
+using DRAMSim::DATA_WRITE;
 
 #if FDSIM
 //#include "FDSim.h"
-#include <FlashDIMMSim/FlashDIMM.h>
+#include <FlashDIMM.h>
 #endif
 
 using namespace std;
@@ -30,15 +38,15 @@ using namespace std;
 // GLOBAL CONSTANTS (move to ini file eventually)
 
 const uint64_t WORD_SIZE = 8; // This should never change, but is just paranoia just in case we need 32-bit words.
-const uint64_t PAGE_SIZE = 16 * 1024; // in bytes, so divide this by 64 to get the number of DDR3 transfers per page
+const uint64_t PAGE_SIZE = 1024; // in bytes, so divide this by 64 to get the number of DDR3 transfers per page
 const uint64_t SET_SIZE = 64; // associativity of cache
 
 const uint64_t BURST_SIZE = 64; // number of bytes in a single transaction, this means with PAGE_SIZE=1024, 16 transactions are needed
 
 // Number of pages total and number of pages in the cache
-const uint64_t TOTAL_PAGES = 2097152 / 16; // 2 GB
+const uint64_t TOTAL_PAGES = 2097152; // 2 GB
 //const uint64_t TOTAL_PAGES = 4194304; // 4 GB
-const uint64_t CACHE_PAGES = 1048576 / 16; // 1 GB
+const uint64_t CACHE_PAGES = 1048576; // 1 GB
 
 // INI files
 const string dram_ini = "ini/DDR3_micron_8M_8B_x8_sg15.ini";

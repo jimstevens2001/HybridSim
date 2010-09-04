@@ -4,6 +4,7 @@
 //#include <FlashDIMMSim/FlashDIMM.h>
 
 #include "config.h"
+#include "CallbackHybrid.h"
 
 namespace HybridSim
 {
@@ -13,11 +14,11 @@ namespace HybridSim
 		HybridSystem(uint id);
 		void update();
 		bool addTransaction(bool isWrite, uint64_t addr);
-		bool addTransaction(Transaction &trans);
+		bool addTransaction(DRAMSim::Transaction &trans);
 		bool WillAcceptTransaction();
 		void RegisterCallbacks(
-			    DRAMSim::TransactionCompleteCB *readDone,
-			    DRAMSim::TransactionCompleteCB *writeDone,
+			    TransactionCompleteCB *readDone,
+			    TransactionCompleteCB *writeDone,
 			    void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower));
 		void DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle);
 		void DRAMWriteCallback(uint id, uint64_t addr, uint64_t cycle);
@@ -27,7 +28,6 @@ namespace HybridSim
 		void printStats();
 		string SetOutputFileName(string tracefilename);
 
-		HybridSystem *getMemorySystemInstance(uint id);
 
 		// Functions that schedule pending operations (second part to these operations is in the callbacks).
 //		void VictimRead(uint64_t flash_addr, uint64_t victim_cache_addr, uint64_t victim_tag, TransactionType type);
@@ -49,8 +49,8 @@ namespace HybridSim
 		list<uint64_t> get_valid_pages();
 
 		// State
-		DRAMSim::TransactionCompleteCB *ReadDone;
-		DRAMSim::TransactionCompleteCB *WriteDone;
+		TransactionCompleteCB *ReadDone;
+		TransactionCompleteCB *WriteDone;
 		uint systemID;
 
 		DRAMSim::MemorySystem *dram;
@@ -68,11 +68,13 @@ namespace HybridSim
 
 		set<uint64_t> pending_pages; // If a page is in the pending set, then skip subsequent transactions to the page.
 
-		list<Transaction> trans_queue; // Entry queue for the cache controller.
-		list<Transaction> dram_queue; // Buffer to wait for DRAM
-		list<Transaction> flash_queue; // Buffer to wait for Flash
+		list<DRAMSim::Transaction> trans_queue; // Entry queue for the cache controller.
+		list<DRAMSim::Transaction> dram_queue; // Buffer to wait for DRAM
+		list<DRAMSim::Transaction> flash_queue; // Buffer to wait for Flash
 
 	};
+
+	HybridSystem *getMemorySystemInstance(uint id);
 
 }
 

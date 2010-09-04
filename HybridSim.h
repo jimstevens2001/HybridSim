@@ -30,7 +30,7 @@
  */
 #include <stdint.h>
 #include <string>
-#include "Callback.h"
+#include "CallbackHybrid.h"
 using std::string;
 
 namespace HybridSim 
@@ -47,7 +47,6 @@ namespace HybridSim
 				TransactionCompleteCB *writeDone,
 				void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower));
 	};
-	//HybridSystem *getMemorySystemInstance(uint id, string dev, string sys, string pwd, string trc);
 	HybridSystem *getMemorySystemInstance(uint id);
 }
 

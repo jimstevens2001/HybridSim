@@ -32,7 +32,7 @@ int complete = 0;
 
 int main()
 {
-	printf("dramsim_test main()\n");
+	printf("hybridsim_test main()\n");
 	some_object obj;
 	obj.add_one_and_run();
 }
@@ -64,6 +64,7 @@ int some_object::add_one_and_run()
 
 
 	/* create and register our callback functions */
+	typedef CallbackBase<void,uint,uint64_t,uint64_t> Callback_t;
 	Callback_t *read_cb = new Callback<some_object, void, uint, uint64_t, uint64_t>(this, &some_object::read_complete);
 	Callback_t *write_cb = new Callback<some_object, void, uint, uint64_t, uint64_t>(this, &some_object::write_complete);
 	mem->RegisterCallbacks(read_cb, write_cb, power_callback);
@@ -74,14 +75,14 @@ int some_object::add_one_and_run()
 	uint64_t num_init = 10000;
 	for (uint64_t i=0; i<num_init; i++)
 	{
-		Transaction t = Transaction(DATA_READ, i*PAGE_SIZE, NULL);
+		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_READ, i*PAGE_SIZE, NULL);
 		//cout << i << "calling HybridSystem::addTransaction\n";
 		mem->addTransaction(t);
 		if (i%10000 == 0)
 			cout << i << "/" << num_init << endl;
 	}
 	cout << "Running transactions to preload cache with data...\n";
-	int factor = 10000;
+	int factor = 1000;
 	for (uint64_t i=0; i<num_init*factor; i++)
 	{
 		mem->update();
@@ -94,6 +95,7 @@ int some_object::add_one_and_run()
 	const uint64_t NUM_ACCESSES = 1000;
 	const int MISS_RATE = 10;
 
+	cout << "Starting miss rate test...\n";
 	for (uint64_t i=0; i<NUM_ACCESSES; i++)
 	{
 		TransactionType type = DATA_READ;
@@ -125,7 +127,7 @@ int some_object::add_one_and_run()
 		//cur_addr = (cur_addr + PAGE_SIZE) % (TOTAL_PAGES * PAGE_SIZE);
 		
 
-		Transaction t = Transaction(type, cur_addr, NULL);
+		DRAMSim::Transaction t = DRAMSim::Transaction(type, cur_addr, NULL);
 		mem->addTransaction(t);
 
 #if DEBUG_CACHE

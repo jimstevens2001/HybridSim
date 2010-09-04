@@ -1,7 +1,4 @@
-# Specify include directory
-# This directory must contain symbolic links to DRAMSim and FlashDIMMSim
-# TODO: If the .so files for these are not already build, they will be by build.
-INCLUDEDIR=/home/jims/include
+# HybridSim build system
 
 ###################################################
 
@@ -19,10 +16,10 @@ ifdef PROFILE
 CXXFLAGS = -pg
 endif 
 
-DRAM_LIB=${INCLUDEDIR}/DRAMSim
-FLASH_LIB=${INCLUDEDIR}/FlashDIMMSim
+DRAM_LIB=../DRAMSim2
+FLASH_LIB=../FlashDIMMSim/src
 
-INCLUDES=${INCLUDEDIR}
+INCLUDES=-I$(DRAM_LIB) -I$(FLASH_LIB)
 LIBS=-L${DRAM_LIB} -L${FLASH_LIB} -ldramsim -lfdsim -Wl,-rpath=${DRAM_LIB} -Wl,-rpath=${FLASH_LIB} 
 
 EXE_NAME=HybridSim
@@ -50,16 +47,16 @@ ${LIB_NAME}: ${POBJ}
 
 # build dependency list via gcc -M and save to a .dep file
 %.dep : %.cpp
-	@$(CXX) -I$(INCLUDES) -std=c++0x -M $(CXXFLAGS) $< > $@
+	@$(CXX) $(INCLUDES) -std=c++0x -M $(CXXFLAGS) $< > $@
 
 # build all .cpp files to .o files
 %.o : %.cpp
-	g++ -g $(CXXFLAGS) -I$(INCLUDES) -std=c++0x -o $@ -c $<
+	g++ -g $(CXXFLAGS) $(INCLUDES) -std=c++0x -o $@ -c $<
 
 MBOBSim.o: TraceBasedSim.cpp
 	g++ ${CXXFLAGS} -DMBOB_SYSTEM -o $@ -c $<
 
 %.po : %.cpp
-	g++ -I$(INCLUDES) -std=c++0x -O3 -ffast-math -fPIC -DNO_OUTPUT -DNO_STORAGE -o $@ -c $<
+	g++ $(INCLUDES) -std=c++0x -O3 -ffast-math -fPIC -DNO_OUTPUT -DNO_STORAGE -o $@ -c $<
 clean: 
 	rm -rf ${REBUILDABLES} *.dep out results *.log callgrind*
