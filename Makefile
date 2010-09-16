@@ -2,19 +2,17 @@
 
 ###################################################
 
-
-CXXFLAGS= -O0 -DDEBUG_BUILD -DNO_STORAGE -Wall
-#CXXFLAGS= -O3 -DNO_OUTPUT -DNO_STORAGE -Wall
+CXXFLAGS=-DNO_STORAGE -Wall -DDEBUG_BUILD
+OPTFLAGS=-O3
 
 
 ifdef DEBUG
-ifeq (${DEBUG}, 0)
-CXXFLAGS= -O3 -DNO_STORAGE -DNO_OUTPUT -L
+ifeq ($(DEBUG), 1)
+OPTFLAGS= -O0 -g
 endif
 endif
-ifdef PROFILE
-CXXFLAGS = -pg
-endif 
+CXXFLAGS+=$(OPTFLAGS)
+
 
 DRAM_LIB=../DRAMSim2
 FLASH_LIB=../FlashDIMMSim/src
@@ -34,7 +32,7 @@ all: ${EXE_NAME}
 
 #   $@ target name, $^ target deps, $< matched pattern
 $(EXE_NAME): $(OBJ)
-	$(CXX) -g $(CXXFLAGS) ${LIBS} -o $@ $^ 
+	$(CXX) $(CXXFLAGS) ${LIBS} -o $@ $^ 
 	@echo "Built $@ successfully" 
 
 ${LIB_NAME}: ${POBJ}
@@ -51,7 +49,7 @@ ${LIB_NAME}: ${POBJ}
 
 # build all .cpp files to .o files
 %.o : %.cpp
-	g++ -g $(CXXFLAGS) $(INCLUDES) -std=c++0x -o $@ -c $<
+	g++ $(CXXFLAGS) $(INCLUDES) -std=c++0x -o $@ -c $<
 
 MBOBSim.o: TraceBasedSim.cpp
 	g++ ${CXXFLAGS} -DMBOB_SYSTEM -o $@ -c $<
