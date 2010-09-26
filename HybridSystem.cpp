@@ -312,10 +312,12 @@ void HybridSystem::VictimRead(Pending p)
 	dram_queue.push_back(t);
 #else
 	// Schedule reads for the entire page.
-	p.init_wait(p.cache_addr);
+	p.init_wait();
 	for(uint64_t i=0; i<PAGE_SIZE/BURST_SIZE; i++)
 	{
-		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_READ, p.cache_addr + i*BURST_SIZE, NULL);
+		uint64_t addr = p.cache_addr + i*BURST_SIZE;
+		p.insert_wait(addr);
+		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_READ, addr, NULL);
 		dram_queue.push_back(t);
 	}
 #endif
@@ -341,9 +343,9 @@ void HybridSystem::VictimWrite(Pending p)
 	flash_queue.push_back(t);
 #else
 	// Schedule reads for the entire page.
-	for(uint64_t i=0; i<PAGE_SIZE/BURST_SIZE; i++)
+	for(uint64_t i=0; i<PAGE_SIZE/FLASH_BURST_SIZE; i++)
 	{
-		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, victim_flash_addr + i*BURST_SIZE, NULL);
+		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, victim_flash_addr + i*FLASH_BURST_SIZE, NULL);
 		flash_queue.push_back(t);
 	}
 #endif
@@ -365,10 +367,12 @@ void HybridSystem::LineRead(Pending p)
 	flash_queue.push_back(t);
 #else
 	// Schedule reads for the entire page.
-	p.init_wait(page_addr);
-	for(uint64_t i=0; i<PAGE_SIZE/BURST_SIZE; i++)
+	p.init_wait();
+	for(uint64_t i=0; i<PAGE_SIZE/FLASH_BURST_SIZE; i++)
 	{
-		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_READ, page_addr + i*BURST_SIZE, NULL);
+		uint64_t addr = page_addr + i*FLASH_BURST_SIZE;
+		p.insert_wait(addr);
+		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_READ, addr, NULL);
 		flash_queue.push_back(t);
 	}
 #endif

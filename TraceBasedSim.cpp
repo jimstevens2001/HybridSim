@@ -94,7 +94,9 @@ int some_object::add_one_and_run()
 	{
 		mem->update();
 		if (i%1000000 == 0)
+		{
 			cout << i << "/" << num_init*factor << endl;
+		}
 	}
 
 	uint64_t cur_addr = 0;

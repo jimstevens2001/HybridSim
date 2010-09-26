@@ -4,7 +4,7 @@
 // Default values for alternate code.
 #define DEBUG_CACHE 0
 #define SINGLE_WORD 0
-#define FDSIM 0
+#define FDSIM 1
 
 #include <iostream>
 #include <string>
@@ -38,15 +38,16 @@ using namespace std;
 // GLOBAL CONSTANTS (move to ini file eventually)
 
 const uint64_t WORD_SIZE = 8; // This should never change, but is just paranoia just in case we need 32-bit words.
-const uint64_t PAGE_SIZE = 1024; // in bytes, so divide this by 64 to get the number of DDR3 transfers per page
+const uint64_t PAGE_SIZE = 1024*4; // in bytes, so divide this by 64 to get the number of DDR3 transfers per page
 const uint64_t SET_SIZE = 64; // associativity of cache
 
 const uint64_t BURST_SIZE = 64; // number of bytes in a single transaction, this means with PAGE_SIZE=1024, 16 transactions are needed
+const uint64_t FLASH_BURST_SIZE = 4096; // number of bytes in a single flash transaction
 
 // Number of pages total and number of pages in the cache
-const uint64_t TOTAL_PAGES = 2097152; // 2 GB
+const uint64_t TOTAL_PAGES = 2097152/4; // 2 GB
 //const uint64_t TOTAL_PAGES = 4194304; // 4 GB
-const uint64_t CACHE_PAGES = 1048576; // 1 GB
+const uint64_t CACHE_PAGES = 1048576/4; // 1 GB
 
 // INI files
 const string dram_ini = "ini/DDR3_micron_8M_8B_x8_sg15.ini";
@@ -105,24 +106,18 @@ class Pending
 	Pending() : op(VICTIM_READ), flash_addr(0), cache_addr(0), victim_tag(0), type(DATA_READ), wait(0) {};
         string str() { stringstream out; out << "O=" << op << " F=" << flash_addr << " C=" << cache_addr << " V=" << victim_tag 
 		<< " T=" << type; return out.str(); }
-	void init_wait(uint64_t base)
+
+	void init_wait()
 	{
 		wait = new unordered_set<uint64_t>;
 
-#if DEBUG_CACHE
-		cout << "initializing wait set\n";
-#endif
-		for (uint64_t i=0; i < PAGE_SIZE/BURST_SIZE; i++)
-		{
-#if DEBUG_CACHE
-			cout << base+i*BURST_SIZE << " ";
-#endif
-			wait->insert(base+i*BURST_SIZE);
-		}
-#if DEBUG_CACHE
-		cout << "\n\n";
-#endif
 	}
+
+	void insert_wait(uint64_t n)
+	{
+		wait->insert(n);
+	}
+
 	void delete_wait()
 	{
 		delete wait;
