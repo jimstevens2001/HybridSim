@@ -31,6 +31,8 @@ using DRAMSim::DATA_WRITE;
 #if FDSIM
 //#include "FDSim.h"
 #include <FlashDIMM.h>
+#elseif NVDSIM
+#include <NVDIMM.h>
 #endif
 
 using namespace std;

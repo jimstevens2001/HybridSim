@@ -57,6 +57,8 @@ namespace HybridSim
 
 #if FDSIM
 		FDSim::FlashDIMM *flash;
+#elseif NVDSIM
+		NVDSim::NVDIMM *flash;
 #else
 		DRAMSim::MemorySystem *flash;
 #endif

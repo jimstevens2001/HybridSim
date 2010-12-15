@@ -14,6 +14,8 @@ HybridSystem::HybridSystem(uint id)
 	cout << "Creating Flash\n";
 #if FDSIM
 	flash = new FDSim::FlashDIMM(1,"ini/samsung_K9XXG08UXM.ini","ini/def_system.ini","../HybridSim","");
+#elseif NVDSIM
+	flash = new NVDSim::NVDIMM(1,"ini/samsung_K9XXG08UXM.ini","ini/def_system.ini","../HybridSim","");
 #else
 	flash = DRAMSim::getMemorySystemInstance(1, flash_ini, sys_ini, "../HybridSim", "resultsfilename2"); 
 #endif
