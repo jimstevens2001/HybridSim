@@ -5,6 +5,7 @@
 #define DEBUG_CACHE 0
 #define SINGLE_WORD 0
 #define FDSIM 1
+#define NVDSIM 2
 
 #include <iostream>
 #include <string>
@@ -31,7 +32,7 @@ using DRAMSim::DATA_WRITE;
 #if FDSIM
 //#include "FDSim.h"
 #include <FlashDIMM.h>
-#elseif NVDSIM
+#elif NVDSIM
 #include <NVDIMM.h>
 #endif
 
