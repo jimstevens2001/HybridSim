@@ -2,8 +2,8 @@
 
 ###################################################
 
-CXXFLAGS=-DNO_STORAGE -Wall -DDEBUG_BUILD
-OPTFLAGS=-O3
+CXXFLAGS=-m64 -DNO_STORAGE -Wall -DDEBUG_BUILD
+OPTFLAGS=-m64 -O3
 
 
 ifdef DEBUG
@@ -19,10 +19,10 @@ FLASH_LIB=../FlashDIMMSim/src
 NV_LIB=../NVDIMMSim/src
 
 INCLUDES=-I$(DRAM_LIB) -I$(FLASH_LIB) -I$(NV_LIB)
-LIBS=-L${DRAM_LIB} -L${FLASH_LIB} -L${NV_LIB} -ldramsim -lfdsim -lnvsim -Wl,-rpath=${DRAM_LIB} -Wl,-rpath=${FLASH_LIB} -Wl, -rpath=${NV_LIB}
+LIBS=-L${DRAM_LIB} -L${FLASH_LIB} -L${NV_LIB} -ldramsim -lfdsim -lnvdsim -Wl,-rpath=${DRAM_LIB} -Wl,-rpath=${FLASH_LIB} -Wl,-rpath=${NV_LIB}
 
-EXE_NAME=HybridSim
-LIB_NAME=libhybridsim.so
+EXE_NAME=NVHybridSim
+LIB_NAME=libnvhybridsim.so
 
 SRC = $(wildcard *.cpp)
 OBJ = $(addsuffix .o, $(basename $(SRC)))
