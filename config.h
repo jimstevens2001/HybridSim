@@ -59,7 +59,7 @@ const uint64_t CACHE_PAGES = 1048576/4; // 1 GB
 
 // INI files
 const string dram_ini = "ini/DDR3_micron_8M_8B_x8_sg15.ini";
-const string flash_ini = "ini/DDR3_micron_16M_8B_x8_sg15.ini";
+const string flash_ini = "ini/samsung_K9XXG08UXM(mod).ini";
 const string sys_ini = "ini/system.ini";
 
 
