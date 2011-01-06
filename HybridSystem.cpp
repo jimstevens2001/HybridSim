@@ -34,6 +34,11 @@ HybridSystem::HybridSystem(uint id)
 	FDSim::Callback_t *f_read_cb = new fdsim_callback_t(this, &HybridSystem::FlashReadCallback);
 	FDSim::Callback_t *f_write_cb = new fdsim_callback_t(this, &HybridSystem::FlashWriteCallback);
 	flash->RegisterCallbacks(f_read_cb, f_write_cb);
+#elif NVDSIM
+	typedef NVDSim::Callback <HybridSystem, void, uint, uint64_t, uint64_t> nvdsim_callback_t;
+	NVDSim::Callback_t *nv_read_cb = new nvdsim_callback_t(this, &HybridSystem::FlashReadCallback);
+	NVDSim::Callback_t *nv_write_cb = new nvdsim_callback_t(this, &HybridSystem::FlashWriteCallback);
+	flash->RegisterCallbacks(nv_read_cb, nv_write_cb);
 #else
 	read_cb = new dramsim_callback_t(this, &HybridSystem::FlashReadCallback);
 	write_cb = new dramsim_callback_t(this, &HybridSystem::FlashWriteCallback);
@@ -131,6 +136,11 @@ void HybridSystem::update()
 		// put some code to deal with FDSim interactions here
 		DRAMSim::Transaction t = flash_queue.front();
 		FDSim::FlashTransaction ft = FDSim::FlashTransaction(static_cast<FDSim::TransactionType>(t.transactionType), t.address, t.data);
+		not_full = flash->add(ft);
+#elif NVDSIM
+		// put some code to deal with NVDSim interactions here
+		DRAMSim::Transaction t = flash_queue.front();
+		NVDSim::FlashTransaction ft = NVDSim::FlashTransaction(static_cast<NVDSim::TransactionType>(t.transactionType), t.address, t.data);
 		not_full = flash->add(ft);
 #else
 		//not_full = flash->addTransaction(flash_queue.front());
@@ -622,6 +632,7 @@ list<uint64_t> HybridSystem::get_valid_pages()
 	return valid_pages;
 }
 
+// TODO: probably need to change these computations to work on a finer granularity than pages
 uint64_t HybridSystem::get_hit()
 {
 	list<uint64_t> valid_pages = get_valid_pages();
@@ -669,6 +680,7 @@ uint64_t HybridSystem::get_hit()
 	return ret_addr;
 }
 
+// TODO: probably need to change these computations to work on a finer granularity than pages
 bool HybridSystem::is_hit(uint64_t address)
 {
 	uint64_t addr = ALIGN(address);
