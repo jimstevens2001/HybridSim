@@ -139,6 +139,7 @@ void HybridSystem::update()
 		not_full = flash->add(ft);
 #elif NVDSIM
 		// put some code to deal with NVDSim interactions here
+		cout << "adding a flash transaction" << endl;
 		DRAMSim::Transaction t = flash_queue.front();
 		NVDSim::FlashTransaction ft = NVDSim::FlashTransaction(static_cast<NVDSim::TransactionType>(t.transactionType), t.address, t.data);
 		not_full = flash->add(ft);
@@ -152,8 +153,10 @@ void HybridSystem::update()
 			isWrite = false;
 		not_full = flash->addTransaction(isWrite, tmp.address);
 #endif
-		if (not_full)
+		if (not_full){
 			flash_queue.pop_front();
+			cout << "popping front of flash queue" << endl;
+		}
 	}
 
 	// Update the memories.
