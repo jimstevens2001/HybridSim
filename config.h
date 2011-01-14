@@ -2,7 +2,7 @@
 #define CONFIG_H
 
 // Default values for alternate code.
-#define DEBUG_CACHE 1
+#define DEBUG_CACHE 0
 #define SINGLE_WORD 0
 #define FDSIM 0
 #define NVDSIM 1
@@ -40,11 +40,10 @@ using namespace std;
 
 // GLOBAL CONSTANTS (move to ini file eventually)
 
-#if FDSIM
-// these values are specified in the ini file of the nvdimm so we only need them for FlashDIMMs
+// these values are also specified in the ini file of the nvdimm but have a different name
 const uint64_t WORD_SIZE = 8; // This should never change, but is just paranoia just in case we need 32-bit words.
 const uint64_t PAGE_SIZE = 1024*4; // in bytes, so divide this by 64 to get the number of DDR3 transfers per page
-#endif
+
 
 
 const uint64_t SET_SIZE = 64; // associativity of cache

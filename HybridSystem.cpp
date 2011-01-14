@@ -139,9 +139,10 @@ void HybridSystem::update()
 		not_full = flash->add(ft);
 #elif NVDSIM
 		// put some code to deal with NVDSim interactions here
-		cout << "adding a flash transaction" << endl;
+		//cout << "adding a flash transaction" << endl;
 		DRAMSim::Transaction t = flash_queue.front();
 		NVDSim::FlashTransaction ft = NVDSim::FlashTransaction(static_cast<NVDSim::TransactionType>(t.transactionType), t.address, t.data);
+		//cout << "the address sent to flash was " << t.address << endl;
 		not_full = flash->add(ft);
 #else
 		//not_full = flash->addTransaction(flash_queue.front());
@@ -155,7 +156,7 @@ void HybridSystem::update()
 #endif
 		if (not_full){
 			flash_queue.pop_front();
-			cout << "popping front of flash queue" << endl;
+			//cout << "popping front of flash queue" << endl;
 		}
 	}
 
@@ -547,6 +548,11 @@ void HybridSystem::DRAMWriteCallback(uint id, uint64_t addr, uint64_t cycle)
 
 void HybridSystem::FlashReadCallback(uint id, uint64_t addr, uint64_t cycle)
 {
+	cout << "flash read callback arrives" << endl;
+	cout << "flash address was " << addr << endl;
+	cout << "flash cycle was " << cycle << endl;
+	cout << "flash id was " << id << endl;
+	cout << flash_pending.count(PAGE_ADDRESS(addr)) << endl;
 	if (flash_pending.count(PAGE_ADDRESS(addr)) != 0)
 	{
 		// Get the pending object.
@@ -598,6 +604,9 @@ void HybridSystem::FlashReadCallback(uint id, uint64_t addr, uint64_t cycle)
 				CacheWrite(p.orig_addr, p.flash_addr, p.cache_addr);
 			
 		}
+	}
+	else{
+		cout << "we had a 0 address the skipped all of the pending operations" << endl;
 	}
 }
 

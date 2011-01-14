@@ -129,6 +129,6 @@ TraceBasedSim.o: TraceBasedSim.cpp TraceBasedSim.h HybridSystem.h \
  /usr/include/bits/posix2_lim.h /usr/include/bits/xopen_lim.h \
  ../NVDIMMSim/src/Controller.h ../NVDIMMSim/src/Die.h \
  ../NVDIMMSim/src/ChannelPacket.h ../NVDIMMSim/src/Plane.h \
- ../NVDIMMSim/src/Block.h ../NVDIMMSim/src/Page.h \
- ../NVDIMMSim/src/Channel.h ../NVDIMMSim/src/FlashTransaction.h \
- ../NVDIMMSim/src/Ftl.h ../NVDIMMSim/src/Callbacks.h CallbackHybrid.h
+ ../NVDIMMSim/src/Block.h ../NVDIMMSim/src/Page.h ../NVDIMMSim/src/Ftl.h \
+ ../NVDIMMSim/src/FlashTransaction.h ../NVDIMMSim/src/Channel.h \
+ ../NVDIMMSim/src/Callbacks.h CallbackHybrid.h
