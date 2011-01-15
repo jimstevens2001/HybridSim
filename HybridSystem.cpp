@@ -548,11 +548,6 @@ void HybridSystem::DRAMWriteCallback(uint id, uint64_t addr, uint64_t cycle)
 
 void HybridSystem::FlashReadCallback(uint id, uint64_t addr, uint64_t cycle)
 {
-	cout << "flash read callback arrives" << endl;
-	cout << "flash address was " << addr << endl;
-	cout << "flash cycle was " << cycle << endl;
-	cout << "flash id was " << id << endl;
-	cout << flash_pending.count(PAGE_ADDRESS(addr)) << endl;
 	if (flash_pending.count(PAGE_ADDRESS(addr)) != 0)
 	{
 		// Get the pending object.
@@ -613,6 +608,10 @@ void HybridSystem::FlashReadCallback(uint id, uint64_t addr, uint64_t cycle)
 void HybridSystem::FlashWriteCallback(uint id, uint64_t addr, uint64_t cycle)
 {
 	// Nothing to do (it doesn't matter when the flash write finishes for the cache controller, as long as it happens).
+
+#if DEBUG_CACHE
+	cout << "The write to Flash line " << PAGE_ADDRESS(addr) << " has completed.\n";
+#endif
 }
 
 void HybridSystem::printStats() 
