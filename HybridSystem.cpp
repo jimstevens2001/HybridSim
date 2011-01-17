@@ -291,6 +291,7 @@ void HybridSystem::ProcessTransaction(DRAMSim::Transaction &trans)
 #if DEBUG_CACHE
 		cout << currentClockCycle << ": " << "MISS: victim is cache_address " << cache_address << endl;
 		cout << cur_line.str() << endl;
+		cout << currentClockCycle << ": " << "The victim is dirty? " << cur_line.dirty << endl;
 #endif
 
 		Pending p;
@@ -359,14 +360,14 @@ void HybridSystem::VictimWrite(Pending p)
 	DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, victim_flash_addr, NULL);
 	flash_queue.push_back(t);
 #else
-	// Schedule reads for the entire page.
+	// Schedule writes for the entire page.
 	for(uint64_t i=0; i<PAGE_SIZE/FLASH_BURST_SIZE; i++)
 	{
 		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, victim_flash_addr + i*FLASH_BURST_SIZE, NULL);
 		flash_queue.push_back(t);
 	}
 #endif
-
+	
 	// No pending event schedule necessary (might add later for debugging though).
 }
 
@@ -374,6 +375,7 @@ void HybridSystem::LineRead(Pending p)
 {
 #if DEBUG_CACHE
 	cout << currentClockCycle << ": " << "Performing LINE_READ for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
+	cout << "the page address was " << PAGE_ADDRESS(p.flash_addr) << endl;
 #endif
 
 	uint64_t page_addr = PAGE_ADDRESS(p.flash_addr);
@@ -611,6 +613,8 @@ void HybridSystem::FlashWriteCallback(uint id, uint64_t addr, uint64_t cycle)
 
 #if DEBUG_CACHE
 	cout << "The write to Flash line " << PAGE_ADDRESS(addr) << " has completed.\n";
+	//Remove this pending object from flash_pending
+	//flash_pending.erase(PAGE_ADDRESS(addr));
 #endif
 }
 

@@ -134,7 +134,7 @@ int some_object::add_one_and_run()
 	{
 		TransactionType type = DATA_WRITE;
 
-		cur_addr = (i*4096)*4096; //set size 64 so mod 64 should fill only one set	
+		cur_addr = 1073741824+((i*4096)*4096); //set size 64 so mod 64 should fill only one set	
 
 		DRAMSim::Transaction t = DRAMSim::Transaction(type, cur_addr, NULL);
 		mem->addTransaction(t);
@@ -154,7 +154,7 @@ int some_object::add_one_and_run()
 	cur_addr = 0;
 	
 	cout << "reading from flash... hopefully" << endl;
-	for (uint64_t i=0; i<NUM_ACCESSES; i++)
+	for (uint64_t i=0; i<100; i++)
 	  {
 	    TransactionType type = DATA_READ;
 
@@ -176,7 +176,7 @@ int some_object::add_one_and_run()
 	  }
 
 
-	for (int i=0; i<1000000; i++)
+	for (int i=0; i<50000000; i++)
 	{
 		mem->update();
 	}
