@@ -632,7 +632,7 @@ uint64_t HybridSystem::get_hit()
 	// Pick an element number to grab.
 	int size = valid_pages.size();
 	//cout << "size=" << size << "\n";
-	srand (time(NULL));
+	//srand (time(NULL)); // this causes the address to repeat
 	//cout << "pending=" << pending_pages.size() << " flash_pending size=" << flash_pending.size() << "\n";
 	int x = rand() % size;
 	//cout << "x=" << x << "\n";

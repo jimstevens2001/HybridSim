@@ -128,7 +128,15 @@ int some_object::add_one_and_run()
 		int k=0;
 		while(mem->is_hit(cur_addr) != want_hit)
 		{
-			cur_addr = (rand() % TOTAL_PAGES) * PAGE_SIZE;
+			if (want_hit)
+			{
+				cout << "This shouldn't happen!!!\n";
+				abort();
+				cur_addr = mem->get_hit();
+			}
+			else
+				cur_addr = (rand() % TOTAL_PAGES) * PAGE_SIZE;
+
 			k++;
 			cout << "k=" << k << " want_hit=" << want_hit << " cur_addr=" << cur_addr << " is_hit=" << mem->is_hit(cur_addr) << "\n";
 			
