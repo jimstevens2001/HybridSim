@@ -523,6 +523,7 @@ void HybridSystem::DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle)
 			{
 				// If not done with this line, then re-enter pending map.
 				dram_pending[PAGE_ADDRESS(addr)] = p;
+				dram_pending_set.erase(addr);
 				return;
 			}
 
