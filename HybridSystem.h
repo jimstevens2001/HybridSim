@@ -68,6 +68,15 @@ namespace HybridSim
 
 		set<uint64_t> pending_pages; // If a page is in the pending set, then skip subsequent transactions to the page.
 
+		set<uint64_t> pending_sets; // If a page is in the pending set, then skip subsequent transactions to the page.
+		int64_t pending_count;
+		set<uint64_t> dram_pending_set;
+		list<uint64_t> dram_bad_address;
+		uint64_t max_dram_pending;
+		uint64_t pending_sets_max;
+		uint64_t pending_pages_max;
+		uint64_t trans_queue_max;
+
 		list<DRAMSim::Transaction> trans_queue; // Entry queue for the cache controller.
 		list<DRAMSim::Transaction> dram_queue; // Buffer to wait for DRAM
 		list<DRAMSim::Transaction> flash_queue; // Buffer to wait for Flash

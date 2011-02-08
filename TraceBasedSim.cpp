@@ -82,14 +82,15 @@ int some_object::add_one_and_run()
 	uint64_t num_init = 10000;
 	for (uint64_t i=0; i<num_init; i++)
 	{
-		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_READ, i*PAGE_SIZE, NULL);
+		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, i*PAGE_SIZE, NULL);
 		//cout << i << "calling HybridSystem::addTransaction\n";
 		mem->addTransaction(t);
 		if (i%10000 == 0)
 			cout << i << "/" << num_init << endl;
 	}
+
 	cout << "Running transactions to preload cache with data...\n";
-	int factor = 1000;
+	int factor = 10;
 	for (uint64_t i=0; i<num_init*factor; i++)
 	{
 		mem->update();
@@ -159,7 +160,7 @@ int some_object::add_one_and_run()
 	}
 
 
-	for (int i=0; i<1000000; i++)
+	for (int i=0; i<10000000; i++)
 	{
 		mem->update();
 	}
@@ -169,6 +170,23 @@ int some_object::add_one_and_run()
 	cout << "dram_pending=" << mem->dram_pending.size() << " flash_pending=" << mem->flash_pending.size() << "\n\n";
 	cout << "dram_queue=" << mem->dram_queue.size() << " flash_queue=" << mem->flash_queue.size() << "\n\n";
 	cout << "pending_pages=" << mem->pending_pages.size() << "\n\n";
+	for (set<uint64_t>::iterator it = mem->pending_pages.begin(); it != mem->pending_pages.end(); it++)
+	{
+		cout << (*it) << " ";
+	}
+	cout << "\n\n";
+	cout << "pending_count=" << mem->pending_count << "\n\n";
+	cout << "dram_pending_set.size() =" << mem->dram_pending_set.size() << "\n\n";
+	cout << "dram_bad_address.size() = " << mem->dram_bad_address.size() << "\n";
+	for (list<uint64_t>::iterator it = mem->dram_bad_address.begin(); it != mem->dram_bad_address.end(); it++)
+	{
+		cout << (*it) << " ";
+	}
+	cout << "\n\n";
+	cout << "pending_sets.size() = " << mem->pending_sets.size() << "\n\n";
+	cout << "pending_sets_max = " << mem->pending_sets_max << "\n\n";
+	cout << "pending_pages_max = " << mem->pending_pages_max << "\n\n";
+	cout << "trans_queue_max = " << mem->trans_queue_max << "\n\n";
 
 	return 0;
 }
