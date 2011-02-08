@@ -422,6 +422,11 @@ void HybridSystem::CacheRead(uint64_t orig_addr, uint64_t flash_addr, uint64_t c
 	DRAMSim::Transaction t = DRAMSim::Transaction(DATA_READ, data_addr, NULL);
 	dram_queue.push_back(t);
 
+	// Update the cache state
+	cache_line cur_line = cache[cache_addr];
+	cur_line.ts = currentClockCycle;
+	cache[cache_addr] = cur_line;
+
 	// Add a record in the DRAM's pending table.
 	Pending p;
 	p.op = CACHE_READ;
