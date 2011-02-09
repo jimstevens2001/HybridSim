@@ -16,18 +16,23 @@ namespace HybridSim
 		bool addTransaction(bool isWrite, uint64_t addr);
 		bool addTransaction(DRAMSim::Transaction &trans);
 		bool WillAcceptTransaction();
-		void RegisterCallbacks(
+		/*void RegisterCallbacks(
 			    TransactionCompleteCB *readDone,
 			    TransactionCompleteCB *writeDone,
-			    void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower));
+			    void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower));*/
+		void RegisterCallbacks(
+			    TransactionCompleteCB *readDone,
+			    TransactionCompleteCB *writeDone);
 		void DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle);
 		void DRAMWriteCallback(uint id, uint64_t addr, uint64_t cycle);
+		void DRAMPowerCallback(double a, double b, double c, double d);
 		void FlashReadCallback(uint id, uint64_t addr, uint64_t cycle);
 		void FlashWriteCallback(uint id, uint64_t addr, uint64_t cycle);
-		void FlashIdlePower(uint id, vector<double> idle_energy, uint64_t cycle);
-		void FlashAccessPower(uint id, vector<double> access_energy, uint64_t cycle);
-		void FlashErasePower(uint id, vector<double> erase_energy, uint64_t cycle);
+		void FlashIdlePower(uint id, vector<double> i_energy, uint64_t cycle);
+		void FlashAccessPower(uint id, vector<double> a_energy, uint64_t cycle);
+		void FlashErasePower(uint id, vector<double> e_energy, uint64_t cycle);
 
+		void reportPower();
 		void printStats();
 		string SetOutputFileName(string tracefilename);
 
@@ -73,9 +78,23 @@ namespace HybridSim
 
 		set<uint64_t> pending_pages; // If a page is in the pending set, then skip subsequent transactions to the page.
 
+		set<uint64_t> pending_sets; // If a page is in the pending set, then skip subsequent transactions to the page.
+		int64_t pending_count;
+		set<uint64_t> dram_pending_set;
+		list<uint64_t> dram_bad_address;
+		uint64_t max_dram_pending;
+		uint64_t pending_sets_max;
+		uint64_t pending_pages_max;
+		uint64_t trans_queue_max;
+
 		list<DRAMSim::Transaction> trans_queue; // Entry queue for the cache controller.
 		list<DRAMSim::Transaction> dram_queue; // Buffer to wait for DRAM
 		list<DRAMSim::Transaction> flash_queue; // Buffer to wait for Flash
+
+		//Power system variables
+		vector<double> idle_energy;
+		vector<double> access_energy;
+		vector<double> erase_energy;
 
 	};
 

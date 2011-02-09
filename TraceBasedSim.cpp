@@ -51,10 +51,10 @@ void some_object::write_complete(uint id, uint64_t address, uint64_t clock_cycle
 }
 
 /* FIXME: this may be broken, currently */
-void power_callback(double a, double b, double c, double d)
+/*void power_callback(double a, double b, double c, double d)
 {
 	printf("power callback: %0.3f, %0.3f, %0.3f, %0.3f\n",a,b,c,d);
-}
+}*/
 
 int some_object::add_one_and_run()
 {
@@ -67,7 +67,7 @@ int some_object::add_one_and_run()
 	typedef CallbackBase<void,uint,uint64_t,uint64_t> Callback_t;
 	Callback_t *read_cb = new Callback<some_object, void, uint, uint64_t, uint64_t>(this, &some_object::read_complete);
 	Callback_t *write_cb = new Callback<some_object, void, uint, uint64_t, uint64_t>(this, &some_object::write_complete);
-	mem->RegisterCallbacks(read_cb, write_cb, power_callback);
+	mem->RegisterCallbacks(read_cb, write_cb);
 
 	srand (time(NULL));
 
@@ -82,15 +82,16 @@ int some_object::add_one_and_run()
 	uint64_t num_init = 10000;
 	/*for (uint64_t i=0; i<num_init; i++)
 	{
-		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_READ, i*PAGE_SIZE, NULL);
+		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, i*PAGE_SIZE, NULL);
 		//cout << i << "calling HybridSystem::addTransaction\n";
 		mem->addTransaction(t);
 		if (i%10000 == 0)
 			cout << i << "/" << num_init << endl;
-			}*/
+	}
+
 	cout << "Running transactions to preload cache with data...\n";
-	int factor = 1000;
-	/*for (uint64_t i=0; i<num_init*factor; i++)
+	int factor = 10;
+	for (uint64_t i=0; i<num_init*factor; i++)
 	{
 		mem->update();
 		if (i%1000000 == 0)
@@ -122,7 +123,7 @@ int some_object::add_one_and_run()
 #endif
 		
 		// TODO: not sure this update factor is correct for this test
-		for (int j=0; j<factor; j++)
+		for (int j=0; j<10; j++)
 		{
 			mem->update();
 		}
@@ -145,7 +146,7 @@ int some_object::add_one_and_run()
 #endif
 		
 		// TODO: not sure this update factor is correct for this test
-		for (int j=0; j<factor; j++)
+		for (int j=0; j<10; j++)
 		{
 			mem->update();
 		}
@@ -169,12 +170,11 @@ int some_object::add_one_and_run()
 #endif
 		
 		// TODO: not sure this update factor is correct for this test
-		for (int j=0; j<factor; j++)
+		for (int j=0; j<10; j++)
 		{
 			mem->update();
 		}	    
 	  }
-
 
 	for (int i=0; i<50000000; i++)
 	{
@@ -186,6 +186,25 @@ int some_object::add_one_and_run()
 	cout << "dram_pending=" << mem->dram_pending.size() << " flash_pending=" << mem->flash_pending.size() << "\n\n";
 	cout << "dram_queue=" << mem->dram_queue.size() << " flash_queue=" << mem->flash_queue.size() << "\n\n";
 	cout << "pending_pages=" << mem->pending_pages.size() << "\n\n";
+	for (set<uint64_t>::iterator it = mem->pending_pages.begin(); it != mem->pending_pages.end(); it++)
+	{
+		cout << (*it) << " ";
+	}
+	cout << "\n\n";
+	cout << "pending_count=" << mem->pending_count << "\n\n";
+	cout << "dram_pending_set.size() =" << mem->dram_pending_set.size() << "\n\n";
+	cout << "dram_bad_address.size() = " << mem->dram_bad_address.size() << "\n";
+	for (list<uint64_t>::iterator it = mem->dram_bad_address.begin(); it != mem->dram_bad_address.end(); it++)
+	{
+		cout << (*it) << " ";
+	}
+	cout << "\n\n";
+	cout << "pending_sets.size() = " << mem->pending_sets.size() << "\n\n";
+	cout << "pending_sets_max = " << mem->pending_sets_max << "\n\n";
+	cout << "pending_pages_max = " << mem->pending_pages_max << "\n\n";
+	cout << "trans_queue_max = " << mem->trans_queue_max << "\n\n";
+
+	mem->reportPower();
 
 	return 0;
 }
