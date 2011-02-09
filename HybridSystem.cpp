@@ -618,6 +618,21 @@ void HybridSystem::FlashWriteCallback(uint id, uint64_t addr, uint64_t cycle)
 #endif
 }
 
+void HybridSystem::FlashIdlePower(uint id, vector<double> idle_energy, uint64_t cycle)
+{
+  
+}
+
+void HybridSystem::FlashAccessPower(uint id, vector<double> access_energy, uint64_t cycle)
+{
+  
+}
+
+void HybridSystem::FlashErasePower(uint id, vector<double> erase_energy, uint64_t cycle)
+{
+  
+}
+
 void HybridSystem::printStats() 
 {
 	//dram->printStats();

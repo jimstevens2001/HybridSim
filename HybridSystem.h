@@ -24,6 +24,9 @@ namespace HybridSim
 		void DRAMWriteCallback(uint id, uint64_t addr, uint64_t cycle);
 		void FlashReadCallback(uint id, uint64_t addr, uint64_t cycle);
 		void FlashWriteCallback(uint id, uint64_t addr, uint64_t cycle);
+		void FlashIdlePower(uint id, vector<double> idle_energy, uint64_t cycle);
+		void FlashAccessPower(uint id, vector<double> access_energy, uint64_t cycle);
+		void FlashErasePower(uint id, vector<double> erase_energy, uint64_t cycle);
 
 		void printStats();
 		string SetOutputFileName(string tracefilename);
