@@ -28,9 +28,7 @@ namespace HybridSim
 		void DRAMPowerCallback(double a, double b, double c, double d);
 		void FlashReadCallback(uint id, uint64_t addr, uint64_t cycle);
 		void FlashWriteCallback(uint id, uint64_t addr, uint64_t cycle);
-		void FlashIdlePower(uint id, vector<double> i_energy, uint64_t cycle);
-		void FlashAccessPower(uint id, vector<double> a_energy, uint64_t cycle);
-		void FlashErasePower(uint id, vector<double> e_energy, uint64_t cycle);
+		void FlashPowerCallback(uint id, vector<vector<double>> power_data, uint64_t cycle);
 
 		void reportPower();
 		void printStats();
@@ -92,9 +90,9 @@ namespace HybridSim
 		list<DRAMSim::Transaction> flash_queue; // Buffer to wait for Flash
 
 		//Power system variables
-		vector<double> idle_energy;
-		vector<double> access_energy;
-		vector<double> erase_energy;
+		vector<double> idle_power;
+		vector<double> access_power;
+		vector<double> erase_power;
 
 	};
 

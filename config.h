@@ -6,6 +6,7 @@
 #define SINGLE_WORD 0
 #define FDSIM 0
 #define NVDSIM 1
+#define PRINT_POWER_CB 0
 
 #include <iostream>
 #include <string>

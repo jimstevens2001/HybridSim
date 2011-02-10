@@ -36,25 +36,21 @@ HybridSystem::HybridSystem(uint id)
 	flash->RegisterCallbacks(f_read_cb, f_write_cb);
 #elif NVDSIM
 	typedef NVDSim::Callback <HybridSystem, void, uint, uint64_t, uint64_t> nvdsim_callback_t;
-	typedef NVDSim::Callback <HybridSystem, void, uint, vector<double>, uint64_t> nvdsim_callback_v;
+	typedef NVDSim::Callback <HybridSystem, void, uint, vector<vector<double>>, uint64_t> nvdsim_callback_v;
 	NVDSim::Callback_t *nv_read_cb = new nvdsim_callback_t(this, &HybridSystem::FlashReadCallback);
 	NVDSim::Callback_t *nv_write_cb = new nvdsim_callback_t(this, &HybridSystem::FlashWriteCallback);
-	NVDSim::Callback_v *nv_i_cb = new nvdsim_callback_v(this, &HybridSystem::FlashIdlePower);
-	NVDSim::Callback_v *nv_a_cb = new nvdsim_callback_v(this, &HybridSystem::FlashAccessPower);
-	if( GARBAGE_COLLECT == 1)
-	{
-	  NVDSim::Callback_v *nv_e_cb = new nvdsim_callback_v(this, &HybridSystem::FlashErasePower);
-	  flash->RegisterCallbacks(nv_read_cb, nv_write_cb, nv_i_cb, nv_a_cb, nv_e_cb);
-	}
-	else
-	{
-	  flash->RegisterCallbacks(nv_read_cb, nv_write_cb, nv_i_cb, nv_a_cb);
-	}
+	NVDSim::Callback_v *nv_power_cb = new nvdsim_callback_v(this, &HybridSystem::FlashPowerCallback);
+	flash->RegisterCallbacks(nv_read_cb, nv_write_cb, nv_power_cb);
 #else
 	read_cb = new dramsim_callback_t(this, &HybridSystem::FlashReadCallback);
 	write_cb = new dramsim_callback_t(this, &HybridSystem::FlashWriteCallback);
 	flash->RegisterCallbacks(read_cb, write_cb, NULL);
 #endif
+
+	// Power stuff
+	idle_power = vector<double>(NUM_PACKAGES, 0.0); 
+	access_power = vector<double>(NUM_PACKAGES, 0.0); 
+	erase_power = vector<double>(NUM_PACKAGES, 0.0); 
 
 	// debug stuff to remove later
 	pending_count = 0;
@@ -725,77 +721,56 @@ void HybridSystem::FlashWriteCallback(uint id, uint64_t addr, uint64_t cycle)
 #endif
 }
 
-void HybridSystem::FlashIdlePower(uint id, vector<double> i_energy, uint64_t cycle)
+void HybridSystem::FlashPowerCallback(uint id, vector<vector<double>> power_data, uint64_t cycle)
 {
-  idle_energy = i_energy;
+  // Total power used
+  vector<double> total_power = vector<double>(NUM_PACKAGES, 0.0);
 
   vector<double> ave_idle_power = vector<double>(NUM_PACKAGES, 0.0);
-
-  for(uint i = 0; i < NUM_PACKAGES; i++)
-	{
-	  ave_idle_power[i] = (idle_energy[i] * VCC) / currentClockCycle;
-	}
-
-	cout<<endl;
-	cout<<"Idle Power Data: "<<endl;
-	cout<<"========================"<<endl;
-
-	for(uint i = 0; i < NUM_PACKAGES; i++)
-	{
-	    cout<<"Package: "<<i<<endl;
-	    cout<<"Accumulated Idle Power: "<<(idle_energy[i] * VCC)<<"mW"<<endl;
-	    cout<<"Average Idle Power: "<<ave_idle_power[i]<<"mW"<<endl;
-	    cout<<endl;
-	}
-  
-}
-
-void HybridSystem::FlashAccessPower(uint id, vector<double> a_energy, uint64_t cycle)
-{
-  access_energy = a_energy;
-
   vector<double> ave_access_power = vector<double>(NUM_PACKAGES, 0.0);
-
-  for(uint i = 0; i < NUM_PACKAGES; i++)
-  {
-	  ave_access_power[i] = (access_energy[i] * VCC) / currentClockCycle;
-  }
-
-  cout<<endl;
-  cout<<"Access Power Data: "<<endl;
-  cout<<"========================"<<endl;
-
-  for(uint i = 0; i < NUM_PACKAGES; i++)
-  {
-      cout<<"Package: "<<i<<endl;
-      cout<<"Accumulated Access Power: "<<(access_energy[i] * VCC)<<"mW"<<endl;
-      cout<<"Average Access Power: "<<ave_access_power[i]<<"mW"<<endl;
-      cout<<endl;
-  }
-}
-
-void HybridSystem::FlashErasePower(uint id, vector<double> e_energy, uint64_t cycle)
-{
-  erase_energy = e_energy;
-
   vector<double> ave_erase_power = vector<double>(NUM_PACKAGES, 0.0);
+  vector<double> average_power = vector<double>(NUM_PACKAGES, 0.0);
 
-  for(uint i = 0; i < NUM_PACKAGES; i++)
+  for(int i = 0; i < NUM_PACKAGES; i++)
   {
-	  ave_erase_power[i] = (erase_energy[i] * VCC) / currentClockCycle;
+        idle_power[i] = power_data[0][i];
+	access_power[i] = power_data[1][i];
+	erase_power[i] = power_data[2][i];   
+	total_power[i] = power_data[0][i] + power_data[1][i] + power_data[2][i];
+
+        ave_idle_power[i] = idle_power[i] / cycle;
+	ave_access_power[i] = access_power[i] / cycle;
+        ave_erase_power[i] = erase_power[i] / cycle;
+	average_power[i] = total_power[i] / cycle;
   }
 
+#if PRINT_POWER_CB
   cout<<endl;
-  cout<<"Erase Power Data: "<<endl;
+  cout<<"Power Data: "<<endl;
   cout<<"========================"<<endl;
 
   for(uint i = 0; i < NUM_PACKAGES; i++)
   {
-      cout<<"Package: "<<i<<endl;
-      cout<<"Accumulated Erase Power: "<<(erase_energy[i] * VCC)<<"mW"<<endl;
-      cout<<"Average Erase Power: "<<ave_erase_power[i]<<"mW"<<endl;
-      cout<<endl;
+	cout<<"Package: "<<i<<endl;
+	cout<<"Accumulated Idle Power: "<<idle_power[i]<<"mW"<<endl;
+	cout<<"Accumulated Access Power: "<<access_power[i]<<"mW"<<endl;
+	if(GARBAGE_COLLECT == 1)
+	{
+	  cout<<"Accumulated Erase Power: "<<erase_power[i]<<"mW"<<endl;
+	}
+	cout<<"Total Power: "<<total_power[i]<<"mW"<<endl;
+	cout<<endl;
+	cout<<"Average Idle Power: "<<ave_idle_power[i]<<"mW"<<endl;
+	cout<<"Average Access Power: "<<ave_access_power[i]<<"mW"<<endl;
+	if(GARBAGE_COLLECT == 1)
+	{
+	  cout<<"Average Erase Power: "<<ave_erase_power[i]<<"mW"<<endl;
+	}
+	cout<<"Average Power: "<<average_power[i]<<"mW"<<endl;
+	cout<<endl;
   }
+#endif
+  
 }
 
 void HybridSystem::reportPower()
@@ -808,6 +783,57 @@ void HybridSystem::reportPower()
 void HybridSystem::printStats() 
 {
 	//dram->printStats();
+  if(!idle_power.empty())
+  {    
+        // Power Stats
+        vector<double> total_power = vector<double>(NUM_PACKAGES, 0.0);
+        // Average power used
+	vector<double> ave_idle_power = vector<double>(NUM_PACKAGES, 0.0);
+	vector<double> ave_access_power = vector<double>(NUM_PACKAGES, 0.0);	
+	vector<double> ave_erase_power = vector<double>(NUM_PACKAGES, 0.0);
+	vector<double> average_power = vector<double>(NUM_PACKAGES, 0.0);
+
+	for(uint i = 0; i < NUM_PACKAGES; i++)
+	{
+	  if(GARBAGE_COLLECT == 1)
+	  {
+	    total_power[i] = (idle_power[i] + access_power[i] + erase_power[i]);
+	  }
+	  else
+	  {
+	    total_power[i] = (idle_power[i] + access_power[i]);
+	  }
+	  ave_idle_power[i] = idle_power[i] / currentClockCycle;
+	  ave_access_power[i] = access_power[i] / currentClockCycle;
+	  ave_erase_power[i] = erase_power[i] / currentClockCycle;
+	  average_power[i] = total_power[i] / currentClockCycle;
+	}
+
+	cout<<endl;
+	cout<<"Flash Power Data: "<<endl;
+	cout<<"========================"<<endl;
+
+	for(uint i = 0; i < NUM_PACKAGES; i++)
+	{
+	    cout<<"Package: "<<i<<endl;
+	    cout<<"Accumulated Idle Power: "<<idle_power[i]<<"mW"<<endl;
+	    cout<<"Accumulated Access Power: "<<access_power[i]<<"mW"<<endl;
+	    if( GARBAGE_COLLECT == 1)
+	    {
+	      cout<<"Accumulated Erase Power: "<<erase_power[i]<<"mW"<<endl;
+	    }
+	    cout<<"Total Power: "<<total_power[i]<<"mW"<<endl;
+	    cout<<endl;
+	    cout<<"Average Idle Power: "<<ave_idle_power[i]<<"mW"<<endl;
+	    cout<<"Average Access Power: "<<ave_access_power[i]<<"mW"<<endl;
+	    if( GARBAGE_COLLECT == 1)
+	    {
+	      cout<<"Average Erase Power: "<<ave_erase_power[i]<<"mW"<<endl;
+	    }
+	    cout<<"Average Power: "<<average_power[i]<<"mW"<<endl;
+	    cout<<endl;
+	}
+  }
 }
 
 string HybridSystem::SetOutputFileName(string tracefilename) { return ""; }

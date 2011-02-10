@@ -205,6 +205,7 @@ int some_object::add_one_and_run()
 	cout << "trans_queue_max = " << mem->trans_queue_max << "\n\n";
 
 	mem->reportPower();
+	mem->printStats();
 
 	return 0;
 }
