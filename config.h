@@ -47,7 +47,7 @@ const uint64_t FLASH_BURST_SIZE = 4096; // number of bytes in a single flash tra
 // Number of pages total and number of pages in the cache
 const uint64_t TOTAL_PAGES = 2097152/4; // 2 GB
 //const uint64_t TOTAL_PAGES = 4194304; // 4 GB
-const uint64_t CACHE_PAGES = 1048576/4096; // 1 GB
+const uint64_t CACHE_PAGES = 1048576/4; // 1 GB
 
 // INI files
 const string dram_ini = "ini/DDR3_micron_8M_8B_x8_sg15.ini";
