@@ -48,6 +48,7 @@ namespace HybridSim
 				void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower));
 	};
 	HybridSystem *getMemorySystemInstance(uint id);
+	void printStats();
 }
 
 
