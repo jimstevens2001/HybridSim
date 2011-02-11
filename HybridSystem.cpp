@@ -47,9 +47,9 @@ HybridSystem::HybridSystem(uint id)
 #endif
 
 	// Power stuff
-	idle_power = vector<double>(NUM_PACKAGES, 0.0); 
-	access_power = vector<double>(NUM_PACKAGES, 0.0); 
-	erase_power = vector<double>(NUM_PACKAGES, 0.0); 
+	idle_energy = vector<double>(NUM_PACKAGES, 0.0); 
+	access_energy = vector<double>(NUM_PACKAGES, 0.0); 
+	erase_energy = vector<double>(NUM_PACKAGES, 0.0); 
 
 	// debug stuff to remove later
 	pending_count = 0;
@@ -723,7 +723,7 @@ void HybridSystem::FlashWriteCallback(uint id, uint64_t addr, uint64_t cycle)
 void HybridSystem::FlashPowerCallback(uint id, vector<vector<double>> power_data, uint64_t cycle)
 {
   // Total power used
-  vector<double> total_power = vector<double>(NUM_PACKAGES, 0.0);
+  vector<double> total_energy = vector<double>(NUM_PACKAGES, 0.0);
 
   vector<double> ave_idle_power = vector<double>(NUM_PACKAGES, 0.0);
   vector<double> ave_access_power = vector<double>(NUM_PACKAGES, 0.0);
@@ -732,41 +732,39 @@ void HybridSystem::FlashPowerCallback(uint id, vector<vector<double>> power_data
 
   for(int i = 0; i < NUM_PACKAGES; i++)
   {
-        idle_power[i] = power_data[0][i];
-	access_power[i] = power_data[1][i];
-	erase_power[i] = power_data[2][i];   
-	total_power[i] = power_data[0][i] + power_data[1][i] + power_data[2][i];
+        idle_energy[i] = power_data[0][i];
+	access_energy[i] = power_data[1][i];
+	erase_energy[i] = power_data[2][i];   
+	total_energy[i] = power_data[0][i] + power_data[1][i] + power_data[2][i];
 
-        ave_idle_power[i] = idle_power[i] / cycle;
-	ave_access_power[i] = access_power[i] / cycle;
-        ave_erase_power[i] = erase_power[i] / cycle;
-	average_power[i] = total_power[i] / cycle;
+        ave_idle_power[i] = idle_energy[i] / cycle;
+	ave_access_power[i] = access_energy[i] / cycle;
+        ave_erase_power[i] = erase_energy[i] / cycle;
+	average_power[i] = total_energy[i] / cycle;
   }
 
 #if PRINT_POWER_CB
-  cout<<endl;
-  cout<<"Power Data: "<<endl;
-  cout<<"========================"<<endl;
+  cout<<"\nPower Data: \n";
+  cout<<"========================\n";
 
   for(uint i = 0; i < NUM_PACKAGES; i++)
   {
-	cout<<"Package: "<<i<<endl;
-	cout<<"Accumulated Idle Power: "<<idle_power[i]<<"mW"<<endl;
-	cout<<"Accumulated Access Power: "<<access_power[i]<<"mW"<<endl;
+	cout<<"Package: "<<i<<"\n";
+	cout<<"Accumulated Idle Energy: "<<idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	cout<<"Accumulated Access Energy: "<<access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
 	if(GARBAGE_COLLECT == 1)
 	{
-	  cout<<"Accumulated Erase Power: "<<erase_power[i]<<"mW"<<endl;
+	  cout<<"Accumulated Erase Energy: "<<erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
 	}
-	cout<<"Total Power: "<<total_power[i]<<"mW"<<endl;
-	cout<<endl;
-	cout<<"Average Idle Power: "<<ave_idle_power[i]<<"mW"<<endl;
-	cout<<"Average Access Power: "<<ave_access_power[i]<<"mW"<<endl;
+	cout<<"Total Energy: "<<total_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n\n";
+        
+	cout<<"Average Idle Power: "<<ave_idle_power[i]<<"mW\n";
+	cout<<"Average Access Power: "<<ave_access_power[i]<<"mW\n";
 	if(GARBAGE_COLLECT == 1)
 	{
-	  cout<<"Average Erase Power: "<<ave_erase_power[i]<<"mW"<<endl;
+	  cout<<"Average Erase Power: "<<ave_erase_power[i]<<"mW\n";
 	}
-	cout<<"Average Power: "<<average_power[i]<<"mW"<<endl;
-	cout<<endl;
+	cout<<"Average Power: "<<average_power[i]<<"mW\n\n";
   }
 #endif
   
@@ -782,10 +780,10 @@ void HybridSystem::reportPower()
 void HybridSystem::printStats() 
 {
 	//dram->printStats();
-  if(!idle_power.empty())
+  if(!idle_energy.empty())
   {    
         // Power Stats
-        vector<double> total_power = vector<double>(NUM_PACKAGES, 0.0);
+        vector<double> total_energy = vector<double>(NUM_PACKAGES, 0.0);
         // Average power used
 	vector<double> ave_idle_power = vector<double>(NUM_PACKAGES, 0.0);
 	vector<double> ave_access_power = vector<double>(NUM_PACKAGES, 0.0);	
@@ -796,42 +794,40 @@ void HybridSystem::printStats()
 	{
 	  if(GARBAGE_COLLECT == 1)
 	  {
-	    total_power[i] = (idle_power[i] + access_power[i] + erase_power[i]);
+	    total_energy[i] = (idle_energy[i] + access_energy[i] + erase_energy[i]);
 	  }
 	  else
 	  {
-	    total_power[i] = (idle_power[i] + access_power[i]);
+	    total_energy[i] = (idle_energy[i] + access_energy[i]);
 	  }
-	  ave_idle_power[i] = idle_power[i] / currentClockCycle;
-	  ave_access_power[i] = access_power[i] / currentClockCycle;
-	  ave_erase_power[i] = erase_power[i] / currentClockCycle;
-	  average_power[i] = total_power[i] / currentClockCycle;
+	  ave_idle_power[i] = idle_energy[i] / currentClockCycle;
+	  ave_access_power[i] = access_energy[i] / currentClockCycle;
+	  ave_erase_power[i] = erase_energy[i] / currentClockCycle;
+	  average_power[i] = total_energy[i] / currentClockCycle;
 	}
 
-	cout<<endl;
-	cout<<"Flash Power Data: "<<endl;
-	cout<<"========================"<<endl;
+	cout<<"\nPower Data: \n";
+	cout<<"========================\n";
 
 	for(uint i = 0; i < NUM_PACKAGES; i++)
-	{
-	    cout<<"Package: "<<i<<endl;
-	    cout<<"Accumulated Idle Power: "<<idle_power[i]<<"mW"<<endl;
-	    cout<<"Accumulated Access Power: "<<access_power[i]<<"mW"<<endl;
-	    if( GARBAGE_COLLECT == 1)
-	    {
-	      cout<<"Accumulated Erase Power: "<<erase_power[i]<<"mW"<<endl;
-	    }
-	    cout<<"Total Power: "<<total_power[i]<<"mW"<<endl;
-	    cout<<endl;
-	    cout<<"Average Idle Power: "<<ave_idle_power[i]<<"mW"<<endl;
-	    cout<<"Average Access Power: "<<ave_access_power[i]<<"mW"<<endl;
-	    if( GARBAGE_COLLECT == 1)
-	    {
-	      cout<<"Average Erase Power: "<<ave_erase_power[i]<<"mW"<<endl;
-	    }
-	    cout<<"Average Power: "<<average_power[i]<<"mW"<<endl;
-	    cout<<endl;
-	}
+	  {
+	    cout<<"Package: "<<i<<"\n";
+	    cout<<"Accumulated Idle Energy: "<<idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	    cout<<"Accumulated Access Energy: "<<access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	    if(GARBAGE_COLLECT == 1)
+	      {
+		cout<<"Accumulated Erase Energy: "<<erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	      }
+	    cout<<"Total Energy: "<<total_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n\n";
+        
+	    cout<<"Average Idle Power: "<<ave_idle_power[i]<<"mW\n";
+	    cout<<"Average Access Power: "<<ave_access_power[i]<<"mW\n";
+	    if(GARBAGE_COLLECT == 1)
+	      {
+		cout<<"Average Erase Power: "<<ave_erase_power[i]<<"mW\n";
+	      }
+	    cout<<"Average Power: "<<average_power[i]<<"mW\n\n";
+	  }
   }
 }
 

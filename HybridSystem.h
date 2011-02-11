@@ -90,9 +90,9 @@ namespace HybridSim
 		list<DRAMSim::Transaction> flash_queue; // Buffer to wait for Flash
 
 		//Power system variables
-		vector<double> idle_power;
-		vector<double> access_power;
-		vector<double> erase_power;
+		vector<double> idle_energy;
+		vector<double> access_energy;
+		vector<double> erase_energy;
 
 	};
 
