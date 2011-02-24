@@ -544,6 +544,7 @@ void HybridSystem::DRAMWriteCallback(uint id, uint64_t addr, uint64_t cycle)
 
 void HybridSystem::FlashReadCallback(uint id, uint64_t addr, uint64_t cycle)
 {
+        cout << flash_pending.count(PAGE_ADDRESS(addr)) << endl;
 	if (flash_pending.count(PAGE_ADDRESS(addr)) != 0)
 	{
 		// Get the pending object.
