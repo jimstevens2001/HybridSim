@@ -1,0 +1,8 @@
+results/
+*.o
+*.po
+*.dep
+*.swp
+HybridSim
+libhybridsim.so
+
