@@ -1,0 +1,15 @@
+results/
+*.o
+*.po
+*.dep
+*.swp
+*.sh~
+*.h~
+*.cpp~
+*~
+\.#*
+*#
+HybridSim
+libhybridsim.so
+NVHybridSim
+libnvhybridsim.so

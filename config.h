@@ -2,10 +2,11 @@
 #define CONFIG_H
 
 // Default values for alternate code.
-#define DEBUG_CACHE 0
+#define DEBUG_CACHE 1
 #define SINGLE_WORD 0
-#define FDSIM 1
-#define NVDSIM 0
+#define FDSIM 0
+#define NVDSIM 1
+#define PRINT_POWER_CB 1
 
 #include <iostream>
 #include <string>
@@ -17,6 +18,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <stdint.h>
+#include <vector>
 
 //#include <MemorySystem.h>
 #include <DRAMSim.h>
@@ -40,11 +42,10 @@ using namespace std;
 
 // GLOBAL CONSTANTS (move to ini file eventually)
 
-#if FDSIM
-// these values are specified in the ini file of the nvdimm so we only need them for FlashDIMMs
+// these values are also specified in the ini file of the nvdimm but have a different name
 const uint64_t WORD_SIZE = 8; // This should never change, but is just paranoia just in case we need 32-bit words.
 const uint64_t PAGE_SIZE = 1024*4; // in bytes, so divide this by 64 to get the number of DDR3 transfers per page
-#endif
+
 
 
 const uint64_t SET_SIZE = 64; // associativity of cache
@@ -73,7 +74,6 @@ const uint64_t NUM_SETS = CACHE_PAGES / SET_SIZE;
 #define PAGE_OFFSET(addr) (addr % PAGE_SIZE)
 #define SET_INDEX(addr) (PAGE_NUMBER(addr) % NUM_SETS)
 #define TAG(addr) (PAGE_NUMBER(addr) / NUM_SETS)
-//#define ALIGN(addr) (addr / BURST_SIZE) * BURST_SIZE;
 #define ALIGN(addr) (((addr / BURST_SIZE) * BURST_SIZE) % (TOTAL_PAGES * PAGE_SIZE))
 
 
@@ -132,7 +132,6 @@ class Pending
 		wait = NULL;
 	}
 };
-
 
 
 #endif

@@ -9,16 +9,15 @@ HybridSystem::HybridSystem(uint id)
 	systemID = id;
 	cout << "Creating DRAM" << endl;
 	//dram = new DRAMSim::MemorySystem(0, dram_ini, sys_ini, ".", "resultsfilename"); 
-	dram = DRAMSim::getMemorySystemInstance(0, dram_ini, sys_ini, "../NVHybridSim", "resultsfilename"); 
-
+	dram = DRAMSim::getMemorySystemInstance(0, dram_ini, sys_ini, "../NVHybridSim", "resultsfilename", (CACHE_PAGES * PAGE_SIZE) >> 20);
 	cout << "Creating Flash" << endl;
 #if FDSIM
 	flash = new FDSim::FlashDIMM(1,"ini/samsung_K9XXG08UXM.ini","ini/def_system.ini","../NVHybridSim","");
 #elif NVDSIM
-	flash = new NVDSim::NVDIMM(1,"ini/samsung_K9XXG08UXM(mod).ini","ini/def_system.ini","../NVHybridSim","");
+	flash = new NVDSim::NVDIMM(1,"ini/samsung_K9XXG08UXM(pcm).ini","ini/def_system.ini","../NVHybridSim","");
 	cout << "Did NVDSIM" << endl;
 #else
-	flash = DRAMSim::getMemorySystemInstance(1, flash_ini, sys_ini, "../NVHybridSim", "resultsfilename2"); 
+	flash = DRAMSim::getMemorySystemInstance(1, flash_ini, sys_ini, "../NVHybridSim", "resultsfilename2", (TOTAL_PAGES * PAGE_SIZE) >> 20); 
 #endif
 	cout << "Done with creating memories" << endl;
 
@@ -36,14 +35,29 @@ HybridSystem::HybridSystem(uint id)
 	flash->RegisterCallbacks(f_read_cb, f_write_cb);
 #elif NVDSIM
 	typedef NVDSim::Callback <HybridSystem, void, uint, uint64_t, uint64_t> nvdsim_callback_t;
+	typedef NVDSim::Callback <HybridSystem, void, uint, vector<vector<double>>, uint64_t> nvdsim_callback_v;
 	NVDSim::Callback_t *nv_read_cb = new nvdsim_callback_t(this, &HybridSystem::FlashReadCallback);
 	NVDSim::Callback_t *nv_write_cb = new nvdsim_callback_t(this, &HybridSystem::FlashWriteCallback);
-	flash->RegisterCallbacks(nv_read_cb, nv_write_cb);
+	NVDSim::Callback_v *nv_power_cb = new nvdsim_callback_v(this, &HybridSystem::FlashPowerCallback);
+	flash->RegisterCallbacks(nv_read_cb, nv_write_cb, nv_power_cb);
 #else
 	read_cb = new dramsim_callback_t(this, &HybridSystem::FlashReadCallback);
 	write_cb = new dramsim_callback_t(this, &HybridSystem::FlashWriteCallback);
 	flash->RegisterCallbacks(read_cb, write_cb, NULL);
 #endif
+
+	// Power stuff
+	idle_energy = vector<double>(NUM_PACKAGES, 0.0); 
+	access_energy = vector<double>(NUM_PACKAGES, 0.0); 
+	erase_energy = vector<double>(NUM_PACKAGES, 0.0); 
+	vpp_idle_energy = vector<double>(NUM_PACKAGES, 0.0); 
+	vpp_access_energy = vector<double>(NUM_PACKAGES, 0.0); 
+	vpp_erase_energy = vector<double>(NUM_PACKAGES, 0.0); 
+
+
+	// debug stuff to remove later
+	pending_count = 0;
+	max_dram_pending = 0;
 }
 
 // static allocator for the library interface
@@ -57,6 +71,17 @@ void HybridSystem::update()
 {
 	// Process the transaction queue.
 	// This will fill the dram_queue and flash_queue.
+
+	if (dram_pending.size() > max_dram_pending)
+		max_dram_pending = dram_pending.size();
+	if (pending_sets.size() > pending_sets_max)
+		pending_sets_max = pending_sets.size();
+	if (pending_pages.size() > pending_pages_max)
+		pending_pages_max = pending_pages.size();
+	if (trans_queue.size() > trans_queue_max)
+		trans_queue_max = trans_queue.size();
+	
+
 
 	//if (trans_queue.size() > 0)
 	//if (currentClockCycle % 1000 == 0)
@@ -82,7 +107,8 @@ void HybridSystem::update()
 	list<DRAMSim::Transaction>::iterator it = trans_queue.begin();
 	//while(!trans_queue.empty())
 	//for (list<Transaction>::iterator it = trans_queue.begin(); it != trans_queue.end(); ++it)
-	while(it != trans_queue.end())
+	//while(it != trans_queue.end())
+	while((it != trans_queue.end()) && (pending_sets.size() < (CACHE_PAGES / SET_SIZE)))
 	{
 		//ProcessTransaction(trans_queue.front());
 		//trans_queue.pop_front();
@@ -90,13 +116,16 @@ void HybridSystem::update()
 		// Compute the page address.
 		uint64_t page_addr = PAGE_ADDRESS(ALIGN((*it).address));
 
-		if (pending_pages.count(page_addr) == 0)
+
+		//if (pending_pages.count(page_addr) == 0)
+		if (pending_sets.count(SET_INDEX(page_addr)) == 0)
 		//if (true)
 		{
 			//cout << "PAGE NOT IN PENDING" << page_addr << "\n";
 			// Add to the pending 
 			//cout << "Inserted " << page_addr << " into pending pages set\n";
 			pending_pages.insert(page_addr);
+			pending_sets.insert(SET_INDEX(page_addr));
 
 			// Process the transaction.
 			ProcessTransaction(*it);
@@ -125,7 +154,10 @@ void HybridSystem::update()
 			isWrite = false;
 		not_full = dram->addTransaction(isWrite, tmp.address);
 		if (not_full)
+		{
 			dram_queue.pop_front();
+			dram_pending_set.insert(tmp.address);
+		}
 	}
 
 	// Process Flash transaction queue until it is empty or addTransaction returns false.
@@ -139,8 +171,10 @@ void HybridSystem::update()
 		not_full = flash->add(ft);
 #elif NVDSIM
 		// put some code to deal with NVDSim interactions here
+		//cout << "adding a flash transaction" << endl;
 		DRAMSim::Transaction t = flash_queue.front();
 		NVDSim::FlashTransaction ft = NVDSim::FlashTransaction(static_cast<NVDSim::TransactionType>(t.transactionType), t.address, t.data);
+		//cout << "the address sent to flash was " << t.address << endl;
 		not_full = flash->add(ft);
 #else
 		//not_full = flash->addTransaction(flash_queue.front());
@@ -152,8 +186,10 @@ void HybridSystem::update()
 			isWrite = false;
 		not_full = flash->addTransaction(isWrite, tmp.address);
 #endif
-		if (not_full)
+		if (not_full){
 			flash_queue.pop_front();
+			//cout << "popping front of flash queue" << endl;
+		}
 	}
 
 	// Update the memories.
@@ -181,6 +217,9 @@ bool HybridSystem::addTransaction(bool isWrite, uint64_t addr)
 
 bool HybridSystem::addTransaction(DRAMSim::Transaction &trans)
 {
+
+	pending_count += 1;
+
 	//cout << "enter HybridSystem::addTransaction\n";
 	trans_queue.push_back(trans);
 	//cout << "pushed\n";
@@ -287,6 +326,7 @@ void HybridSystem::ProcessTransaction(DRAMSim::Transaction &trans)
 #if DEBUG_CACHE
 		cout << currentClockCycle << ": " << "MISS: victim is cache_address " << cache_address << endl;
 		cout << cur_line.str() << endl;
+		cout << currentClockCycle << ": " << "The victim is dirty? " << cur_line.dirty << endl;
 #endif
 
 		Pending p;
@@ -337,6 +377,7 @@ void HybridSystem::VictimRead(Pending p)
 
 	// Add a record in the DRAM's pending table.
 	p.op = VICTIM_READ;
+	assert(dram_pending.count(p.cache_addr) == 0);
 	dram_pending[p.cache_addr] = p;
 }
 
@@ -355,14 +396,14 @@ void HybridSystem::VictimWrite(Pending p)
 	DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, victim_flash_addr, NULL);
 	flash_queue.push_back(t);
 #else
-	// Schedule reads for the entire page.
+	// Schedule writes for the entire page.
 	for(uint64_t i=0; i<PAGE_SIZE/FLASH_BURST_SIZE; i++)
 	{
 		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, victim_flash_addr + i*FLASH_BURST_SIZE, NULL);
 		flash_queue.push_back(t);
 	}
 #endif
-
+	
 	// No pending event schedule necessary (might add later for debugging though).
 }
 
@@ -370,6 +411,7 @@ void HybridSystem::LineRead(Pending p)
 {
 #if DEBUG_CACHE
 	cout << currentClockCycle << ": " << "Performing LINE_READ for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
+	cout << "the page address was " << PAGE_ADDRESS(p.flash_addr) << endl;
 #endif
 
 	uint64_t page_addr = PAGE_ADDRESS(p.flash_addr);
@@ -404,8 +446,15 @@ void HybridSystem::CacheRead(uint64_t orig_addr, uint64_t flash_addr, uint64_t c
 	// Compute the actual DRAM address of the data word we care about.
 	uint64_t data_addr = cache_addr + PAGE_OFFSET(flash_addr);
 
+	assert(cache_addr == PAGE_ADDRESS(data_addr));
+
 	DRAMSim::Transaction t = DRAMSim::Transaction(DATA_READ, data_addr, NULL);
 	dram_queue.push_back(t);
+
+	// Update the cache state
+	cache_line cur_line = cache[cache_addr];
+	cur_line.ts = currentClockCycle;
+	cache[cache_addr] = cur_line;
 
 	// Add a record in the DRAM's pending table.
 	Pending p;
@@ -414,8 +463,13 @@ void HybridSystem::CacheRead(uint64_t orig_addr, uint64_t flash_addr, uint64_t c
 	p.flash_addr = flash_addr;
 	p.cache_addr = cache_addr;
 	p.type = DATA_READ;
+	assert(dram_pending.count(cache_addr) == 0);
 	dram_pending[cache_addr] = p;
+
+	assert(dram_pending.count(PAGE_ADDRESS(data_addr)) != 0);
+	assert(dram_pending.count(cache_addr) != 0);
 }
+
 
 void HybridSystem::CacheWrite(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr)
 {
@@ -449,7 +503,9 @@ void HybridSystem::CacheWrite(uint64_t orig_addr, uint64_t flash_addr, uint64_t 
 
 	// Erase the page from the pending set.
 	int num = pending_pages.erase(PAGE_ADDRESS(flash_addr));
-	if (num != 1)
+	int num2 = pending_sets.erase(SET_INDEX(PAGE_ADDRESS(flash_addr)));
+	pending_count -= 1;
+	if ((num != 1) || (num2 != 1))
 	{
 		cout << "pending_pages.erase() was called after CACHE_WRITE and num was 0.\n";
 		cout << "orig:" << orig_addr << " aligned:" << flash_addr << "\n\n";
@@ -459,8 +515,8 @@ void HybridSystem::CacheWrite(uint64_t orig_addr, uint64_t flash_addr, uint64_t 
 
 void HybridSystem::RegisterCallbacks(
 	    TransactionCompleteCB *readDone,
-	    TransactionCompleteCB *writeDone,
-	    void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower))
+	    TransactionCompleteCB *writeDone
+	    /*void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower)*/)
 {
 	// Save the external callbacks.
 	ReadDone = readDone;
@@ -478,6 +534,7 @@ void HybridSystem::DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle)
 
 		// Remove this pending object from dram_pending
 		dram_pending.erase(PAGE_ADDRESS(addr));
+		assert(dram_pending.count(PAGE_ADDRESS(addr)) == 0);
 
 		if (p.op == VICTIM_READ)
 		{
@@ -495,6 +552,7 @@ void HybridSystem::DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle)
 			{
 				// If not done with this line, then re-enter pending map.
 				dram_pending[PAGE_ADDRESS(addr)] = p;
+				dram_pending_set.erase(addr);
 				return;
 			}
 
@@ -527,19 +585,66 @@ void HybridSystem::DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle)
 
 			// Erase the page from the pending set.
 			int num = pending_pages.erase(PAGE_ADDRESS(p.flash_addr));
-			if (num != 1)
+			int num2 = pending_sets.erase(SET_INDEX(PAGE_ADDRESS(p.flash_addr)));
+			pending_count -= 1;
+			if ((num != 1) || (num2 != 1))
 			{
 				cout << "pending_pages.erase() was called after CACHE_READ and num was 0.\n";
 				cout << "orig:" << p.orig_addr << " aligned:" << p.flash_addr << "\n\n";
 				abort();
 			}
 		}
+		else
+		{
+			ERROR("DRAMReadCallback received an invalid op.");
+			abort();
+		}
 	}
+	else
+	{
+		ERROR("DRAMReadCallback received an address not in the pending set.");
+
+		// DEBUG CODE (remove this later)
+		cout << "dram_pending.size() = " << dram_pending.size() << "\n";
+		for (unordered_map<uint64_t, Pending>::iterator it = dram_pending.begin(); it != dram_pending.end(); it++)
+		{
+			cout << (*it).first << " ";
+		}
+	
+
+		cout << "\n\ndram_queue.size() = " << dram_queue.size() << "\n";
+		
+		cout << "\n\ndram_pending_set.size() = " << dram_pending_set.size() << "\n";
+		for (set<uint64_t>::iterator it = dram_pending_set.begin(); it != dram_pending_set.end(); it++)
+		{
+			cout << (*it) << " ";
+		}
+		cout << "\n\n" << "addr= " << addr << endl;
+		cout << "PAGE_ADDRESS(addr)= " << PAGE_ADDRESS(addr) << "\n";
+		cout << "max_dram_pending= " << max_dram_pending << "\n";
+
+		dram_bad_address.push_back(addr);
+			
+		// end debug code
+
+		
+
+		abort();
+	}
+
+	// Erase from the pending set AFTER everything else (so I can see if failed values are in the pending set).
+	dram_pending_set.erase(addr);
 }
 
 void HybridSystem::DRAMWriteCallback(uint id, uint64_t addr, uint64_t cycle)
 {
 	// Nothing to do (it doesn't matter when the DRAM write finishes for the cache controller, as long as it happens).
+	dram_pending_set.erase(addr);
+}
+
+void HybridSystem::DRAMPowerCallback(double a, double b, double c, double d)
+{
+  	printf("power callback: %0.3f, %0.3f, %0.3f, %0.3f\n",a,b,c,d);
 }
 
 void HybridSystem::FlashReadCallback(uint id, uint64_t addr, uint64_t cycle)
@@ -596,17 +701,239 @@ void HybridSystem::FlashReadCallback(uint id, uint64_t addr, uint64_t cycle)
 				CacheWrite(p.orig_addr, p.flash_addr, p.cache_addr);
 			
 		}
+		else
+		{
+			ERROR("FlashReadCallback received an invalid op.");
+			abort();
+		}
+	}
+	else
+	{
+		ERROR("FlashReadCallback received an address not in the pending set.");
+		abort();
 	}
 }
 
 void HybridSystem::FlashWriteCallback(uint id, uint64_t addr, uint64_t cycle)
 {
 	// Nothing to do (it doesn't matter when the flash write finishes for the cache controller, as long as it happens).
+
+#if DEBUG_CACHE
+	cout << "The write to Flash line " << PAGE_ADDRESS(addr) << " has completed.\n";
+	//Remove this pending object from flash_pending
+	//flash_pending.erase(PAGE_ADDRESS(addr));
+#endif
+}
+
+void HybridSystem::FlashPowerCallback(uint id, vector<vector<double>> power_data, uint64_t cycle)
+{
+  // Total power used
+  vector<double> total_energy = vector<double>(NUM_PACKAGES, 0.0);
+  vector<double> ave_idle_power = vector<double>(NUM_PACKAGES, 0.0);
+  vector<double> ave_access_power = vector<double>(NUM_PACKAGES, 0.0);
+  vector<double> ave_erase_power = vector<double>(NUM_PACKAGES, 0.0);
+  vector<double> ave_vpp_idle_power = vector<double>(NUM_PACKAGES, 0.0);
+  vector<double> ave_vpp_access_power = vector<double>(NUM_PACKAGES, 0.0);
+  vector<double> ave_vpp_erase_power = vector<double>(NUM_PACKAGES, 0.0);
+  vector<double> average_power = vector<double>(NUM_PACKAGES, 0.0);
+
+  for(int i = 0; i < NUM_PACKAGES; i++)
+  {
+    idle_energy[i] = power_data[0][i];
+    access_energy[i] = power_data[1][i];
+    ave_idle_power[i] = idle_energy[i] / cycle;
+    ave_access_power[i] = access_energy[i] / cycle;
+
+    total_energy[i] = power_data[0][i] + power_data[1][i];  
+
+    if(power_data.size() == 6)
+    {
+       erase_energy[i] = power_data[2][i];
+       vpp_idle_energy[i] = power_data[3][i];
+       vpp_access_energy[i] = power_data[4][i];
+       vpp_erase_energy[i] = power_data[5][i];  
+       total_energy[i] = total_energy[i] + power_data[2][i] + power_data[3][i]
+	                 + power_data[4][i] + power_data[5][i];
+
+       
+       ave_erase_power[i] = erase_energy[i] / cycle;
+       ave_vpp_idle_power[i] = vpp_idle_energy[i] / cycle;
+       ave_vpp_access_power[i] = vpp_access_energy[i] / cycle;
+       ave_vpp_erase_power[i] = vpp_erase_energy[i] / cycle;
+    }
+    else if(power_data.size() == 4)
+    {
+       vpp_idle_energy[i] = power_data[2][i];
+       vpp_access_energy[i] = power_data[3][i];
+       total_energy[i] = total_energy[i] + power_data[2][i] + power_data[3][i];
+
+       ave_vpp_idle_power[i] = vpp_idle_energy[i] / cycle;
+       ave_vpp_access_power[i] = vpp_access_energy[i] / cycle;
+    }
+    else if(power_data.size() == 3)
+    {
+       erase_energy[i] = power_data[2][i];
+       total_energy[i] = total_energy[i] + power_data[2][i];
+
+       ave_erase_power[i] = erase_energy[i] / cycle;
+    }
+
+    average_power[i] = total_energy[i] / cycle;
+  }
+
+#if PRINT_POWER_CB
+  cout<<"\nCallback Power Data: \n";
+  cout<<"========================\n";
+
+  for(uint i = 0; i < NUM_PACKAGES; i++)
+  {
+        cout<<"Package: "<<i<<"\n";
+	cout<<"Accumulated Idle Energy: "<<idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	cout<<"Accumulated Access Energy: "<<access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+
+        if(power_data.size() == 6)
+	{
+	  cout<<"Accumulated Erase Energy: "<<erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	  cout<<"Accumulated VPP Idle Energy: "<<vpp_idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	  cout<<"Accumulated VPP Access Energy: "<<vpp_access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	  cout<<"Accumulated VPP Erase Energy: "<<vpp_erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	}
+	else if(power_data.size() == 4)
+	{
+	  cout<<"Accumulated VPP Idle Energy: "<<vpp_idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	  cout<<"Accumulated VPP Access Energy: "<<vpp_access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	}
+	else if(power_data.size() == 3)
+	{
+	  cout<<"Accumulated Erase Energy: "<<erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	}
+	cout<<"Total Energy: "<<total_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n\n";
+        
+	cout<<"Average Idle Power: "<<ave_idle_power[i]<<"mW\n";
+	cout<<"Average Access Power: "<<ave_access_power[i]<<"mW\n";
+	if(power_data.size() == 6)
+	{
+	  cout<<"Average Erase Power: "<<ave_erase_power[i]<<"mW\n";
+	  cout<<"Average VPP Idle Power: "<<ave_vpp_idle_power[i]<<"mW\n";
+	  cout<<"Average VPP Access Power: "<<ave_vpp_access_power[i]<<"mW\n";
+	  cout<<"Average VPP Erase Power: "<<ave_vpp_erase_power[i]<<"mW\n";
+	}
+	else if(power_data.size() == 4)
+	{
+	  cout<<"Average VPP Idle Power: "<<ave_vpp_idle_power[i]<<"mW\n";
+	  cout<<"Average VPP Access Power: "<<ave_vpp_access_power[i]<<"mW\n";
+	}
+	else if(power_data.size() == 3)
+	{
+	  cout<<"Average Erase Power: "<<ave_erase_power[i]<<"mW\n";
+	}
+	cout<<"Average Power: "<<average_power[i]<<"mW\n\n";
+  }
+
+  // Get statisics on the number of reads, writes and erases at this point in the simulation
+  flash->printStats();
+#endif
+  
+}
+
+void HybridSystem::reportPower()
+{
+#if NVDSIM
+  flash->powerCallback();
+#endif  
 }
 
 void HybridSystem::printStats() 
 {
 	//dram->printStats();
+  if(!idle_energy.empty())
+  {    
+        // Power Stats
+        vector<double> total_energy = vector<double>(NUM_PACKAGES, 0.0);
+        // Average power used
+	vector<double> ave_idle_power = vector<double>(NUM_PACKAGES, 0.0);
+	vector<double> ave_access_power = vector<double>(NUM_PACKAGES, 0.0);	
+	vector<double> ave_erase_power = vector<double>(NUM_PACKAGES, 0.0);
+	vector<double> ave_vpp_idle_power = vector<double>(NUM_PACKAGES, 0.0);
+        vector<double> ave_vpp_access_power = vector<double>(NUM_PACKAGES, 0.0);
+        vector<double> ave_vpp_erase_power = vector<double>(NUM_PACKAGES, 0.0);
+	vector<double> average_power = vector<double>(NUM_PACKAGES, 0.0);
+
+	for(uint i = 0; i < NUM_PACKAGES; i++)
+	{
+	  if(DEVICE_TYPE.compare("PCM") == 0 && GARBAGE_COLLECT == 1)
+	  {
+	     total_energy[i] = (idle_energy[i] + access_energy[i] + erase_energy[i]
+				+ vpp_idle_energy[i] + vpp_access_energy[i] + vpp_erase_energy[i]);
+	  }
+	  else if(DEVICE_TYPE.compare("PCM") == 0)
+	  {
+	    total_energy[i] = (idle_energy[i] + access_energy[i] + vpp_idle_energy[i] + vpp_access_energy[i]);
+	  }
+	  else if(GARBAGE_COLLECT == 1)
+	  {
+	    total_energy[i] = (idle_energy[i] + access_energy[i] + erase_energy[i]);
+	  }
+	  else
+	  {
+	    total_energy[i] = (idle_energy[i] + access_energy[i]);
+	  }
+	  ave_idle_power[i] = idle_energy[i] / currentClockCycle;
+	  ave_access_power[i] = access_energy[i] / currentClockCycle;
+	  ave_erase_power[i] = erase_energy[i] / currentClockCycle;
+	  ave_vpp_idle_power[i] = vpp_idle_energy[i] / currentClockCycle;
+	  ave_vpp_access_power[i] = vpp_access_energy[i] / currentClockCycle;
+	  ave_vpp_erase_power[i] = vpp_erase_energy[i] / currentClockCycle;
+	  average_power[i] = total_energy[i] / currentClockCycle;
+	}
+
+	cout<<"\nStat Power Data: \n";
+	cout<<"========================\n";
+
+	for(uint i = 0; i < NUM_PACKAGES; i++)
+	  {
+	    cout<<"Package: "<<i<<"\n";
+	    cout<<"Accumulated Idle Energy: "<<idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	    cout<<"Accumulated Access Energy: "<<access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	    if(DEVICE_TYPE.compare("PCM") == 0 && GARBAGE_COLLECT == 1)
+	    {
+	      cout<<"Accumulated Erase Energy: "<<erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	      cout<<"Accumulated VPP Idle Energy: "<<vpp_idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	      cout<<"Accumulated VPP Access Energy: "<<vpp_access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	      cout<<"Accumulated VPP Erase Energy: "<<vpp_erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	    }
+	    else if(DEVICE_TYPE.compare("PCM") == 0)
+	    {
+	      cout<<"Accumulated VPP Idle Energy: "<<vpp_idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	      cout<<"Accumulated VPP Access Energy: "<<vpp_access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	    }
+	    else if(GARBAGE_COLLECT == 1)
+	    {
+		cout<<"Accumulated Erase Energy: "<<erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	    }
+	    cout<<"Total Energy: "<<total_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n\n";
+        
+	    cout<<"Average Idle Power: "<<ave_idle_power[i]<<"mW\n";
+	    cout<<"Average Access Power: "<<ave_access_power[i]<<"mW\n";
+	    if(DEVICE_TYPE.compare("PCM") == 0 && GARBAGE_COLLECT == 1)
+	    {
+	      cout<<"Average Erase Power: "<<ave_erase_power[i]<<"mW\n";
+	      cout<<"Average VPP Idle Power: "<<ave_vpp_idle_power[i]<<"mW\n";
+	      cout<<"Average VPP Access Power: "<<ave_vpp_access_power[i]<<"mW\n";
+	      cout<<"Average VPP Erase Power: "<<ave_vpp_erase_power[i]<<"mW\n";
+	    }
+	    else if(DEVICE_TYPE.compare("PCM") == 0)
+	    {
+	      cout<<"Average VPP Idle Power: "<<ave_vpp_idle_power[i]<<"mW\n";
+	      cout<<"Average VPP Access Power: "<<ave_vpp_access_power[i]<<"mW\n";
+	    }
+	    else if(GARBAGE_COLLECT == 1)
+	    {
+		cout<<"Average Erase Power: "<<ave_erase_power[i]<<"mW\n";
+	    }
+	    cout<<"Average Power: "<<average_power[i]<<"mW\n\n";
+	  }
+  }
 }
 
 string HybridSystem::SetOutputFileName(string tracefilename) { return ""; }
@@ -647,7 +974,7 @@ uint64_t HybridSystem::get_hit()
 	// Pick an element number to grab.
 	int size = valid_pages.size();
 	//cout << "size=" << size << "\n";
-	srand (time(NULL));
+	//srand (time(NULL)); // this causes the address to repeat
 	//cout << "pending=" << pending_pages.size() << " flash_pending size=" << flash_pending.size() << "\n";
 	int x = rand() % size;
 	//cout << "x=" << x << "\n";
