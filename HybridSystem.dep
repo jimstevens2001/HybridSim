@@ -131,4 +131,6 @@ HybridSystem.o: HybridSystem.cpp HybridSystem.h config.h \
  ../NVDIMMSim/src/ChannelPacket.h ../NVDIMMSim/src/Plane.h \
  ../NVDIMMSim/src/Block.h ../NVDIMMSim/src/Ftl.h \
  ../NVDIMMSim/src/FlashTransaction.h ../NVDIMMSim/src/Channel.h \
- ../NVDIMMSim/src/Callbacks.h CallbackHybrid.h
+ ../NVDIMMSim/src/GCFtl.h ../NVDIMMSim/src/PCMFtl.h \
+ ../NVDIMMSim/src/PCMGCFtl.h ../NVDIMMSim/src/Callbacks.h \
+ CallbackHybrid.h

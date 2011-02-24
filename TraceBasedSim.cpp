@@ -203,9 +203,15 @@ int some_object::add_one_and_run()
 	cout << "pending_sets_max = " << mem->pending_sets_max << "\n\n";
 	cout << "pending_pages_max = " << mem->pending_pages_max << "\n\n";
 	cout << "trans_queue_max = " << mem->trans_queue_max << "\n\n";
-
+	
+	//mem->printStats();
+	//mem->flash->printStats();
 	mem->reportPower();
-	mem->printStats();
+
+	for (int i=0; i<500; i++)
+	{
+		mem->update();
+	}
 
 	return 0;
 }

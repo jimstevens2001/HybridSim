@@ -93,6 +93,9 @@ namespace HybridSim
 		vector<double> idle_energy;
 		vector<double> access_energy;
 		vector<double> erase_energy;
+		vector<double> vpp_idle_energy;
+		vector<double> vpp_access_energy;
+		vector<double> vpp_erase_energy;
 
 	};
 
