@@ -31,6 +31,8 @@
 #include <stdint.h>
 #include <string>
 #include <vector>
+#include <iostream>
+#include <fstream>
 #include "CallbackHybrid.h"
 
 using std::string;
@@ -52,9 +54,10 @@ namespace HybridSim
 			void RegisterCallbacks(
 			    TransactionCompleteCB *readDone,
 			    TransactionCompleteCB *writeDone);
+			void reportPower();
 	};
 	HybridSystem *getMemorySystemInstance(uint id);
-	void printStats();
+
 }
 
 

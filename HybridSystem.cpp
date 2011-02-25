@@ -9,12 +9,12 @@ HybridSystem::HybridSystem(uint id)
 	systemID = id;
 	cout << "Creating DRAM" << endl;
 	//dram = new DRAMSim::MemorySystem(0, dram_ini, sys_ini, ".", "resultsfilename"); 
-	dram = DRAMSim::getMemorySystemInstance(0, dram_ini, sys_ini, "../HybridSim", "resultsfilename", (CACHE_PAGES * PAGE_SIZE) >> 20);
+	dram = DRAMSim::getMemorySystemInstance(0, dram_ini, sys_ini, "../NVHybridSim", "resultsfilename", (CACHE_PAGES * PAGE_SIZE) >> 20);
 	cout << "Creating Flash" << endl;
 #if FDSIM
-	flash = new FDSim::FlashDIMM(1,"ini/samsung_K9XXG08UXM.ini","ini/def_system.ini","../HybridSim","");
+	flash = new FDSim::FlashDIMM(1,"ini/samsung_K9XXG08UXM.ini","ini/def_system.ini","../NVHybridSim","");
 #elif NVDSIM
-	flash = new NVDSim::NVDIMM(1,"ini/samsung_K9XXG08UXM(pcm).ini","ini/def_system.ini","../HybridSim","");
+	flash = new NVDSim::NVDIMM(1,"ini/samsung_K9XXG08UXM(pcm).ini","ini/def_system.ini","../NVHybridSim","");
 	cout << "Did NVDSIM" << endl;
 #else
 	flash = DRAMSim::getMemorySystemInstance(1, flash_ini, sys_ini, "../HybridSim", "resultsfilename2", (TOTAL_PAGES * PAGE_SIZE) >> 20); 
@@ -832,6 +832,66 @@ void HybridSystem::FlashPowerCallback(uint id, vector<vector<double>> power_data
   // Get statisics on the number of reads, writes and erases at this point in the simulation
   flash->printStats();
 #endif
+
+#if SAVE_POWER_CB
+
+  ofstream savefile;
+  savefile.open("Results/PowerStats.txt");
+
+  savefile<<"\nCallback Power Data: \n";
+  savefile<<"========================\n";
+
+  for(uint i = 0; i < NUM_PACKAGES; i++)
+  {
+        savefile<<"Package: "<<i<<"\n";
+	savefile<<"Accumulated Idle Energy: "<<idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	savefile<<"Accumulated Access Energy: "<<access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+
+        if(power_data.size() == 6)
+	{
+	  savefile<<"Accumulated Erase Energy: "<<erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	  savefile<<"Accumulated VPP Idle Energy: "<<vpp_idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	  savefile<<"Accumulated VPP Access Energy: "<<vpp_access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	  savefile<<"Accumulated VPP Erase Energy: "<<vpp_erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	}
+	else if(power_data.size() == 4)
+	{
+	  savefile<<"Accumulated VPP Idle Energy: "<<vpp_idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	  savefile<<"Accumulated VPP Access Energy: "<<vpp_access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	}
+	else if(power_data.size() == 3)
+	{
+	  savefile<<"Accumulated Erase Energy: "<<erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	}
+	savefile<<"Total Energy: "<<total_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n\n";
+        
+	savefile<<"Average Idle Power: "<<ave_idle_power[i]<<"mW\n";
+	savefile<<"Average Access Power: "<<ave_access_power[i]<<"mW\n";
+	if(power_data.size() == 6)
+	{
+	  savefile<<"Average Erase Power: "<<ave_erase_power[i]<<"mW\n";
+	  savefile<<"Average VPP Idle Power: "<<ave_vpp_idle_power[i]<<"mW\n";
+	  savefile<<"Average VPP Access Power: "<<ave_vpp_access_power[i]<<"mW\n";
+	  savefile<<"Average VPP Erase Power: "<<ave_vpp_erase_power[i]<<"mW\n";
+	}
+	else if(power_data.size() == 4)
+	{
+	  savefile<<"Average VPP Idle Power: "<<ave_vpp_idle_power[i]<<"mW\n";
+	  savefile<<"Average VPP Access Power: "<<ave_vpp_access_power[i]<<"mW\n";
+	}
+	else if(power_data.size() == 3)
+	{
+	  savefile<<"Average Erase Power: "<<ave_erase_power[i]<<"mW\n";
+	}
+	savefile<<"Average Power: "<<average_power[i]<<"mW\n\n";
+  }
+
+  savefile<<"Reads completed: "<<flash->numReads<<"\n";
+  savefile<<"Writes completed: "<<flash->numWrites<<"\n";
+  savefile<<"Erases completed: "<<flash->numErases<<"\n";
+
+  savefile.close();
+#endif
   
 }
 
@@ -932,6 +992,107 @@ void HybridSystem::printStats()
 	    }
 	    cout<<"Average Power: "<<average_power[i]<<"mW\n\n";
 	  }
+  }
+}
+
+void HybridSystem::saveStats()
+{
+  if(!idle_energy.empty())
+  {
+        ofstream savefile;
+        savefile.open("Results/PowerStats.txt");
+
+        // Power Stats
+        vector<double> total_energy = vector<double>(NUM_PACKAGES, 0.0);
+        // Average power used
+	vector<double> ave_idle_power = vector<double>(NUM_PACKAGES, 0.0);
+	vector<double> ave_access_power = vector<double>(NUM_PACKAGES, 0.0);	
+	vector<double> ave_erase_power = vector<double>(NUM_PACKAGES, 0.0);
+	vector<double> ave_vpp_idle_power = vector<double>(NUM_PACKAGES, 0.0);
+        vector<double> ave_vpp_access_power = vector<double>(NUM_PACKAGES, 0.0);
+        vector<double> ave_vpp_erase_power = vector<double>(NUM_PACKAGES, 0.0);
+	vector<double> average_power = vector<double>(NUM_PACKAGES, 0.0);
+
+	for(uint i = 0; i < NUM_PACKAGES; i++)
+	{
+	  if(DEVICE_TYPE.compare("PCM") == 0 && GARBAGE_COLLECT == 1)
+	  {
+	     total_energy[i] = (idle_energy[i] + access_energy[i] + erase_energy[i]
+				+ vpp_idle_energy[i] + vpp_access_energy[i] + vpp_erase_energy[i]);
+	  }
+	  else if(DEVICE_TYPE.compare("PCM") == 0)
+	  {
+	    total_energy[i] = (idle_energy[i] + access_energy[i] + vpp_idle_energy[i] + vpp_access_energy[i]);
+	  }
+	  else if(GARBAGE_COLLECT == 1)
+	  {
+	    total_energy[i] = (idle_energy[i] + access_energy[i] + erase_energy[i]);
+	  }
+	  else
+	  {
+	    total_energy[i] = (idle_energy[i] + access_energy[i]);
+	  }
+	  ave_idle_power[i] = idle_energy[i] / currentClockCycle;
+	  ave_access_power[i] = access_energy[i] / currentClockCycle;
+	  ave_erase_power[i] = erase_energy[i] / currentClockCycle;
+	  ave_vpp_idle_power[i] = vpp_idle_energy[i] / currentClockCycle;
+	  ave_vpp_access_power[i] = vpp_access_energy[i] / currentClockCycle;
+	  ave_vpp_erase_power[i] = vpp_erase_energy[i] / currentClockCycle;
+	  average_power[i] = total_energy[i] / currentClockCycle;
+	}
+
+	savefile<<"\nPower Data: \n";
+	savefile<<"========================\n";
+
+	for(uint i = 0; i < NUM_PACKAGES; i++)
+	  {
+	    savefile<<"Package: "<<i<<"\n";
+	    savefile<<"Accumulated Idle Energy: "<<idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	    savefile<<"Accumulated Access Energy: "<<access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	    if(DEVICE_TYPE.compare("PCM") == 0 && GARBAGE_COLLECT == 1)
+	    {
+	      savefile<<"Accumulated Erase Energy: "<<erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	      savefile<<"Accumulated VPP Idle Energy: "<<vpp_idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	      savefile<<"Accumulated VPP Access Energy: "<<vpp_access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	      savefile<<"Accumulated VPP Erase Energy: "<<vpp_erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	    }
+	    else if(DEVICE_TYPE.compare("PCM") == 0)
+	    {
+	      savefile<<"Accumulated VPP Idle Energy: "<<vpp_idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	      savefile<<"Accumulated VPP Access Energy: "<<vpp_access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	    }
+	    else if(GARBAGE_COLLECT == 1)
+	    {
+		savefile<<"Accumulated Erase Energy: "<<erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
+	    }
+	    savefile<<"Total Energy: "<<total_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n\n";
+        
+	    savefile<<"Average Idle Power: "<<ave_idle_power[i]<<"mW\n";
+	    savefile<<"Average Access Power: "<<ave_access_power[i]<<"mW\n";
+	    if(DEVICE_TYPE.compare("PCM") == 0 && GARBAGE_COLLECT == 1)
+	    {
+	      savefile<<"Average Erase Power: "<<ave_erase_power[i]<<"mW\n";
+	      savefile<<"Average VPP Idle Power: "<<ave_vpp_idle_power[i]<<"mW\n";
+	      savefile<<"Average VPP Access Power: "<<ave_vpp_access_power[i]<<"mW\n";
+	      savefile<<"Average VPP Erase Power: "<<ave_vpp_erase_power[i]<<"mW\n";
+	    }
+	    else if(DEVICE_TYPE.compare("PCM") == 0)
+	    {
+	      savefile<<"Average VPP Idle Power: "<<ave_vpp_idle_power[i]<<"mW\n";
+	      savefile<<"Average VPP Access Power: "<<ave_vpp_access_power[i]<<"mW\n";
+	    }
+	    else if(GARBAGE_COLLECT == 1)
+	    {
+		savefile<<"Average Erase Power: "<<ave_erase_power[i]<<"mW\n";
+	    }
+	    savefile<<"Average Power: "<<average_power[i]<<"mW\n\n";
+	  }
+
+	savefile<<"Reads completed: "<<flash->numReads<<"\n";
+	savefile<<"Writes completed: "<<flash->numWrites<<"\n";
+	savefile<<"Erases completed: "<<flash->numErases<<"\n";
+
+	savefile.close();
   }
 }
 
