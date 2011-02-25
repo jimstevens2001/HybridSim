@@ -649,6 +649,7 @@ void HybridSystem::DRAMPowerCallback(double a, double b, double c, double d)
 
 void HybridSystem::FlashReadCallback(uint id, uint64_t addr, uint64_t cycle)
 {
+        cout << flash_pending.count(PAGE_ADDRESS(addr)) << endl;
 	if (flash_pending.count(PAGE_ADDRESS(addr)) != 0)
 	{
 		// Get the pending object.
@@ -835,8 +836,14 @@ void HybridSystem::FlashPowerCallback(uint id, vector<vector<double>> power_data
 
 #if SAVE_POWER_CB
 
-  ofstream savefile;
-  savefile.open("PowerStats.log");
+  std::ofstream savefile;
+  savefile.open("PowerStats.log", ios_base::out | ios_base::trunc);
+
+  if (!savefile) 
+  {
+      	ERROR("Cannot open PowerStats.log");
+       	exit(-1); 
+  }
 
   savefile<<"\nCallback Power Data: \n";
   savefile<<"========================\n";
