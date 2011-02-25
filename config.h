@@ -7,6 +7,7 @@
 #define FDSIM 0
 #define NVDSIM 1
 #define PRINT_POWER_CB 1
+#define SAVE_POWER_CB 1
 
 #include <iostream>
 #include <string>

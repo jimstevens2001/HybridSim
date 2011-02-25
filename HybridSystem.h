@@ -3,6 +3,9 @@
 
 //#include <FlashDIMMSim/FlashDIMM.h>
 
+#include <iostream>
+#include <fstream>
+
 #include "config.h"
 #include "CallbackHybrid.h"
 
@@ -32,6 +35,7 @@ namespace HybridSim
 
 		void reportPower();
 		void printStats();
+		void saveStats();
 		string SetOutputFileName(string tracefilename);
 
 

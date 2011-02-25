@@ -30,8 +30,13 @@
  */
 #include <stdint.h>
 #include <string>
+#include <vector>
+#include <iostream>
+#include <fstream>
 #include "CallbackHybrid.h"
+
 using std::string;
+using std::vector;
 
 namespace HybridSim 
 {
@@ -42,12 +47,17 @@ namespace HybridSim
 			bool addTransaction(bool isWrite, uint64_t addr);
 			bool WillAcceptTransaction();
 			void update();
-			void RegisterCallbacks( 
+			/*void RegisterCallbacks( 
 				TransactionCompleteCB *readDone,
 				TransactionCompleteCB *writeDone,
-				void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower));
+				void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower));*/
+			void RegisterCallbacks(
+			    TransactionCompleteCB *readDone,
+			    TransactionCompleteCB *writeDone);
+			void reportPower();
 	};
 	HybridSystem *getMemorySystemInstance(uint id);
+
 }
 
 

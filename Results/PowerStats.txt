@@ -1,0 +1,23 @@
+
+Callback Power Data: 
+========================
+Package: 0
+Accumulated Idle Energy: 0.0220493mJ
+Accumulated Access Energy: 1.35236mJ
+Accumulated Erase Energy: 0mJ
+Accumulated VPP Idle Energy: 5.51232e-05mJ
+Accumulated VPP Access Energy: 0.00183911mJ
+Accumulated VPP Erase Energy: 0mJ
+Total Energy: 1.3763mJ
+
+Average Idle Power: 0.264mW
+Average Access Power: 16.1921mW
+Average Erase Power: 0mW
+Average VPP Idle Power: 0.00066mW
+Average VPP Access Power: 0.02202mW
+Average VPP Erase Power: 0mW
+Average Power: 16.4787mW
+
+Reads completed: 201
+Writes completed: 100
+Erases completed: 0

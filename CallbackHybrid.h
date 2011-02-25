@@ -23,6 +23,8 @@
 #ifndef CALLBACKHYBRID_H
 #define CALLBACKHYBRID_H
 
+using std::vector;
+
 namespace HybridSim
 {
 
@@ -69,7 +71,7 @@ private:
 };
 
 typedef CallbackBase <void, uint, uint64_t, uint64_t> TransactionCompleteCB;
-typedef CallbackBase <void, uint, vector<vector<double>>, uint64_t> FlashPowerCB;
+typedef CallbackBase <void, uint, vector<vector<double> >, uint64_t> FlashPowerCB;
 } // namespace HybridSim
 
 #endif
