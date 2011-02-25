@@ -836,8 +836,14 @@ void HybridSystem::FlashPowerCallback(uint id, vector<vector<double>> power_data
 
 #if SAVE_POWER_CB
 
-  ofstream savefile;
-  savefile.open("Results/PowerStats.txt");
+  std::ofstream savefile;
+  savefile.open("PowerStats.log", ios_base::out | ios_base::trunc);
+
+  if (!savefile) 
+  {
+      	ERROR("Cannot open PowerStats.log");
+       	exit(-1); 
+  }
 
   savefile<<"\nCallback Power Data: \n";
   savefile<<"========================\n";
