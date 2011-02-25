@@ -31,6 +31,8 @@ REBUILDABLES=$(OBJ) ${POBJ} $(EXE_NAME) $(LIB_NAME)
 
 all: ${EXE_NAME} 
 
+lib: ${LIB_NAME} 
+
 #   $@ target name, $^ target deps, $< matched pattern
 $(EXE_NAME): $(OBJ)
 	$(CXX) $(CXXFLAGS) ${LIBS} -o $@ $^ 
