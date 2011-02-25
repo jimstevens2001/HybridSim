@@ -577,11 +577,7 @@ void HybridSystem::DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle)
 #endif
 
 			// Read operation has completed, call the top level callback.
-			if (ReadDone != NULL)
-			{
-				// Call the callback.
-				(*ReadDone)(systemID, p.orig_addr, cycle);
-			}
+			ReadDoneCallback(systemID, p.orig_addr, cycle);
 
 			// Erase the page from the pending set.
 			int num = pending_pages.erase(PAGE_ADDRESS(p.flash_addr));
@@ -834,6 +830,22 @@ void HybridSystem::FlashPowerCallback(uint id, vector<vector<double>> power_data
 #endif
   
 }
+
+
+void HybridSystem::ReadDoneCallback(uint systemID, uint64_t orig_addr, uint64_t cycle)
+{
+	if (ReadDone != NULL)
+	{
+		// Call the callback.
+		(*ReadDone)(systemID, orig_addr, cycle);
+	}
+}
+
+
+void HybridSystem::WriteDoneCallback()
+{
+}
+
 
 void HybridSystem::reportPower()
 {

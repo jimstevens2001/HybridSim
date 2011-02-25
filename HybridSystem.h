@@ -30,6 +30,10 @@ namespace HybridSim
 		void FlashWriteCallback(uint id, uint64_t addr, uint64_t cycle);
 		void FlashPowerCallback(uint id, vector<vector<double>> power_data, uint64_t cycle);
 
+		// Functions to run the callbacks to the module using HybridSim.
+		void ReadDoneCallback(uint systemID, uint64_t orig_addr, uint64_t cycle);
+		void WriteDoneCallback();
+
 		void reportPower();
 		void printStats();
 		string SetOutputFileName(string tracefilename);
