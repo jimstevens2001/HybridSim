@@ -836,7 +836,7 @@ void HybridSystem::FlashPowerCallback(uint id, vector<vector<double>> power_data
 #if SAVE_POWER_CB
 
   ofstream savefile;
-  savefile.open("Results/PowerStats.txt");
+  savefile.open("PowerStats.log");
 
   savefile<<"\nCallback Power Data: \n";
   savefile<<"========================\n";
