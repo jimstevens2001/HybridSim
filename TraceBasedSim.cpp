@@ -123,7 +123,7 @@ int some_object::add_one_and_run()
 #endif
 		
 		// TODO: not sure this update factor is correct for this test
-		for (int j=0; j<10; j++)
+		for (int j=0; j<10000; j++)
 		{
 			mem->update();
 		}
@@ -146,7 +146,7 @@ int some_object::add_one_and_run()
 #endif
 		
 		// TODO: not sure this update factor is correct for this test
-		for (int j=0; j<10; j++)
+		for (int j=0; j<10000; j++)
 		{
 			mem->update();
 		}
@@ -155,7 +155,7 @@ int some_object::add_one_and_run()
 	cur_addr = 0;
 	
 	cout << "reading from flash... hopefully" << endl;
-	for (uint64_t i=0; i<100; i++)
+	for (uint64_t i=0; i<1000; i++)
 	  {
 	    TransactionType type = DATA_READ;
 
@@ -170,7 +170,7 @@ int some_object::add_one_and_run()
 #endif
 		
 		// TODO: not sure this update factor is correct for this test
-		for (int j=0; j<10; j++)
+		for (int j=0; j<10000; j++)
 		{
 			mem->update();
 		}	    

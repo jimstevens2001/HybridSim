@@ -533,7 +533,7 @@ void HybridSystem::LineWrite(Pending p)
 #endif
 
 #if SINGLE_WORD
-	// Schedule a write to Flash to save the evicted line.
+	// Schedule a write to DRAM to simulate the write of the line that was read from Flash.
 	DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, p.cache_addr, NULL);
 	dram_queue.push_back(t);
 #else
@@ -832,124 +832,12 @@ void HybridSystem::FlashPowerCallback(uint id, vector<vector<double>> power_data
   }
 
 #if PRINT_POWER_CB
-  cout<<"\nCallback Power Data: \n";
-  cout<<"========================\n";
-
-  for(uint i = 0; i < NUM_PACKAGES; i++)
-  {
-        cout<<"Package: "<<i<<"\n";
-	cout<<"Accumulated Idle Energy: "<<idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
-	cout<<"Accumulated Access Energy: "<<access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
-
-        if(power_data.size() == 6)
-	{
-	  cout<<"Accumulated Erase Energy: "<<erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
-	  cout<<"Accumulated VPP Idle Energy: "<<vpp_idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
-	  cout<<"Accumulated VPP Access Energy: "<<vpp_access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
-	  cout<<"Accumulated VPP Erase Energy: "<<vpp_erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
-	}
-	else if(power_data.size() == 4)
-	{
-	  cout<<"Accumulated VPP Idle Energy: "<<vpp_idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
-	  cout<<"Accumulated VPP Access Energy: "<<vpp_access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
-	}
-	else if(power_data.size() == 3)
-	{
-	  cout<<"Accumulated Erase Energy: "<<erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
-	}
-	cout<<"Total Energy: "<<total_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n\n";
-        
-	cout<<"Average Idle Power: "<<ave_idle_power[i]<<"mW\n";
-	cout<<"Average Access Power: "<<ave_access_power[i]<<"mW\n";
-	if(power_data.size() == 6)
-	{
-	  cout<<"Average Erase Power: "<<ave_erase_power[i]<<"mW\n";
-	  cout<<"Average VPP Idle Power: "<<ave_vpp_idle_power[i]<<"mW\n";
-	  cout<<"Average VPP Access Power: "<<ave_vpp_access_power[i]<<"mW\n";
-	  cout<<"Average VPP Erase Power: "<<ave_vpp_erase_power[i]<<"mW\n";
-	}
-	else if(power_data.size() == 4)
-	{
-	  cout<<"Average VPP Idle Power: "<<ave_vpp_idle_power[i]<<"mW\n";
-	  cout<<"Average VPP Access Power: "<<ave_vpp_access_power[i]<<"mW\n";
-	}
-	else if(power_data.size() == 3)
-	{
-	  cout<<"Average Erase Power: "<<ave_erase_power[i]<<"mW\n";
-	}
-	cout<<"Average Power: "<<average_power[i]<<"mW\n\n";
-  }
-
-  // Get statisics on the number of reads, writes and erases at this point in the simulation
+  printStats();
   flash->printStats();
 #endif
 
 #if SAVE_POWER_CB
-
-  std::ofstream savefile;
-  savefile.open("PowerStats.log", ios_base::out | ios_base::trunc);
-
-  if (!savefile) 
-  {
-      	ERROR("Cannot open PowerStats.log");
-       	exit(-1); 
-  }
-
-  savefile<<"\nCallback Power Data: \n";
-  savefile<<"========================\n";
-
-  for(uint i = 0; i < NUM_PACKAGES; i++)
-  {
-        savefile<<"Package: "<<i<<"\n";
-	savefile<<"Accumulated Idle Energy: "<<idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
-	savefile<<"Accumulated Access Energy: "<<access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
-
-        if(power_data.size() == 6)
-	{
-	  savefile<<"Accumulated Erase Energy: "<<erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
-	  savefile<<"Accumulated VPP Idle Energy: "<<vpp_idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
-	  savefile<<"Accumulated VPP Access Energy: "<<vpp_access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
-	  savefile<<"Accumulated VPP Erase Energy: "<<vpp_erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
-	}
-	else if(power_data.size() == 4)
-	{
-	  savefile<<"Accumulated VPP Idle Energy: "<<vpp_idle_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
-	  savefile<<"Accumulated VPP Access Energy: "<<vpp_access_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
-	}
-	else if(power_data.size() == 3)
-	{
-	  savefile<<"Accumulated Erase Energy: "<<erase_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n";
-	}
-	savefile<<"Total Energy: "<<total_energy[i] * (CYCLE_TIME * 0.000000001)<<"mJ\n\n";
-        
-	savefile<<"Average Idle Power: "<<ave_idle_power[i]<<"mW\n";
-	savefile<<"Average Access Power: "<<ave_access_power[i]<<"mW\n";
-	if(power_data.size() == 6)
-	{
-	  savefile<<"Average Erase Power: "<<ave_erase_power[i]<<"mW\n";
-	  savefile<<"Average VPP Idle Power: "<<ave_vpp_idle_power[i]<<"mW\n";
-	  savefile<<"Average VPP Access Power: "<<ave_vpp_access_power[i]<<"mW\n";
-	  savefile<<"Average VPP Erase Power: "<<ave_vpp_erase_power[i]<<"mW\n";
-	}
-	else if(power_data.size() == 4)
-	{
-	  savefile<<"Average VPP Idle Power: "<<ave_vpp_idle_power[i]<<"mW\n";
-	  savefile<<"Average VPP Access Power: "<<ave_vpp_access_power[i]<<"mW\n";
-	}
-	else if(power_data.size() == 3)
-	{
-	  savefile<<"Average Erase Power: "<<ave_erase_power[i]<<"mW\n";
-	}
-	savefile<<"Average Power: "<<average_power[i]<<"mW\n\n";
-  }
-
-  savefile<<"Reads completed: "<<flash->numReads<<"\n";
-  savefile<<"Writes completed: "<<flash->numWrites<<"\n";
-  savefile<<"Erases completed: "<<flash->numErases<<"\n";
-
-  savefile<<"Device Type: "<<DEVICE_TYPE<<"\n";
-
-  savefile.close();
+  saveStats();
 #endif
   
 }
@@ -1080,7 +968,13 @@ void HybridSystem::saveStats()
   if(!idle_energy.empty())
   {
         ofstream savefile;
-        savefile.open("Results/PowerStats.txt");
+        savefile.open("PowerStats.log", ios_base::out | ios_base::trunc);
+
+  	if (!savefile) 
+  	{
+      		ERROR("Cannot open PowerStats.log");
+       		exit(-1); 
+  	}
 
         // Power Stats
         vector<double> total_energy = vector<double>(NUM_PACKAGES, 0.0);
@@ -1171,6 +1065,8 @@ void HybridSystem::saveStats()
 	savefile<<"Reads completed: "<<flash->numReads<<"\n";
 	savefile<<"Writes completed: "<<flash->numWrites<<"\n";
 	savefile<<"Erases completed: "<<flash->numErases<<"\n";
+
+	savefile<<"Device Type: "<<DEVICE_TYPE<<"\n";
 
 	savefile.close();
   }
