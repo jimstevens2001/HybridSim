@@ -473,6 +473,7 @@ void HybridSystem::LineRead(Pending p)
 	flash_pending[page_addr] = p;
 }
 
+
 void HybridSystem::LineReadFinish(uint64_t addr, Pending p)
 {
 
@@ -509,13 +510,44 @@ void HybridSystem::LineReadFinish(uint64_t addr, Pending p)
             cur_line.ts = currentClockCycle;
 			cache[p.cache_addr] = cur_line;
 
+            // Schedule LineWrite operation to store the line in DRAM.
+			LineWrite(p);
 
-			// Schedule the final operation (CACHE_READ or CACHE_WRITE)
+			// Use the CacheReadFinish/CacheWriteFinish functions to mark the page dirty (DATA_WRITE only), perform
+			// the callback to the requesting module, and remove this set from the pending sets to allow future
+			// operations to this set to start.
+			// Note: Only write operations are pending at this point, which will not interfere with future operations.
 			if (p.type == DATA_READ)
-				CacheRead(p.orig_addr, p.flash_addr, p.cache_addr);
+				CacheReadFinish(p.cache_addr, p);
 			else if(p.type == DATA_WRITE)
-				CacheWrite(p.orig_addr, p.flash_addr, p.cache_addr);
+				CacheWriteFinish(p.orig_addr, p.flash_addr, p.cache_addr);
 }
+
+
+void HybridSystem::LineWrite(Pending p)
+{
+	// After a LineRead from flash completes, the LineWrite stores the read line into the DRAM.
+
+#if DEBUG_CACHE
+	cout << currentClockCycle << ": " << "Performing LINE_WRITE for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
+#endif
+
+#if SINGLE_WORD
+	// Schedule a write to Flash to save the evicted line.
+	DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, p.cache_addr, NULL);
+	dram_queue.push_back(t);
+#else
+	// Schedule writes for the entire page.
+	for(uint64_t i=0; i<PAGE_SIZE/BURST_SIZE; i++)
+	{
+		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, p.cache_addr + i*BURST_SIZE, NULL);
+		dram_queue.push_back(t);
+	}
+#endif
+	
+	// No pending event schedule necessary (might add later for debugging though).
+}
+
 
 void HybridSystem::CacheRead(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr)
 {
@@ -583,6 +615,15 @@ void HybridSystem::CacheWrite(uint64_t orig_addr, uint64_t flash_addr, uint64_t 
 	DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, data_addr, NULL);
 	dram_queue.push_back(t);
 
+	// Finish the operation by updating cache state, doing the callback, and removing the pending set.
+	// Note: This is only split up so the LineWrite operation can reuse the second half
+	// of CacheWrite without actually issuing a new write.
+	CacheWriteFinish(orig_addr, flash_addr, cache_addr);
+
+}
+
+void HybridSystem::CacheWriteFinish(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr)
+{
 	// Update the cache state
 	cache_line cur_line = cache[cache_addr];
 	cur_line.dirty = true;
@@ -608,6 +649,7 @@ void HybridSystem::CacheWrite(uint64_t orig_addr, uint64_t flash_addr, uint64_t 
 		abort();
 	}
 }
+
 
 void HybridSystem::RegisterCallbacks(
 	    TransactionCompleteCB *readDone,
