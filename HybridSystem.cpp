@@ -14,7 +14,7 @@ HybridSystem::HybridSystem(uint id)
 #if FDSIM
 	flash = new FDSim::FlashDIMM(1,"ini/samsung_K9XXG08UXM.ini","ini/def_system.ini","../NVHybridSim","");
 #elif NVDSIM
-	flash = new NVDSim::NVDIMM(1,"ini/samsung_K9XXG08UXM(pcm).ini","ini/def_system.ini","../NVHybridSim","");
+	flash = new NVDSim::NVDIMM(1,"ini/samsung_K9XXG08UXM(mod).ini","ini/def_system.ini","../NVHybridSim","");
 	cout << "Did NVDSIM" << endl;
 #else
 	flash = DRAMSim::getMemorySystemInstance(1, flash_ini, sys_ini, "../HybridSim", "resultsfilename2", (TOTAL_PAGES * PAGE_SIZE) >> 20); 
@@ -896,6 +896,8 @@ void HybridSystem::FlashPowerCallback(uint id, vector<vector<double>> power_data
   savefile<<"Reads completed: "<<flash->numReads<<"\n";
   savefile<<"Writes completed: "<<flash->numWrites<<"\n";
   savefile<<"Erases completed: "<<flash->numErases<<"\n";
+
+  savefile<<"Device Type: "<<DEVICE_TYPE<<"\n";
 
   savefile.close();
 #endif
