@@ -381,6 +381,42 @@ void HybridSystem::VictimRead(Pending p)
 	dram_pending[p.cache_addr] = p;
 }
 
+void HybridSystem::VictimReadFinish(uint64_t addr, Pending p)
+{
+#if DEBUG_CACHE
+			cout << currentClockCycle << ": " << "VICTIM_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ") offset="
+				<< PAGE_OFFSET(addr) << " num_left=" << p.wait->size() << "\n";
+#endif
+
+#if SINGLE_WORD
+#else
+			// Remove the read that just finished from the wait set.
+			p.wait->erase(addr);
+
+			if (!p.wait->empty())
+			{
+				// If not done with this line, then re-enter pending map.
+				dram_pending[PAGE_ADDRESS(addr)] = p;
+				dram_pending_set.erase(addr);
+				return;
+			}
+
+			// The line has completed. Delete the wait set object and move on.
+			p.delete_wait();
+#endif
+
+#if DEBUG_CACHE
+			cout << "The read to DRAM line " << PAGE_ADDRESS(addr) << " has completed.\n";
+#endif
+
+			// Schedule a write to the flash to simulate the transfer
+			VictimWrite(p);
+
+			// Schedule a read to the flash to get the new line (can be done in parallel)
+			LineRead(p);
+
+}
+
 void HybridSystem::VictimWrite(Pending p)
 {
 #if DEBUG_CACHE
@@ -437,6 +473,50 @@ void HybridSystem::LineRead(Pending p)
 	flash_pending[page_addr] = p;
 }
 
+void HybridSystem::LineReadFinish(uint64_t addr, Pending p)
+{
+
+#if DEBUG_CACHE
+			cout << currentClockCycle << ": " << "LINE_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ") offset="
+				<< PAGE_OFFSET(addr) << " num_left=" << p.wait->size() << "\n";
+#endif
+
+#if SINGLE_WORD
+#else
+			// Remove the read that just finished from the wait set.
+			p.wait->erase(addr);
+
+			if (!p.wait->empty())
+			{
+				// If not done with this line, then re-enter pending map.
+				flash_pending[PAGE_ADDRESS(addr)] = p;
+				return;
+			}
+
+			// The line has completed. Delete the wait set object and move on.
+			p.delete_wait();
+#endif
+
+#if DEBUG_CACHE
+			cout << "The read to Flash line " << PAGE_ADDRESS(addr) << " has completed.\n";
+#endif
+
+			// Update the cache state
+			cache_line cur_line = cache[p.cache_addr];
+            cur_line.tag = TAG(p.flash_addr);
+            cur_line.dirty = false;
+            cur_line.valid = true;
+            cur_line.ts = currentClockCycle;
+			cache[p.cache_addr] = cur_line;
+
+
+			// Schedule the final operation (CACHE_READ or CACHE_WRITE)
+			if (p.type == DATA_READ)
+				CacheRead(p.orig_addr, p.flash_addr, p.cache_addr);
+			else if(p.type == DATA_WRITE)
+				CacheWrite(p.orig_addr, p.flash_addr, p.cache_addr);
+}
+
 void HybridSystem::CacheRead(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr)
 {
 #if DEBUG_CACHE
@@ -470,6 +550,26 @@ void HybridSystem::CacheRead(uint64_t orig_addr, uint64_t flash_addr, uint64_t c
 	assert(dram_pending.count(cache_addr) != 0);
 }
 
+void HybridSystem::CacheReadFinish(uint64_t addr, Pending p)
+{
+#if DEBUG_CACHE
+			cout << currentClockCycle << ": " << "CACHE_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
+#endif
+
+			// Read operation has completed, call the top level callback.
+			ReadDoneCallback(systemID, p.orig_addr, currentClockCycle);
+
+			// Erase the page from the pending set.
+			int num = pending_pages.erase(PAGE_ADDRESS(p.flash_addr));
+			int num2 = pending_sets.erase(SET_INDEX(PAGE_ADDRESS(p.flash_addr)));
+			pending_count -= 1;
+			if ((num != 1) || (num2 != 1))
+			{
+				cout << "pending_pages.erase() was called after CACHE_READ and num was 0.\n";
+				cout << "orig:" << p.orig_addr << " aligned:" << p.flash_addr << "\n\n";
+				abort();
+			}
+}
 
 void HybridSystem::CacheWrite(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr)
 {
@@ -495,11 +595,7 @@ void HybridSystem::CacheWrite(uint64_t orig_addr, uint64_t flash_addr, uint64_t 
 
 	// Call the top level callback.
 	// This is done immediately rather than waiting for callback.
-	if (WriteDone != NULL)
-	{
-		// Call the callback.
-		(*WriteDone)(systemID, orig_addr, currentClockCycle);
-	}
+    WriteDoneCallback(systemID, orig_addr, currentClockCycle);
 
 	// Erase the page from the pending set.
 	int num = pending_pages.erase(PAGE_ADDRESS(flash_addr));
@@ -538,57 +634,11 @@ void HybridSystem::DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle)
 
 		if (p.op == VICTIM_READ)
 		{
-#if DEBUG_CACHE
-			cout << currentClockCycle << ": " << "VICTIM_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ") offset="
-				<< PAGE_OFFSET(addr) << " num_left=" << p.wait->size() << "\n";
-#endif
-
-#if SINGLE_WORD
-#else
-			// Remove the read that just finished from the wait set.
-			p.wait->erase(addr);
-
-			if (!p.wait->empty())
-			{
-				// If not done with this line, then re-enter pending map.
-				dram_pending[PAGE_ADDRESS(addr)] = p;
-				dram_pending_set.erase(addr);
-				return;
-			}
-
-			// The line has completed. Delete the wait set object and move on.
-			p.delete_wait();
-#endif
-
-#if DEBUG_CACHE
-			cout << "The read to DRAM line " << PAGE_ADDRESS(addr) << " has completed.\n";
-#endif
-
-			// Schedule a write to the flash to simulate the transfer
-			VictimWrite(p);
-
-			// Schedule a read to the flash to get the new line (can be done in parallel)
-			LineRead(p);
+            VictimReadFinish(addr, p);
 		}
 		else if (p.op == CACHE_READ)
 		{
-#if DEBUG_CACHE
-			cout << currentClockCycle << ": " << "CACHE_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
-#endif
-
-			// Read operation has completed, call the top level callback.
-			ReadDoneCallback(systemID, p.orig_addr, cycle);
-
-			// Erase the page from the pending set.
-			int num = pending_pages.erase(PAGE_ADDRESS(p.flash_addr));
-			int num2 = pending_sets.erase(SET_INDEX(PAGE_ADDRESS(p.flash_addr)));
-			pending_count -= 1;
-			if ((num != 1) || (num2 != 1))
-			{
-				cout << "pending_pages.erase() was called after CACHE_READ and num was 0.\n";
-				cout << "orig:" << p.orig_addr << " aligned:" << p.flash_addr << "\n\n";
-				abort();
-			}
+            CacheReadFinish(addr, p);
 		}
 		else
 		{
@@ -655,46 +705,8 @@ void HybridSystem::FlashReadCallback(uint id, uint64_t addr, uint64_t cycle)
 
 		if (p.op == LINE_READ)
 		{
-#if DEBUG_CACHE
-			cout << currentClockCycle << ": " << "LINE_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ") offset="
-				<< PAGE_OFFSET(addr) << " num_left=" << p.wait->size() << "\n";
-#endif
 
-#if SINGLE_WORD
-#else
-			// Remove the read that just finished from the wait set.
-			p.wait->erase(addr);
-
-			if (!p.wait->empty())
-			{
-				// If not done with this line, then re-enter pending map.
-				flash_pending[PAGE_ADDRESS(addr)] = p;
-				return;
-			}
-
-			// The line has completed. Delete the wait set object and move on.
-			p.delete_wait();
-#endif
-
-#if DEBUG_CACHE
-			cout << "The read to Flash line " << PAGE_ADDRESS(addr) << " has completed.\n";
-#endif
-
-			// Update the cache state
-			cache_line cur_line = cache[p.cache_addr];
-                        cur_line.tag = TAG(p.flash_addr);
-                        cur_line.dirty = false;
-                        cur_line.valid = true;
-                        cur_line.ts = currentClockCycle;
-			cache[p.cache_addr] = cur_line;
-
-
-			// Schedule the final operation (CACHE_READ or CACHE_WRITE)
-			if (p.type == DATA_READ)
-				CacheRead(p.orig_addr, p.flash_addr, p.cache_addr);
-			else if(p.type == DATA_WRITE)
-				CacheWrite(p.orig_addr, p.flash_addr, p.cache_addr);
-			
+            LineReadFinish(addr, p);
 		}
 		else
 		{
@@ -832,18 +844,23 @@ void HybridSystem::FlashPowerCallback(uint id, vector<vector<double>> power_data
 }
 
 
-void HybridSystem::ReadDoneCallback(uint systemID, uint64_t orig_addr, uint64_t cycle)
+void HybridSystem::ReadDoneCallback(uint sysID, uint64_t orig_addr, uint64_t cycle)
 {
 	if (ReadDone != NULL)
 	{
 		// Call the callback.
-		(*ReadDone)(systemID, orig_addr, cycle);
+		(*ReadDone)(sysID, orig_addr, cycle);
 	}
 }
 
 
-void HybridSystem::WriteDoneCallback()
+void HybridSystem::WriteDoneCallback(uint sysID, uint64_t orig_addr, uint64_t cycle)
 {
+	if (WriteDone != NULL)
+	{
+		// Call the callback.
+		(*WriteDone)(sysID, orig_addr, cycle);
+	}
 }
 
 
