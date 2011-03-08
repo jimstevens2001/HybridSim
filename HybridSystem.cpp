@@ -9,12 +9,12 @@ HybridSystem::HybridSystem(uint id)
 	systemID = id;
 	cout << "Creating DRAM" << endl;
 	//dram = new DRAMSim::MemorySystem(0, dram_ini, sys_ini, ".", "resultsfilename"); 
-	dram = DRAMSim::getMemorySystemInstance(0, dram_ini, sys_ini, "../NVHybridSim", "resultsfilename", (CACHE_PAGES * PAGE_SIZE) >> 20);
+	dram = DRAMSim::getMemorySystemInstance(0, dram_ini, sys_ini, "../HybridSim", "resultsfilename", (CACHE_PAGES * PAGE_SIZE) >> 20);
 	cout << "Creating Flash" << endl;
 #if FDSIM
-	flash = new FDSim::FlashDIMM(1,"ini/samsung_K9XXG08UXM.ini","ini/def_system.ini","../NVHybridSim","");
+	flash = new FDSim::FlashDIMM(1,"ini/samsung_K9XXG08UXM.ini","ini/def_system.ini","../HybridSim","");
 #elif NVDSIM
-	flash = new NVDSim::NVDIMM(1,"ini/samsung_K9XXG08UXM(mod).ini","ini/def_system.ini","../NVHybridSim","");
+	flash = new NVDSim::NVDIMM(1,"ini/samsung_K9XXG08UXM(mod).ini","ini/def_system.ini","../HybridSim","");
 	cout << "Did NVDSIM" << endl;
 #else
 	flash = DRAMSim::getMemorySystemInstance(1, flash_ini, sys_ini, "../HybridSim", "resultsfilename2", (TOTAL_PAGES * PAGE_SIZE) >> 20); 

@@ -28,11 +28,12 @@
  * This is a public header for DRAMSim including this along with libdramsim.so should
  * provide all necessary functionality to talk to an external simulator
  */
+
 #include <stdint.h>
-#include <string>
-#include <vector>
-#include <iostream>
-#include <fstream>
+//#include <string>
+//#include <vector>
+//#include <iostream>
+//#include <fstream>
 #include "CallbackHybrid.h"
 
 using std::string;
