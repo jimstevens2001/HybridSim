@@ -20,12 +20,12 @@ namespace HybridSim
 		bool addTransaction(DRAMSim::Transaction &trans);
 		bool WillAcceptTransaction();
 		/*void RegisterCallbacks(
-			    TransactionCompleteCB *readDone,
-			    TransactionCompleteCB *writeDone,
-			    void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower));*/
+				TransactionCompleteCB *readDone,
+				TransactionCompleteCB *writeDone,
+				void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower));*/
 		void RegisterCallbacks(
-			    TransactionCompleteCB *readDone,
-			    TransactionCompleteCB *writeDone);
+				TransactionCompleteCB *readDone,
+				TransactionCompleteCB *writeDone);
 		void DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle);
 		void DRAMWriteCallback(uint id, uint64_t addr, uint64_t cycle);
 		void DRAMPowerCallback(double a, double b, double c, double d);
@@ -35,7 +35,7 @@ namespace HybridSim
 
 		// Functions to run the callbacks to the module using HybridSim.
 		void ReadDoneCallback(uint systemID, uint64_t orig_addr, uint64_t cycle);
-        void WriteDoneCallback(uint sysID, uint64_t orig_addr, uint64_t cycle);
+		void WriteDoneCallback(uint sysID, uint64_t orig_addr, uint64_t cycle);
 
 		void reportPower();
 		void printStats();
@@ -57,7 +57,7 @@ namespace HybridSim
 		void VictimWrite(Pending p);
 
 		void LineRead(Pending p);
-        void LineReadFinish(uint64_t addr, Pending p);
+		void LineReadFinish(uint64_t addr, Pending p);
 
 		void LineWrite(Pending p);
 

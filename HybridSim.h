@@ -31,13 +31,9 @@
 
 #include <stdint.h>
 //#include <string>
-//#include <vector>
 //#include <iostream>
 //#include <fstream>
 #include "CallbackHybrid.h"
-
-using std::string;
-using std::vector;
 
 namespace HybridSim 
 {

@@ -63,7 +63,7 @@ HybridSystem::HybridSystem(uint id)
 // static allocator for the library interface
 HybridSystem *getMemorySystemInstance(uint id)
 {
-        return new HybridSystem(id);
+	return new HybridSystem(id);
 }
 
 
@@ -136,7 +136,7 @@ void HybridSystem::update()
 		else
 		{
 			// Skip to the next and do nothing else.
-	//		cout << "PAGE IN PENDING" << page_addr << "\n";
+			// cout << "PAGE IN PENDING" << page_addr << "\n";
 			++it;
 			//it = trans_queue.end();
 		}
@@ -504,13 +504,13 @@ void HybridSystem::LineReadFinish(uint64_t addr, Pending p)
 
 			// Update the cache state
 			cache_line cur_line = cache[p.cache_addr];
-            cur_line.tag = TAG(p.flash_addr);
-            cur_line.dirty = false;
-            cur_line.valid = true;
-            cur_line.ts = currentClockCycle;
+			cur_line.tag = TAG(p.flash_addr);
+			cur_line.dirty = false;
+			cur_line.valid = true;
+			cur_line.ts = currentClockCycle;
 			cache[p.cache_addr] = cur_line;
 
-            // Schedule LineWrite operation to store the line in DRAM.
+			// Schedule LineWrite operation to store the line in DRAM.
 			LineWrite(p);
 
 			// Use the CacheReadFinish/CacheWriteFinish functions to mark the page dirty (DATA_WRITE only), perform
@@ -636,7 +636,7 @@ void HybridSystem::CacheWriteFinish(uint64_t orig_addr, uint64_t flash_addr, uin
 
 	// Call the top level callback.
 	// This is done immediately rather than waiting for callback.
-    WriteDoneCallback(systemID, orig_addr, currentClockCycle);
+	WriteDoneCallback(systemID, orig_addr, currentClockCycle);
 
 	// Erase the page from the pending set.
 	int num = pending_pages.erase(PAGE_ADDRESS(flash_addr));
@@ -651,10 +651,8 @@ void HybridSystem::CacheWriteFinish(uint64_t orig_addr, uint64_t flash_addr, uin
 }
 
 
-void HybridSystem::RegisterCallbacks(
-	    TransactionCompleteCB *readDone,
-	    TransactionCompleteCB *writeDone
-	    /*void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower)*/)
+void HybridSystem::RegisterCallbacks( TransactionCompleteCB *readDone, TransactionCompleteCB *writeDone
+		/*void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower)*/)
 {
 	// Save the external callbacks.
 	ReadDone = readDone;
@@ -676,11 +674,11 @@ void HybridSystem::DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle)
 
 		if (p.op == VICTIM_READ)
 		{
-            VictimReadFinish(addr, p);
+			VictimReadFinish(addr, p);
 		}
 		else if (p.op == CACHE_READ)
 		{
-            CacheReadFinish(addr, p);
+			CacheReadFinish(addr, p);
 		}
 		else
 		{
@@ -737,7 +735,7 @@ void HybridSystem::DRAMPowerCallback(double a, double b, double c, double d)
 
 void HybridSystem::FlashReadCallback(uint id, uint64_t addr, uint64_t cycle)
 {
-        cout << flash_pending.count(PAGE_ADDRESS(addr)) << endl;
+	//cout << flash_pending.count(PAGE_ADDRESS(addr)) << endl;
 	if (flash_pending.count(PAGE_ADDRESS(addr)) != 0)
 	{
 		// Get the pending object.
@@ -748,8 +746,7 @@ void HybridSystem::FlashReadCallback(uint id, uint64_t addr, uint64_t cycle)
 
 		if (p.op == LINE_READ)
 		{
-
-            LineReadFinish(addr, p);
+			LineReadFinish(addr, p);
 		}
 		else
 		{

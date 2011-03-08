@@ -23,6 +23,8 @@
 #ifndef CALLBACKHYBRID_H
 #define CALLBACKHYBRID_H
 
+#include <vector>
+
 using std::vector;
 
 namespace HybridSim
