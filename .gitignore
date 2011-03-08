@@ -4,6 +4,7 @@ results/
 *.po
 *.dep
 *.swp
+*.sh
 *.sh~
 *.h~
 *.cpp~
