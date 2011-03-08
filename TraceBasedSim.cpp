@@ -79,7 +79,7 @@ int some_object::add_one_and_run()
 	
 
 	cout << "Preparing transactions to preload cache with data...\n";
-	uint64_t num_init = 10000;
+	//uint64_t num_init = 10000;
 	/*for (uint64_t i=0; i<num_init; i++)
 	{
 		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, i*PAGE_SIZE, NULL);
@@ -102,8 +102,8 @@ int some_object::add_one_and_run()
 
 	uint64_t cur_addr = 0;
 
-	const uint64_t NUM_ACCESSES = 100;
-	const int MISS_RATE = 10;
+	//const uint64_t NUM_ACCESSES = 100;
+	//const int MISS_RATE = 10;
 
 	cout << "Number of sets is" << NUM_SETS << endl;
 	cout << "Starting flash test...\n";

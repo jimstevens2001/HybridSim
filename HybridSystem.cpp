@@ -784,7 +784,7 @@ namespace HybridSim {
 		vector<double> ave_vpp_erase_power = vector<double>(NUM_PACKAGES, 0.0);
 		vector<double> average_power = vector<double>(NUM_PACKAGES, 0.0);
 
-		for(int i = 0; i < NUM_PACKAGES; i++)
+		for(unsigned int i = 0; i < NUM_PACKAGES; i++)
 		{
 			idle_energy[i] = power_data[0][i];
 			access_energy[i] = power_data[1][i];
