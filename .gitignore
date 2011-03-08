@@ -16,4 +16,5 @@ libhybridsim.so
 NVHybridSim
 libnvhybridsim.so
 dramsim.log
+hybridsim.log
 tags

@@ -52,6 +52,7 @@ namespace HybridSim
 			    TransactionCompleteCB *readDone,
 			    TransactionCompleteCB *writeDone);
 			void reportPower();
+		void printLogfile();
 	};
 	HybridSystem *getMemorySystemInstance(uint id);
 

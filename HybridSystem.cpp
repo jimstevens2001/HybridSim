@@ -238,6 +238,12 @@ namespace HybridSim {
 	{
 		uint64_t addr = ALIGN(trans.address);
 
+		// Log the type of access.
+		if (trans.transactionType == DATA_READ)
+			log.read();
+		else if(trans.transactionType == DATA_WRITE)
+			log.write();
+
 		//	if (addr != trans.address)
 		//	{
 		//		cout << "Assertion fail: aligned address and oriignal address are different.\n";
@@ -295,6 +301,10 @@ namespace HybridSim {
 
 		if (hit)
 		{
+			// Log the hit. 
+			log.hit();
+
+			// Issue operation to the DRAM.
 			if (trans.transactionType == DATA_READ)
 				CacheRead(trans.address, addr, cache_address);
 			else if(trans.transactionType == DATA_WRITE)
@@ -303,6 +313,9 @@ namespace HybridSim {
 
 		if (!hit)
 		{
+			// Log the miss.
+			log.miss();
+
 			// Select a victim offset within the set (LRU)
 			uint64_t victim = *(set_address_list.begin());
 			uint64_t min_ts = 0;
@@ -1070,6 +1083,11 @@ namespace HybridSim {
 	}
 
 	string HybridSystem::SetOutputFileName(string tracefilename) { return ""; }
+
+	void HybridSystem::printLogfile()
+	{
+		log.print();
+	}
 
 	list<uint64_t> HybridSystem::get_valid_pages()
 	{
