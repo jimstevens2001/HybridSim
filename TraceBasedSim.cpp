@@ -208,6 +208,8 @@ int some_object::add_one_and_run()
 	//mem->flash->printStats();
 	mem->reportPower();
 
+	mem->printLogfile();
+
 	for (int i=0; i<500; i++)
 	{
 		mem->update();

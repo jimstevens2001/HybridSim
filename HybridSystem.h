@@ -8,6 +8,7 @@
 
 #include "config.h"
 #include "CallbackHybrid.h"
+#include "Logger.h"
 
 namespace HybridSim
 {
@@ -42,6 +43,8 @@ namespace HybridSim
 		void saveStats();
 		string SetOutputFileName(string tracefilename);
 
+		// Print out the logging data for HybridSim only.
+		void printLogfile();
 
 		// Functions that schedule pending operations (second part to these operations is in the callbacks).
 //		void VictimRead(uint64_t flash_addr, uint64_t victim_cache_addr, uint64_t victim_tag, TransactionType type);
@@ -106,6 +109,9 @@ namespace HybridSim
 		list<DRAMSim::Transaction> trans_queue; // Entry queue for the cache controller.
 		list<DRAMSim::Transaction> dram_queue; // Buffer to wait for DRAM
 		list<DRAMSim::Transaction> flash_queue; // Buffer to wait for Flash
+
+		// Logger is used to store HybridSim-specific logging events.
+		Logger log;
 
 		//Power system variables
 		vector<double> idle_energy;
