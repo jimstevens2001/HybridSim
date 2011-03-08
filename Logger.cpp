@@ -54,6 +54,11 @@ namespace HybridSim
 		// Need to calculate a running average of latency.
 	}
 
+	double Logger::miss_rate()
+	{
+		return (double)num_misses / num_accesses;
+	}
+
 	void Logger::print()
 	{
 			ofstream savefile;
@@ -64,6 +69,7 @@ namespace HybridSim
 			savefile << "num_writes " << num_writes << "\n";
 			savefile << "num_misses " << num_misses << "\n";
 			savefile << "num_hits " << num_hits << "\n";
+			savefile << "miss_rate " << miss_rate() << "\n";
 
 			savefile.close();
 	}

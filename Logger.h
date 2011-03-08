@@ -23,6 +23,7 @@ namespace HybridSim
 		void read_latency(uint64_t cycles);
 		void write_latency(uint64_t cycles);
 
+		double miss_rate();
 		void print();
 
 		uint64_t num_accesses;
