@@ -192,6 +192,9 @@ namespace HybridSim {
 			}
 		}
 
+		// Update the logger.
+		log.update();
+
 		// Update the memories.
 		dram->update();
 		flash->update();
@@ -224,6 +227,9 @@ namespace HybridSim {
 		trans_queue.push_back(trans);
 		//cout << "pushed\n";
 
+		// Start the logging for this access.
+		log.access_start(trans.address);
+
 		return true; // TODO: Figure out when this could be false.
 	}
 
@@ -238,11 +244,8 @@ namespace HybridSim {
 	{
 		uint64_t addr = ALIGN(trans.address);
 
-		// Log the type of access.
-		if (trans.transactionType == DATA_READ)
-			log.read();
-		else if(trans.transactionType == DATA_WRITE)
-			log.write();
+		// Tell the logger when the access is processed (used for timing the time in queue).
+		log.access_process(trans.address, trans.transactionType == DATA_READ);
 
 		//	if (addr != trans.address)
 		//	{
@@ -302,7 +305,7 @@ namespace HybridSim {
 		if (hit)
 		{
 			// Log the hit. 
-			log.hit();
+			log.access_cache(trans.address, true);
 
 			// Issue operation to the DRAM.
 			if (trans.transactionType == DATA_READ)
@@ -313,8 +316,6 @@ namespace HybridSim {
 
 		if (!hit)
 		{
-			// Log the miss.
-			log.miss();
 
 			// Select a victim offset within the set (LRU)
 			uint64_t victim = *(set_address_list.begin());
@@ -332,6 +333,9 @@ namespace HybridSim {
 					min_init = true;
 				}
 			}
+
+			// Log the miss (TODO: add more to this: flash page, cache page, and victim flash page).
+			log.access_cache(trans.address, false);
 
 			cache_address = victim;
 			cur_line = cache[cache_address];
@@ -860,6 +864,9 @@ namespace HybridSim {
 			// Call the callback.
 			(*ReadDone)(sysID, orig_addr, cycle);
 		}
+
+		// Finish the logging for this access.
+		log.access_stop(orig_addr);
 	}
 
 
@@ -870,6 +877,9 @@ namespace HybridSim {
 			// Call the callback.
 			(*WriteDone)(sysID, orig_addr, cycle);
 		}
+
+		// Finish the logging for this access.
+		log.access_stop(orig_addr);
 	}
 
 
