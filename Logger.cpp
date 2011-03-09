@@ -28,12 +28,14 @@ namespace HybridSim
 		average_miss_latency = 0;
 		average_hit_latency = 0;
 
-		debug.open("debug.log", ios_base::out | ios_base::trunc);
+		if (DEBUG_LOGGER) 
+			debug.open("debug.log", ios_base::out | ios_base::trunc);
 	}
 
 	Logger::~Logger()
 	{
-		debug.close();
+		if (DEBUG_LOGGER) 
+			debug.close();
 	}
 
 	void Logger::update()
@@ -43,26 +45,42 @@ namespace HybridSim
 
 	void Logger::access_start(uint64_t addr)
 	{
-	
 		access_queue.push_back(pair <uint64_t, uint64_t>(addr, currentClockCycle));
+
+		if (DEBUG_LOGGER)
+		{
+			list<pair <uint64_t, uint64_t>> it = access_queue.begin();
+			debug << "access_start( " << addr << " , " << currentClockCycle << " ) / aq: ( " << (*it).first << " , " << (*it.second) << " )\n\n";
+		}
 	}
 
 	void Logger::access_process(uint64_t addr, bool read_op)
 	{
+		if (DEBUG_LOGGER)
+			debug << "access_process( " << addr << " , " << read_op << " )\n";
+
 		// Get entry off of the access_queue.
 		uint64_t start_cycle = 0;
 		bool found = false;
 		list<pair <uint64_t, uint64_t>>::iterator it;
-		for (it = access_queue.begin(); it != access_queue.end(); it++)
+		uint64_t counter = 0;
+		for (it = access_queue.begin(); it != access_queue.end(); it++, counter++)
 		{
 			uint64_t cur_addr = (*it).first;
 			uint64_t cur_cycle = (*it).second;
+
+			if (DEBUG_LOGGER)
+				debug << counter << " cur_addr = " << cur_addr << ", cur_cycle = " << cur_cycle << "\n";
 
 			if (cur_addr == addr)
 			{
 				start_cycle = cur_cycle;
 				found = true;
 				access_queue.erase(it);
+
+				if (DEBUG_LOGGER)
+					debug << "found match!\n";
+
 				break;
 			}
 		}
@@ -90,11 +108,18 @@ namespace HybridSim
 		else
 			this->write();
 
-		this->queue_latency(a.process - a.start);
+		uint64_t time_in_queue = a.process - a.start;
+		this->queue_latency(time_in_queue);
+
+		if (DEBUG_LOGGER)
+			debug << "finished access_process. time_in_queue = " << time_in_queue << "\n\n";
 	}
 
 	void Logger::access_stop(uint64_t addr)
 	{
+		if (DEBUG_LOGGER)
+			debug << "access_stop( " << addr << " )\n";
+
 		if (access_map.count(addr) == 0)
 		{
 			cerr << "ERROR: Logger.access_stop() called with address not in access_map. address=" << hex << addr << "\n" << dec;
@@ -119,6 +144,9 @@ namespace HybridSim
 			
 		
 		access_map.erase(addr);
+
+		if (DEBUG_LOGGER)
+			debug << "finished access_stop. latency = " << latency << "\n\n";
 	}
 
 	void Logger::access_cache(uint64_t addr, bool hit)
