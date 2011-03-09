@@ -13,6 +13,7 @@ namespace HybridSim
 	{
 		public:
 		Logger();
+		~Logger();
 
 		// State
 		uint64_t num_accesses;
@@ -27,10 +28,15 @@ namespace HybridSim
 		uint64_t num_write_misses;
 		uint64_t num_write_hits;
 		
+		uint64_t sum_latency;
+
 		uint64_t average_latency;
 		uint64_t average_read_latency;
 		uint64_t average_write_latency;
 		uint64_t average_queue_latency;
+
+		uint64_t average_hit_latency;
+		uint64_t average_miss_latency;
 
 
 		class AccessMapEntry
@@ -80,15 +86,21 @@ namespace HybridSim
 		void write_hit();
 		void write_miss();
 
+		double compute_running_average(double old_average, double num_values, double new_value);
+		void latency(uint64_t cycles);
 		void read_latency(uint64_t cycles);
 		void write_latency(uint64_t cycles);
 		void queue_latency(uint64_t cycles);
+
+		void hit_latency(uint64_t cycles);
+		void miss_latency(uint64_t cycles);
 
 		double miss_rate();
 		double read_miss_rate();
 		double write_miss_rate();
 		void print();
 
+		ofstream debug;
 	};
 
 }

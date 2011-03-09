@@ -18,10 +18,22 @@ namespace HybridSim
 		num_write_misses = 0;
 		num_write_hits = 0;
 
+		sum_latency = 0;
+
 		average_latency = 0;
 		average_read_latency = 0;
 		average_write_latency = 0;
 		average_queue_latency = 0;
+
+		average_miss_latency = 0;
+		average_hit_latency = 0;
+
+		debug.open("debug.log", ios_base::out | ios_base::trunc);
+	}
+
+	Logger::~Logger()
+	{
+		debug.close();
 	}
 
 	void Logger::update()
@@ -31,6 +43,7 @@ namespace HybridSim
 
 	void Logger::access_start(uint64_t addr)
 	{
+	
 		access_queue.push_back(pair <uint64_t, uint64_t>(addr, currentClockCycle));
 	}
 
@@ -76,6 +89,8 @@ namespace HybridSim
 			this->read();
 		else
 			this->write();
+
+		this->queue_latency(a.process - a.start);
 	}
 
 	void Logger::access_stop(uint64_t addr)
@@ -90,10 +105,18 @@ namespace HybridSim
 		a.stop = this->currentClockCycle;
 		access_map[addr] = a;
 
+		uint64_t latency = a.stop - a.start;
+
 		if (a.read_op)
-			this->read_latency(a.stop - a.start);
+			this->read_latency(latency);
 		else
-			this->write_latency(a.stop - a.start);
+			this->write_latency(latency);
+
+		if (a.hit)
+			this->hit_latency(latency);
+		else
+			this->miss_latency(latency);
+			
 		
 		access_map.erase(addr);
 	}
@@ -169,19 +192,42 @@ namespace HybridSim
 	}
 
 
+	double Logger::compute_running_average(double old_average, double num_values, double new_value)
+	{
+		return ((old_average * (num_values - 1)) + (new_value)) / num_values;
+	}
+
+	void Logger::latency(uint64_t cycles)
+	{
+		average_latency = compute_running_average(average_latency, num_accesses, cycles);
+		sum_latency += cycles;
+	}
+
 	void Logger::read_latency(uint64_t cycles)
 	{
-		// Need to calculate a running average of latency.
+		this->latency(cycles);
+		average_read_latency = compute_running_average(average_read_latency, num_reads, cycles);
 	}
 
 	void Logger::write_latency(uint64_t cycles)
 	{
-		// Need to calculate a running average of latency.
+		this->latency(cycles);
+		average_write_latency = compute_running_average(average_write_latency, num_writes, cycles);
 	}
 
 	void Logger::queue_latency(uint64_t cycles)
 	{
-		// Need to calculate a running average of latency.
+		average_queue_latency = compute_running_average(average_queue_latency, num_accesses, cycles);
+	}
+
+	void Logger::hit_latency(uint64_t cycles)
+	{
+		average_hit_latency = compute_running_average(average_hit_latency, num_hits, cycles);
+	}
+
+	void Logger::miss_latency(uint64_t cycles)
+	{
+		average_miss_latency = compute_running_average(average_miss_latency, num_misses, cycles);
 	}
 
 	double Logger::miss_rate()
@@ -216,6 +262,13 @@ namespace HybridSim
 			savefile << "miss_rate " << miss_rate() << "\n";
 			savefile << "read_miss_rate " << read_miss_rate() << "\n";
 			savefile << "write_miss_rate " << write_miss_rate() << "\n";
+			savefile << "sum_latency " << sum_latency << "\n";
+			savefile << "average_latency " << average_latency << "\n";
+			savefile << "average_read_latency " << average_read_latency << "\n";
+			savefile << "average_write_latency " << average_write_latency << "\n";
+			savefile << "average_queue_latency " << average_queue_latency << "\n";
+			savefile << "average_hit_latency " << average_hit_latency << "\n";
+			savefile << "average_miss_latency " << average_miss_latency << "\n";
 
 			savefile.close();
 	}
