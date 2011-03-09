@@ -49,8 +49,8 @@ namespace HybridSim
 
 		if (DEBUG_LOGGER)
 		{
-			list<pair <uint64_t, uint64_t>> it = access_queue.begin();
-			debug << "access_start( " << addr << " , " << currentClockCycle << " ) / aq: ( " << (*it).first << " , " << (*it.second) << " )\n\n";
+			list<pair <uint64_t, uint64_t>>::iterator it = access_queue.begin();
+			debug << "access_start( " << addr << " , " << currentClockCycle << " ) / aq: ( " << (*it).first << " , " << (*it).second << " )\n\n";
 		}
 	}
 
