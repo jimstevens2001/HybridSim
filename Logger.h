@@ -38,13 +38,12 @@ namespace HybridSim
 		uint64_t sum_hit_latency;
 		uint64_t sum_miss_latency;
 
-		uint64_t average_latency;
-		uint64_t average_read_latency;
-		uint64_t average_write_latency;
-		uint64_t average_queue_latency;
+		uint64_t sum_read_hit_latency;
+		uint64_t sum_read_miss_latency;
 
-		uint64_t average_hit_latency;
-		uint64_t average_miss_latency;
+		uint64_t sum_write_hit_latency;
+		uint64_t sum_write_miss_latency;
+
 
 
 		class AccessMapEntry
@@ -98,14 +97,22 @@ namespace HybridSim
 		void latency(uint64_t cycles);
 		void read_latency(uint64_t cycles);
 		void write_latency(uint64_t cycles);
+		void read_hit_latency(uint64_t cycles);
+		void read_miss_latency(uint64_t cycles);
+		void write_hit_latency(uint64_t cycles);
+		void write_miss_latency(uint64_t cycles);
 		void queue_latency(uint64_t cycles);
 
 		void hit_latency(uint64_t cycles);
 		void miss_latency(uint64_t cycles);
 
+		double divide(uint64_t a, uint64_t b);
+
 		double miss_rate();
 		double read_miss_rate();
 		double write_miss_rate();
+		double compute_throughput(uint64_t cycles, uint64_t accesses);
+
 		void print();
 
 		ofstream debug;

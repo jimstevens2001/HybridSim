@@ -25,13 +25,11 @@ namespace HybridSim
 		sum_miss_latency = 0;
 		sum_hit_latency = 0;
 
-		average_latency = 0;
-		average_read_latency = 0;
-		average_write_latency = 0;
-		average_queue_latency = 0;
+		sum_read_hit_latency = 0;
+		sum_read_miss_latency = 0;
 
-		average_miss_latency = 0;
-		average_hit_latency = 0;
+		sum_write_hit_latency = 0;
+		sum_write_miss_latency = 0;
 
 		if (DEBUG_LOGGER) 
 			debug.open("debug.log", ios_base::out | ios_base::trunc);
@@ -137,16 +135,15 @@ namespace HybridSim
 
 		uint64_t latency = a.stop - a.start;
 
-		if (a.read_op)
-			this->read_latency(latency);
-		else
-			this->write_latency(latency);
+		if (a.read_op && a.hit)
+			this->read_hit_latency(latency);
+		else if (a.read_op && !a.hit)
+			this->read_miss_latency(latency);
+		else if (!a.read_op && a.hit)
+			this->write_hit_latency(latency);
+		else if (!a.read_op && !a.hit)
+			this->write_miss_latency(latency);
 
-		if (a.hit)
-			this->hit_latency(latency);
-		else
-			this->miss_latency(latency);
-			
 		
 		access_map.erase(addr);
 
@@ -232,88 +229,134 @@ namespace HybridSim
 
 	void Logger::latency(uint64_t cycles)
 	{
-		average_latency = compute_running_average(average_latency, num_accesses, cycles);
+		//average_latency = compute_running_average(average_latency, num_accesses, cycles);
 		sum_latency += cycles;
 	}
 
 	void Logger::read_latency(uint64_t cycles)
 	{
 		this->latency(cycles);
-		average_read_latency = compute_running_average(average_read_latency, num_reads, cycles);
+		//average_read_latency = compute_running_average(average_read_latency, num_reads, cycles);
 		sum_read_latency += cycles;
 	}
 
 	void Logger::write_latency(uint64_t cycles)
 	{
 		this->latency(cycles);
-		average_write_latency = compute_running_average(average_write_latency, num_writes, cycles);
 		sum_write_latency += cycles;
 	}
 
 	void Logger::queue_latency(uint64_t cycles)
 	{
-		average_queue_latency = compute_running_average(average_queue_latency, num_accesses, cycles);
 		sum_queue_latency += cycles;
 	}
 
 	void Logger::hit_latency(uint64_t cycles)
 	{
-		average_hit_latency = compute_running_average(average_hit_latency, num_hits, cycles);
 		sum_hit_latency += cycles;
 	}
 
 	void Logger::miss_latency(uint64_t cycles)
 	{
-		average_miss_latency = compute_running_average(average_miss_latency, num_misses, cycles);
 		sum_miss_latency += cycles;
+	}
+
+	void Logger::read_hit_latency(uint64_t cycles)
+	{
+		this->read_latency(cycles);
+		this->hit_latency(cycles);
+		sum_read_hit_latency += cycles;
+	}
+
+	void Logger::read_miss_latency(uint64_t cycles)
+	{
+		this->read_latency(cycles);
+		this->miss_latency(cycles);
+		sum_read_miss_latency += cycles;
+	}
+
+	void Logger::write_hit_latency(uint64_t cycles)
+	{
+		this->write_latency(cycles);
+		this->hit_latency(cycles);
+		sum_write_hit_latency += cycles;
+	}
+
+	void Logger::write_miss_latency(uint64_t cycles)
+	{
+		this->write_latency(cycles);
+		this->miss_latency(cycles);
+		sum_write_miss_latency += cycles;
+	}
+
+	double Logger::divide(uint64_t a, uint64_t b)
+	{
+		// This is a division routine to prevent floating point exceptions if the denominator is 0.
+		if (b == 0)
+			return 0.0;
+		else
+			return (double)a / (double)b;
 	}
 
 	double Logger::miss_rate()
 	{
-		return (double)num_misses / num_accesses;
+		return this->divide(num_misses, num_accesses);
 	}
 
 	double Logger::read_miss_rate()
 	{
-		return (double)num_read_misses / num_reads;
+		return this->divide(num_read_misses, num_reads);
 	}
 
 	double Logger::write_miss_rate()
 	{
-		return (double)num_write_misses / num_writes;
+		return this->divide(num_write_misses, num_writes);
 	}
+
+	double Logger::compute_throughput(uint64_t cycles, uint64_t accesses)
+	{
+		// Calculate the throughput in kilobytes per second.
+		return ((this->divide(accesses, cycles) * CYCLES_PER_SECOND) * BURST_SIZE) / 1024.0;
+	}
+
 
 	void Logger::print()
 	{
-			ofstream savefile;
-			savefile.open("hybridsim.log", ios_base::out | ios_base::trunc);
+		ofstream savefile;
+		savefile.open("hybridsim.log", ios_base::out | ios_base::trunc);
 
-			savefile << "num_accesses " << num_accesses << "\n";
-			savefile << "num_reads " << num_reads << "\n";
-			savefile << "num_writes " << num_writes << "\n";
-			savefile << "num_misses " << num_misses << "\n";
-			savefile << "num_hits " << num_hits << "\n";
-			savefile << "num_read_misses " << num_read_misses << "\n";
-			savefile << "num_read_hits " << num_read_hits << "\n";
-			savefile << "num_write_misses " << num_write_misses << "\n";
-			savefile << "num_write_hits " << num_write_hits << "\n";
-			savefile << "miss_rate " << miss_rate() << "\n";
-			savefile << "read_miss_rate " << read_miss_rate() << "\n";
-			savefile << "write_miss_rate " << write_miss_rate() << "\n";
-			savefile << "sum_latency " << sum_latency << "\n";
-			savefile << "sum_read_latency " << sum_read_latency << "\n";
-			savefile << "sum_write_latency " << sum_write_latency << "\n";
-			savefile << "sum_queue_latency " << sum_queue_latency << "\n";
-			savefile << "sum_hit_latency " << sum_hit_latency << "\n";
-			savefile << "sum_miss_latency " << sum_miss_latency << "\n";
-			savefile << "average_latency " << average_latency << "\n";
-			savefile << "average_read_latency " << average_read_latency << "\n";
-			savefile << "average_write_latency " << average_write_latency << "\n";
-			savefile << "average_queue_latency " << average_queue_latency << "\n";
-			savefile << "average_hit_latency " << average_hit_latency << "\n";
-			savefile << "average_miss_latency " << average_miss_latency << "\n";
+		savefile << "total accesses: " << num_accesses << "\n";
+		savefile << "misses: " << num_misses << "\n";
+		savefile << "hits: " << num_hits << "\n";
+		savefile << "miss rate: " << miss_rate() << "\n";
+		savefile << "average latency: " << this->divide(sum_latency, num_accesses) << " cycles\n";
+		savefile << "average queue latency: " << this->divide(sum_queue_latency, num_accesses) << " cycles\n";
+		savefile << "average miss latency: " << this->divide(sum_miss_latency, num_misses) << " cycles\n";
+		savefile << "average hit latency: " << this->divide(sum_hit_latency, num_hits) << " cycles\n";
+		savefile << "throughput: " << this->compute_throughput(this->currentClockCycle, num_accesses) << " KB/s\n";
+		savefile << "\n";
 
-			savefile.close();
+		savefile << "reads: " << num_reads << "\n";
+		savefile << "misses: " << num_read_misses << "\n";
+		savefile << "hits: " << num_read_hits << "\n";
+		savefile << "miss rate: " << read_miss_rate() << "\n";
+		savefile << "average latency: " << this->divide(sum_read_latency, num_reads) << " cycles\n";
+		savefile << "average miss latency: " << this->divide(sum_read_miss_latency, num_read_misses) << " cycles\n";
+		savefile << "average hit latency: " << this->divide(sum_read_hit_latency, num_read_hits) << " cycles\n";
+		savefile << "throughput: " << this->compute_throughput(this->currentClockCycle, num_reads) << " KB/s\n";
+		savefile << "\n";
+
+		savefile << "writes: " << num_writes << "\n";
+		savefile << "misses: " << num_write_misses << "\n";
+		savefile << "hits: " << num_write_hits << "\n";
+		savefile << "miss rate: " << write_miss_rate() << "\n";
+		savefile << "average latency: " << this->divide(sum_write_latency, num_writes) << " cycles\n";
+		savefile << "average miss latency: " << this->divide(sum_write_miss_latency, num_write_misses) << " cycles\n";
+		savefile << "average hit latency: " << this->divide(sum_write_hit_latency, num_write_hits) << " cycles\n";
+		savefile << "throughput: " << this->compute_throughput(this->currentClockCycle, num_writes) << " KB/s\n";
+		savefile << "\n";
+
+		savefile.close();
 	}
 
 }

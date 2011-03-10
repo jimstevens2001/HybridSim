@@ -61,6 +61,11 @@ const uint64_t TOTAL_PAGES = 2097152/4; // 2 GB
 //const uint64_t TOTAL_PAGES = 4194304; // 4 GB
 const uint64_t CACHE_PAGES = 1048576/4; // 1 GB
 
+
+// Defined in marss memoryHierachy.cpp.
+// Need to confirm this and make it more flexible later.
+const uint64_t CYCLES_PER_SECOND = 667000000;
+
 // INI files
 const string dram_ini = "ini/DDR3_micron_8M_8B_x8_sg15.ini";
 const string flash_ini = "ini/samsung_K9XXG08UXM(mod).ini";
