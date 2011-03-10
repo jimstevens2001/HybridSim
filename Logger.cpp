@@ -319,6 +319,17 @@ namespace HybridSim
 		return ((this->divide(accesses, cycles) * CYCLES_PER_SECOND) * BURST_SIZE) / 1024.0;
 	}
 
+	double Logger::latency_cycles(uint64_t sum, uint64_t accesses)
+	{
+		return this->divide(sum, accesses);
+	}
+
+	double Logger::latency_us(uint64_t sum, uint64_t accesses)
+	{
+		// Calculate the average latency in microseconds.
+		return (this->divide(sum, accesses) / CYCLES_PER_SECOND) * 1000000;
+	}
+
 
 	void Logger::print()
 	{
@@ -326,13 +337,18 @@ namespace HybridSim
 		savefile.open("hybridsim.log", ios_base::out | ios_base::trunc);
 
 		savefile << "total accesses: " << num_accesses << "\n";
+		savefile << "cycles: " << this->currentClockCycle << " (" << (this->currentClockCycle / (double)CYCLES_PER_SECOND) * 1000000 << " us)\n";
 		savefile << "misses: " << num_misses << "\n";
 		savefile << "hits: " << num_hits << "\n";
 		savefile << "miss rate: " << miss_rate() << "\n";
-		savefile << "average latency: " << this->divide(sum_latency, num_accesses) << " cycles\n";
-		savefile << "average queue latency: " << this->divide(sum_queue_latency, num_accesses) << " cycles\n";
-		savefile << "average miss latency: " << this->divide(sum_miss_latency, num_misses) << " cycles\n";
-		savefile << "average hit latency: " << this->divide(sum_hit_latency, num_hits) << " cycles\n";
+		savefile << "average latency: " << this->latency_cycles(sum_latency, num_accesses) << " cycles";
+		savefile << " (" << this->latency_us(sum_latency, num_accesses) << " us)\n";
+		savefile << "average queue latency: " << this->latency_cycles(sum_queue_latency, num_accesses) << " cycles";
+		savefile << " (" << this->latency_us(sum_queue_latency, num_accesses) << " us)\n";
+		savefile << "average miss latency: " << this->latency_cycles(sum_miss_latency, num_misses) << " cycles";
+		savefile << " (" << this->latency_us(sum_miss_latency, num_misses) << " us)\n";
+		savefile << "average hit latency: " << this->latency_cycles(sum_hit_latency, num_hits) << " cycles";
+		savefile << " (" << this->latency_us(sum_hit_latency, num_hits) << " us)\n";
 		savefile << "throughput: " << this->compute_throughput(this->currentClockCycle, num_accesses) << " KB/s\n";
 		savefile << "\n";
 
@@ -340,9 +356,12 @@ namespace HybridSim
 		savefile << "misses: " << num_read_misses << "\n";
 		savefile << "hits: " << num_read_hits << "\n";
 		savefile << "miss rate: " << read_miss_rate() << "\n";
-		savefile << "average latency: " << this->divide(sum_read_latency, num_reads) << " cycles\n";
-		savefile << "average miss latency: " << this->divide(sum_read_miss_latency, num_read_misses) << " cycles\n";
-		savefile << "average hit latency: " << this->divide(sum_read_hit_latency, num_read_hits) << " cycles\n";
+		savefile << "average latency: " << this->latency_cycles(sum_read_latency, num_reads) << " cycles";
+		savefile << " (" << this->latency_us(sum_read_latency, num_reads) << " us)\n";
+		savefile << "average miss latency: " << this->latency_cycles(sum_read_miss_latency, num_read_misses) << " cycles";
+		savefile << " (" << this->latency_us(sum_read_miss_latency, num_read_misses) << " us)\n";
+		savefile << "average hit latency: " << this->latency_cycles(sum_read_hit_latency, num_read_hits) << " cycles";
+		savefile << " (" << this->latency_us(sum_read_hit_latency, num_read_hits) << " us)\n";
 		savefile << "throughput: " << this->compute_throughput(this->currentClockCycle, num_reads) << " KB/s\n";
 		savefile << "\n";
 
@@ -350,9 +369,12 @@ namespace HybridSim
 		savefile << "misses: " << num_write_misses << "\n";
 		savefile << "hits: " << num_write_hits << "\n";
 		savefile << "miss rate: " << write_miss_rate() << "\n";
-		savefile << "average latency: " << this->divide(sum_write_latency, num_writes) << " cycles\n";
-		savefile << "average miss latency: " << this->divide(sum_write_miss_latency, num_write_misses) << " cycles\n";
-		savefile << "average hit latency: " << this->divide(sum_write_hit_latency, num_write_hits) << " cycles\n";
+		savefile << "average latency: " << this->latency_cycles(sum_write_latency, num_writes) << " cycles";
+		savefile << " (" << this->latency_us(sum_write_latency, num_writes) << " us)\n";
+		savefile << "average miss latency: " << this->latency_cycles(sum_write_miss_latency, num_write_misses) << " cycles";
+		savefile << " (" << this->latency_us(sum_write_miss_latency, num_write_misses) << " us)\n";
+		savefile << "average hit latency: " << this->latency_cycles(sum_write_hit_latency, num_write_hits) << " cycles";
+		savefile << " (" << this->latency_us(sum_write_hit_latency, num_write_hits) << " us)\n";
 		savefile << "throughput: " << this->compute_throughput(this->currentClockCycle, num_writes) << " KB/s\n";
 		savefile << "\n";
 

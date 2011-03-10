@@ -112,6 +112,8 @@ namespace HybridSim
 		double read_miss_rate();
 		double write_miss_rate();
 		double compute_throughput(uint64_t cycles, uint64_t accesses);
+		double latency_cycles(uint64_t sum, uint64_t accesses);
+		double latency_us(uint64_t sum, uint64_t accesses);
 
 		void print();
 

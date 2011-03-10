@@ -2,8 +2,8 @@
 #define CONFIG_H
 
 // Default values for alternate code.
-#define DEBUG_CACHE 1
-#define DEBUG_LOGGER 1
+#define DEBUG_CACHE 0
+#define DEBUG_LOGGER 0
 #define SINGLE_WORD 0
 #define FDSIM 0
 #define NVDSIM 1
