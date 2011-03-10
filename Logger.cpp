@@ -19,6 +19,11 @@ namespace HybridSim
 		num_write_hits = 0;
 
 		sum_latency = 0;
+		sum_read_latency = 0;
+		sum_write_latency = 0;
+		sum_queue_latency = 0;
+		sum_miss_latency = 0;
+		sum_hit_latency = 0;
 
 		average_latency = 0;
 		average_read_latency = 0;
@@ -235,27 +240,32 @@ namespace HybridSim
 	{
 		this->latency(cycles);
 		average_read_latency = compute_running_average(average_read_latency, num_reads, cycles);
+		sum_read_latency += cycles;
 	}
 
 	void Logger::write_latency(uint64_t cycles)
 	{
 		this->latency(cycles);
 		average_write_latency = compute_running_average(average_write_latency, num_writes, cycles);
+		sum_write_latency += cycles;
 	}
 
 	void Logger::queue_latency(uint64_t cycles)
 	{
 		average_queue_latency = compute_running_average(average_queue_latency, num_accesses, cycles);
+		sum_queue_latency += cycles;
 	}
 
 	void Logger::hit_latency(uint64_t cycles)
 	{
 		average_hit_latency = compute_running_average(average_hit_latency, num_hits, cycles);
+		sum_hit_latency += cycles;
 	}
 
 	void Logger::miss_latency(uint64_t cycles)
 	{
 		average_miss_latency = compute_running_average(average_miss_latency, num_misses, cycles);
+		sum_miss_latency += cycles;
 	}
 
 	double Logger::miss_rate()
@@ -291,6 +301,11 @@ namespace HybridSim
 			savefile << "read_miss_rate " << read_miss_rate() << "\n";
 			savefile << "write_miss_rate " << write_miss_rate() << "\n";
 			savefile << "sum_latency " << sum_latency << "\n";
+			savefile << "sum_read_latency " << sum_read_latency << "\n";
+			savefile << "sum_write_latency " << sum_write_latency << "\n";
+			savefile << "sum_queue_latency " << sum_queue_latency << "\n";
+			savefile << "sum_hit_latency " << sum_hit_latency << "\n";
+			savefile << "sum_miss_latency " << sum_miss_latency << "\n";
 			savefile << "average_latency " << average_latency << "\n";
 			savefile << "average_read_latency " << average_read_latency << "\n";
 			savefile << "average_write_latency " << average_write_latency << "\n";

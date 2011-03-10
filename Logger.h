@@ -31,6 +31,12 @@ namespace HybridSim
 		uint64_t num_write_hits;
 		
 		uint64_t sum_latency;
+		uint64_t sum_read_latency;
+		uint64_t sum_write_latency;
+		uint64_t sum_queue_latency;
+
+		uint64_t sum_hit_latency;
+		uint64_t sum_miss_latency;
 
 		uint64_t average_latency;
 		uint64_t average_read_latency;
