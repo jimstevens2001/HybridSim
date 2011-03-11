@@ -218,9 +218,9 @@ namespace HybridSim
 	}
 
 
-	void Logger::access_miss(uint64_t missed_page, uint64_t victim_page, uint64_t cache_set)
+	void Logger::access_miss(uint64_t missed_page, uint64_t victim_page, uint64_t cache_set, uint64_t cache_page, bool dirty, bool valid)
 	{
-		MissedPageEntry m(currentClockCycle, missed_page, victim_page, cache_set);
+		MissedPageEntry m(currentClockCycle, missed_page, victim_page, cache_set, cache_page, dirty, valid);
 		
 		missed_page_list.push_back(m);
 	}
@@ -632,9 +632,14 @@ namespace HybridSim
 			uint64_t missed_page = (*mit).missed_page;
 			uint64_t victim_page = (*mit).victim_page;
 			uint64_t cache_set = (*mit).cache_set;
+			uint64_t cache_page = (*mit).cache_page;
+			bool dirty = (*mit).dirty;
+			bool valid = (*mit).dirty;
 
 			savefile << cycle << ": missed= 0x" << hex << missed_page << "; victim= 0x" << victim_page 
-					<< "; set= " << dec << cache_set << "; victim_tag= " << TAG(victim_page) << ";\n";
+					<< "; set= " << dec << cache_set << "; victim_tag= " << TAG(victim_page)
+					<< "; cache_page= 0x" << hex << cache_page << dec <<"; dirty = " << dirty
+					<< "; valid= " << valid << ";\n";
 		}
 
 		savefile << "\n\n";

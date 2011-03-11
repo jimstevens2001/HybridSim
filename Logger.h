@@ -118,13 +118,19 @@ namespace HybridSim
 			uint64_t missed_page;
 			uint64_t victim_page;
 			uint64_t cache_set;
+			uint64_t cache_page;
+			bool dirty;
+			bool valid;
 
-			MissedPageEntry(uint64_t c, uint64_t missed, uint64_t victim, uint64_t set)
+			MissedPageEntry(uint64_t c, uint64_t missed, uint64_t victim, uint64_t set, uint64_t cache_line, bool d, bool v)
 			{
 				cycle = c;
 				missed_page = missed;
 				victim_page = victim;
 				cache_set = set;
+				cache_page = cache_line;
+				dirty = d;
+				valid = v;
 			}
 		};
 
@@ -175,7 +181,7 @@ namespace HybridSim
 
 		void access_page(uint64_t page_addr);
 
-		void access_miss(uint64_t missed_page, uint64_t victim_page, uint64_t cache_set);
+		void access_miss(uint64_t missed_page, uint64_t victim_page, uint64_t cache_set, uint64_t cache_page, bool dirty, bool valid);
 
 		void print();
 
