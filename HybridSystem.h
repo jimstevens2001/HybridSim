@@ -1,5 +1,5 @@
-#ifndef HYBRIDSYSTEM_H
-#define HYBRIDSYSTEM_H
+#ifndef HYBRIDSIM_HYBRIDSYSTEM_H
+#define HYBRIDSIM_HYBRIDSYSTEM_H
 
 //#include <FlashDIMMSim/FlashDIMM.h>
 

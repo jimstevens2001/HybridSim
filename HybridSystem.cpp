@@ -129,6 +129,9 @@ namespace HybridSim {
 				pending_pages.insert(page_addr);
 				pending_sets.insert(SET_INDEX(page_addr));
 
+				// Log the page access.
+				log.access_page(page_addr);
+
 				// Process the transaction.
 				ProcessTransaction(*it);
 
@@ -336,8 +339,12 @@ namespace HybridSim {
 				}
 			}
 
-			// Log the miss (TODO: add more to this: flash page, cache page, and victim flash page).
+			// Log the miss 
 			log.access_cache(trans.address, false);
+
+			// Log the victim, set, etc.
+			uint64_t victim_flash_addr = (cur_line.tag * NUM_SETS + set_index) * PAGE_SIZE; 
+			log.access_miss(PAGE_ADDRESS(addr), victim_flash_addr, set_index, victim, cur_line.dirty, cur_line.valid);
 
 			cache_address = victim;
 			cur_line = cache[cache_address];

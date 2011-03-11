@@ -20,8 +20,8 @@
 *	 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *
 *****************************************************************************/
-#ifndef CALLBACKHYBRID_H
-#define CALLBACKHYBRID_H
+#ifndef HYBRIDSIM_CALLBACK_H
+#define HYBRIDSIM_CALLBACK_H
 
 #include <vector>
 

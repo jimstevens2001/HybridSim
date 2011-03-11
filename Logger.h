@@ -1,5 +1,5 @@
-#ifndef LOGGER_H
-#define LOGGER_H
+#ifndef HYBRIDSIM_LOGGER_H
+#define HYBRIDSIM_LOGGER_H
 
 #include <iostream>
 #include <fstream>
@@ -17,7 +17,7 @@ namespace HybridSim
 		Logger();
 		~Logger();
 
-		// State
+		// Overall state
 		uint64_t num_accesses;
 		uint64_t num_reads;
 		uint64_t num_writes;
@@ -44,6 +44,101 @@ namespace HybridSim
 		uint64_t sum_write_hit_latency;
 		uint64_t sum_write_miss_latency;
 
+		unordered_map<uint64_t, uint64_t> pages_used; // maps page_addr to num_accesses
+
+		// Epoch state (reset at the beginning of each epoch)
+		uint64_t epoch_count;
+
+		uint64_t cur_num_accesses;
+		uint64_t cur_num_reads;
+		uint64_t cur_num_writes;
+
+		uint64_t cur_num_misses;
+		uint64_t cur_num_hits;
+
+		uint64_t cur_num_read_misses;
+		uint64_t cur_num_read_hits;
+		uint64_t cur_num_write_misses;
+		uint64_t cur_num_write_hits;
+		
+		uint64_t cur_sum_latency;
+		uint64_t cur_sum_read_latency;
+		uint64_t cur_sum_write_latency;
+		uint64_t cur_sum_queue_latency;
+
+		uint64_t cur_sum_hit_latency;
+		uint64_t cur_sum_miss_latency;
+
+		uint64_t cur_sum_read_hit_latency;
+		uint64_t cur_sum_read_miss_latency;
+
+		uint64_t cur_sum_write_hit_latency;
+		uint64_t cur_sum_write_miss_latency;
+
+		unordered_map<uint64_t, uint64_t> cur_pages_used; // maps page_addr to num_accesses
+
+
+		// Epoch lists (used to store state from previous epochs)
+		list<uint64_t> num_accesses_list;
+		list<uint64_t> num_reads_list;
+		list<uint64_t> num_writes_list;
+
+		list<uint64_t> num_misses_list;
+		list<uint64_t> num_hits_list;
+
+		list<uint64_t> num_read_misses_list;
+		list<uint64_t> num_read_hits_list;
+		list<uint64_t> num_write_misses_list;
+		list<uint64_t> num_write_hits_list;
+		
+		list<uint64_t> sum_latency_list;
+		list<uint64_t> sum_read_latency_list;
+		list<uint64_t> sum_write_latency_list;
+		list<uint64_t> sum_queue_latency_list;
+
+		list<uint64_t> sum_hit_latency_list;
+		list<uint64_t> sum_miss_latency_list;
+
+		list<uint64_t> sum_read_hit_latency_list;
+		list<uint64_t> sum_read_miss_latency_list;
+
+		list<uint64_t> sum_write_hit_latency_list;
+		list<uint64_t> sum_write_miss_latency_list;
+
+		list<unordered_map<uint64_t, uint64_t>> pages_used_list; // maps page_addr to num_accesses
+
+
+		// -----------------------------------------------------------
+		// Missed Page Record
+
+		class MissedPageEntry
+		{
+			public:
+			uint64_t cycle;
+			uint64_t missed_page;
+			uint64_t victim_page;
+			uint64_t cache_set;
+			uint64_t cache_page;
+			bool dirty;
+			bool valid;
+
+			MissedPageEntry(uint64_t c, uint64_t missed, uint64_t victim, uint64_t set, uint64_t cache_line, bool d, bool v)
+			{
+				cycle = c;
+				missed_page = missed;
+				victim_page = victim;
+				cache_set = set;
+				cache_page = cache_line;
+				dirty = d;
+				valid = v;
+			}
+		};
+
+		list<MissedPageEntry> missed_page_list;
+
+
+		// -----------------------------------------------------------
+		// Processing state (used to keep track of current transactions, but not part of logging state)
 
 
 		class AccessMapEntry
@@ -71,7 +166,10 @@ namespace HybridSim
 		// Must do this because duplicate addresses may arrive close together.
 		list<pair <uint64_t, uint64_t>> access_queue;
 
-		// Methods
+		ofstream debug;
+
+		// -----------------------------------------------------------
+		// API Methods
 		void update();
 
 		// External logging methods.
@@ -81,7 +179,15 @@ namespace HybridSim
 
 		void access_cache(uint64_t addr, bool hit);
 
+		void access_page(uint64_t page_addr);
+
+		void access_miss(uint64_t missed_page, uint64_t victim_page, uint64_t cache_set, uint64_t cache_page, bool dirty, bool valid);
+
+		void print();
+
+		// -----------------------------------------------------------
 		// Internal helper methods.
+
 		void read();
 		void write();
 
@@ -115,9 +221,7 @@ namespace HybridSim
 		double latency_cycles(uint64_t sum, uint64_t accesses);
 		double latency_us(uint64_t sum, uint64_t accesses);
 
-		void print();
-
-		ofstream debug;
+		void epoch_reset(bool init);
 	};
 
 }
