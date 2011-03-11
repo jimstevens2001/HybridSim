@@ -9,6 +9,7 @@
 #define NVDSIM 1
 #define PRINT_POWER_CB 1
 #define SAVE_POWER_CB 1
+#define EPOCH_LENGTH 200000
 
 
 #include <iostream>
@@ -16,6 +17,7 @@
 #include <sstream>
 #include <list>
 #include <set>
+#include <map>
 #include <unordered_map>
 #include <unordered_set>
 #include <cstdlib>

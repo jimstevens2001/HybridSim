@@ -6,6 +6,7 @@ namespace HybridSim
 {
 	Logger::Logger()
 	{
+		// Overall state
 		num_accesses = 0;
 		num_reads = 0;
 		num_writes = 0;
@@ -31,6 +32,10 @@ namespace HybridSim
 		sum_write_hit_latency = 0;
 		sum_write_miss_latency = 0;
 
+		// Resetting the epoch state will initialize it.
+		epoch_count = 0;
+		this->epoch_reset(true);
+
 		if (DEBUG_LOGGER) 
 			debug.open("debug.log", ios_base::out | ios_base::trunc);
 	}
@@ -43,6 +48,11 @@ namespace HybridSim
 
 	void Logger::update()
 	{
+		// Every EPOCH_LENGTH cycles, reset the epoch state.
+		if (this->currentClockCycle % EPOCH_LENGTH == 0)
+			epoch_reset(false);
+
+		// Increment to the next clock cycle.
 		this->step();
 	}
 
@@ -174,51 +184,111 @@ namespace HybridSim
 			this->write_miss();
 	}
 
+	void Logger::access_page(uint64_t page_addr)
+	{
+		if (pages_used.count(page_addr) == 0)
+		{
+			// Create an entry for a page that has not been previously accessed.
+			pages_used[page_addr] = 0;
+		}
+
+		// At this point, the invariant is that the page entry exists in pages_used
+		// and is >= 0.
+
+		// Load, increment, and store.
+		uint64_t cur_count = pages_used[page_addr];
+		cur_count += 1;
+		pages_used[page_addr] = cur_count;
+
+		// Now do the same for the cur_pages_used (which is for this epoch only).
+
+		if (cur_pages_used.count(page_addr) == 0)
+		{
+			// Create an entry for a page that has not been previously accessed.
+			cur_pages_used[page_addr] = 0;
+		}
+
+		// At this point, the invariant is that the page entry exists in pages_used
+		// and is >= 0.
+
+		// Increment.
+		cur_count = cur_pages_used[page_addr];
+		cur_count += 1;
+		cur_pages_used[page_addr] = cur_count;
+	}
+
+
+	void Logger::access_miss(uint64_t missed_page, uint64_t victim_page, uint64_t cache_set)
+	{
+		MissedPageEntry m(currentClockCycle, missed_page, victim_page, cache_set);
+		
+		missed_page_list.push_back(m);
+	}
+
+
 	void Logger::read()
 	{
 		num_accesses += 1;
 		num_reads += 1;
+
+		cur_num_accesses += 1;
+		cur_num_reads += 1;
 	}
 
 	void Logger::write()
 	{
 		num_accesses += 1;
 		num_writes += 1;
+
+		cur_num_accesses += 1;
+		cur_num_writes += 1;
 	}
 
 
 	void Logger::hit()
 	{
 		num_hits += 1;
+
+		cur_num_hits += 1;
 	}
 
 	void Logger::miss()
 	{
 		num_misses += 1;
+
+		cur_num_misses += 1;
 	}
 
 	void Logger::read_hit()
 	{
 		hit();
 		num_read_hits += 1;
+
+		cur_num_read_hits += 1;
 	}
 
 	void Logger::read_miss()
 	{
 		miss();
 		num_read_misses += 1;
+
+		cur_num_read_misses += 1;
 	}
 
 	void Logger::write_hit()
 	{
 		hit();
 		num_write_hits += 1;
+
+		cur_num_write_hits += 1;
 	}
 
 	void Logger::write_miss()
 	{
 		miss();
 		num_write_misses += 1;
+
+		cur_num_write_misses += 1;
 	}
 
 
@@ -231,6 +301,8 @@ namespace HybridSim
 	{
 		//average_latency = compute_running_average(average_latency, num_accesses, cycles);
 		sum_latency += cycles;
+
+		cur_sum_latency += cycles;
 	}
 
 	void Logger::read_latency(uint64_t cycles)
@@ -238,34 +310,45 @@ namespace HybridSim
 		this->latency(cycles);
 		//average_read_latency = compute_running_average(average_read_latency, num_reads, cycles);
 		sum_read_latency += cycles;
+
+		cur_sum_read_latency += cycles;
 	}
 
 	void Logger::write_latency(uint64_t cycles)
 	{
 		this->latency(cycles);
 		sum_write_latency += cycles;
+
+		cur_sum_write_latency += cycles;
 	}
 
 	void Logger::queue_latency(uint64_t cycles)
 	{
 		sum_queue_latency += cycles;
+
+		cur_sum_queue_latency += cycles;
 	}
 
 	void Logger::hit_latency(uint64_t cycles)
 	{
 		sum_hit_latency += cycles;
+
+		cur_sum_hit_latency += cycles;
 	}
 
 	void Logger::miss_latency(uint64_t cycles)
 	{
 		sum_miss_latency += cycles;
+
+		cur_sum_miss_latency += cycles;
 	}
 
 	void Logger::read_hit_latency(uint64_t cycles)
 	{
 		this->read_latency(cycles);
 		this->hit_latency(cycles);
-		sum_read_hit_latency += cycles;
+
+		cur_sum_read_hit_latency += cycles;
 	}
 
 	void Logger::read_miss_latency(uint64_t cycles)
@@ -273,6 +356,8 @@ namespace HybridSim
 		this->read_latency(cycles);
 		this->miss_latency(cycles);
 		sum_read_miss_latency += cycles;
+
+		cur_sum_read_miss_latency += cycles;
 	}
 
 	void Logger::write_hit_latency(uint64_t cycles)
@@ -280,6 +365,8 @@ namespace HybridSim
 		this->write_latency(cycles);
 		this->hit_latency(cycles);
 		sum_write_hit_latency += cycles;
+
+		cur_sum_write_hit_latency += cycles;
 	}
 
 	void Logger::write_miss_latency(uint64_t cycles)
@@ -287,6 +374,8 @@ namespace HybridSim
 		this->write_latency(cycles);
 		this->miss_latency(cycles);
 		sum_write_miss_latency += cycles;
+
+		cur_sum_write_miss_latency += cycles;
 	}
 
 	double Logger::divide(uint64_t a, uint64_t b)
@@ -331,6 +420,73 @@ namespace HybridSim
 	}
 
 
+	void Logger::epoch_reset(bool init)
+	{
+		// If this is not initialization, then save the epoch state to the lists.
+		if (!init)
+		{
+			// Save all of the state in the epoch lists.
+			num_accesses_list.push_back(cur_num_accesses);
+			num_reads_list.push_back(cur_num_reads);
+			num_writes_list.push_back(cur_num_writes);
+
+			num_misses_list.push_back(cur_num_misses);
+			num_hits_list.push_back(cur_num_hits);
+
+			num_read_misses_list.push_back(cur_num_read_misses);
+			num_read_hits_list.push_back(cur_num_read_hits);
+			num_write_misses_list.push_back(cur_num_write_misses);
+			num_write_hits_list.push_back(cur_num_write_hits);
+			
+			sum_latency_list.push_back(cur_sum_latency);
+			sum_read_latency_list.push_back(cur_sum_read_latency);
+			sum_write_latency_list.push_back(cur_sum_write_latency);
+			sum_queue_latency_list.push_back(cur_sum_queue_latency);
+
+			sum_hit_latency_list.push_back(cur_sum_hit_latency);
+			sum_miss_latency_list.push_back(cur_sum_miss_latency);
+
+			sum_read_hit_latency_list.push_back(cur_sum_read_hit_latency);
+			sum_read_miss_latency_list.push_back(cur_sum_read_miss_latency);
+
+			sum_write_hit_latency_list.push_back(cur_sum_write_hit_latency);
+			sum_write_miss_latency_list.push_back(cur_sum_write_miss_latency);
+
+			pages_used_list.push_back(cur_pages_used); // maps page_addr to num_accesses
+
+			epoch_count++;
+		}
+
+		// Reset epoch state
+		cur_num_accesses = 0;
+		cur_num_reads = 0;
+		cur_num_writes = 0;
+
+		cur_num_misses = 0;
+		cur_num_hits = 0;
+
+		cur_num_read_misses = 0;
+		cur_num_read_hits = 0;
+		cur_num_write_misses = 0;
+		cur_num_write_hits = 0;
+
+		cur_sum_latency = 0;
+		cur_sum_read_latency = 0;
+		cur_sum_write_latency = 0;
+		cur_sum_queue_latency = 0;
+		cur_sum_miss_latency = 0;
+		cur_sum_hit_latency = 0;
+
+		cur_sum_read_hit_latency = 0;
+		cur_sum_read_miss_latency = 0;
+
+		cur_sum_write_hit_latency = 0;
+		cur_sum_write_miss_latency = 0;
+
+		// Clear cur_pages_used
+		cur_pages_used.clear();
+	}
+
 	void Logger::print()
 	{
 		ofstream savefile;
@@ -350,6 +506,8 @@ namespace HybridSim
 		savefile << "average hit latency: " << this->latency_cycles(sum_hit_latency, num_hits) << " cycles";
 		savefile << " (" << this->latency_us(sum_hit_latency, num_hits) << " us)\n";
 		savefile << "throughput: " << this->compute_throughput(this->currentClockCycle, num_accesses) << " KB/s\n";
+		savefile << "working set size in pages: " << pages_used.size() << " (pagesize = " << PAGE_SIZE << " bytes)\n";
+		savefile << "working set size in bytes: " << pages_used.size() * PAGE_SIZE << " bytes\n";
 		savefile << "\n";
 
 		savefile << "reads: " << num_reads << "\n";
@@ -376,7 +534,124 @@ namespace HybridSim
 		savefile << "average hit latency: " << this->latency_cycles(sum_write_hit_latency, num_write_hits) << " cycles";
 		savefile << " (" << this->latency_us(sum_write_hit_latency, num_write_hits) << " us)\n";
 		savefile << "throughput: " << this->compute_throughput(this->currentClockCycle, num_writes) << " KB/s\n";
-		savefile << "\n";
+		savefile << "\n\n";
+
+		savefile << "================================================================================\n\n";
+		savefile << "Epoch data:\n\n";
+
+		for (uint64_t i = 0; i < epoch_count; i++)
+		{
+			savefile << "---------------------------------------------------\n";
+			savefile << "Epoch number: " << i << "\n";
+
+			// Print everything out.
+			savefile << "total accesses: " << num_accesses_list.front() << "\n";
+			savefile << "cycles: " << EPOCH_LENGTH << " (" << (EPOCH_LENGTH / (double)CYCLES_PER_SECOND) * 1000000 << " us)\n";
+			savefile << "misses: " << num_misses_list.front() << "\n";
+			savefile << "hits: " << num_hits_list.front() << "\n";
+			savefile << "miss rate: " << this->divide(num_misses_list.front(), num_accesses_list.front()) << "\n";
+			savefile << "average latency: " << this->latency_cycles(sum_latency_list.front(), num_accesses_list.front()) << " cycles";
+			savefile << " (" << this->latency_us(sum_latency_list.front(), num_accesses_list.front()) << " us)\n";
+			savefile << "average queue latency: " << this->latency_cycles(sum_queue_latency_list.front(), num_accesses_list.front()) << " cycles";
+			savefile << " (" << this->latency_us(sum_queue_latency_list.front(), num_accesses_list.front()) << " us)\n";
+			savefile << "average miss latency: " << this->latency_cycles(sum_miss_latency_list.front(), num_misses_list.front()) << " cycles";
+			savefile << " (" << this->latency_us(sum_miss_latency_list.front(), num_misses_list.front()) << " us)\n";
+			savefile << "average hit latency: " << this->latency_cycles(sum_hit_latency_list.front(), num_hits_list.front()) << " cycles";
+			savefile << " (" << this->latency_us(sum_hit_latency_list.front(), num_hits_list.front()) << " us)\n";
+			savefile << "throughput: " << this->compute_throughput(EPOCH_LENGTH, num_accesses_list.front()) << " KB/s\n";
+			savefile << "working set size in pages: " << pages_used_list.front().size() << " (pagesize = " << PAGE_SIZE << " bytes)\n";
+			savefile << "working set size in bytes: " << pages_used_list.front().size() * PAGE_SIZE << " bytes\n";
+			savefile << "current queue length: " << access_queue.size() << "\n";
+			savefile << "\n";
+
+			savefile << "reads: " << num_reads_list.front() << "\n";
+			savefile << "misses: " << num_read_misses_list.front() << "\n";
+			savefile << "hits: " << num_read_hits_list.front() << "\n";
+			savefile << "miss rate: " << this->divide(num_read_misses_list.front(), num_reads_list.front()) << "\n";
+			savefile << "average latency: " << this->latency_cycles(sum_read_latency_list.front(), num_reads_list.front()) << " cycles";
+			savefile << " (" << this->latency_us(sum_read_latency_list.front(), num_reads_list.front()) << " us)\n";
+			savefile << "average miss latency: " << this->latency_cycles(sum_read_miss_latency_list.front(), num_read_misses_list.front()) << " cycles";
+			savefile << " (" << this->latency_us(sum_read_miss_latency_list.front(), num_read_misses_list.front()) << " us)\n";
+			savefile << "average hit latency: " << this->latency_cycles(sum_read_hit_latency_list.front(), num_read_hits_list.front()) << " cycles";
+			savefile << " (" << this->latency_us(sum_read_hit_latency_list.front(), num_read_hits_list.front()) << " us)\n";
+			savefile << "throughput: " << this->compute_throughput(EPOCH_LENGTH, num_reads_list.front()) << " KB/s\n";
+			savefile << "\n";
+
+			savefile << "writes: " << num_writes_list.front() << "\n";
+			savefile << "misses: " << num_write_misses_list.front() << "\n";
+			savefile << "hits: " << num_write_hits_list.front() << "\n";
+			savefile << "miss rate: " << this->divide(num_write_misses_list.front(), num_writes_list.front()) << "\n";
+			savefile << "average latency: " << this->latency_cycles(sum_write_latency_list.front(), num_writes_list.front()) << " cycles";
+			savefile << " (" << this->latency_us(sum_write_latency_list.front(), num_writes_list.front()) << " us)\n";
+			savefile << "average miss latency: " << this->latency_cycles(sum_write_miss_latency_list.front(), num_write_misses_list.front()) << " cycles";
+			savefile << " (" << this->latency_us(sum_write_miss_latency_list.front(), num_write_misses_list.front()) << " us)\n";
+			savefile << "average hit latency: " << this->latency_cycles(sum_write_hit_latency_list.front(), num_write_hits_list.front()) << " cycles";
+			savefile << " (" << this->latency_us(sum_write_hit_latency_list.front(), num_write_hits_list.front()) << " us)\n";
+			savefile << "throughput: " << this->compute_throughput(EPOCH_LENGTH, num_writes_list.front()) << " KB/s\n";
+			savefile << "\n\n";
+			
+
+
+			// Pop all of the lists.
+			num_accesses_list.pop_front();
+			num_reads_list.pop_front();
+			num_writes_list.pop_front();
+
+			num_misses_list.pop_front();
+			num_hits_list.pop_front();
+
+			num_read_misses_list.pop_front();
+			num_read_hits_list.pop_front();
+			num_write_misses_list.pop_front();
+			num_write_hits_list.pop_front();
+					
+			sum_latency_list.pop_front();
+			sum_read_latency_list.pop_front();
+			sum_write_latency_list.pop_front();
+			sum_queue_latency_list.pop_front();
+
+			sum_hit_latency_list.pop_front();
+			sum_miss_latency_list.pop_front();
+
+			sum_read_hit_latency_list.pop_front();
+			sum_read_miss_latency_list.pop_front();
+
+			sum_write_hit_latency_list.pop_front();
+			sum_write_miss_latency_list.pop_front();
+
+			pages_used_list.pop_front();
+		}
+
+		savefile << "================================================================================\n\n";
+		savefile << "Missed Page Data:\n";
+
+		list<MissedPageEntry>::iterator mit;
+		for (mit = missed_page_list.begin(); mit != missed_page_list.end(); mit++)
+		{
+			uint64_t cycle = (*mit).cycle;
+			uint64_t missed_page = (*mit).missed_page;
+			uint64_t victim_page = (*mit).victim_page;
+			uint64_t cache_set = (*mit).cache_set;
+
+			savefile << cycle << ": missed= 0x" << hex << missed_page << "; victim= 0x" << victim_page 
+					<< "; set= " << dec << cache_set << "; victim_tag= " << TAG(victim_page) << ";\n";
+		}
+
+		savefile << "\n\n";
+
+		savefile << "================================================================================\n\n";
+		savefile << "Pages accessed:\n";
+
+		savefile << flush;
+
+		unordered_map<uint64_t, uint64_t>::iterator it; 
+		for (it = pages_used.begin(); it != pages_used.end(); it++)
+		{
+			uint64_t page_addr = (*it).first;
+			uint64_t num_accesses = (*it).second;
+			savefile << hex << "0x" << page_addr << " : " << dec << num_accesses << "\n";
+		}
+
 
 		savefile.close();
 	}

@@ -56,7 +56,10 @@ ${LIB_NAME}: ${POBJ}
 MBOBSim.o: TraceBasedSim.cpp
 	g++ ${CXXFLAGS} -DMBOB_SYSTEM -o $@ -c $<
 
+#%.po : %.cpp
+#	g++ $(INCLUDES) -std=c++0x -O3 -g -ffast-math -fPIC -DNO_OUTPUT -DNO_STORAGE -o $@ -c $<
 %.po : %.cpp
-	g++ $(INCLUDES) -std=c++0x -O3 -ffast-math -fPIC -DNO_OUTPUT -DNO_STORAGE -o $@ -c $<
+	g++ $(INCLUDES) -std=c++0x -g -ffast-math -fPIC -DNO_OUTPUT -DNO_STORAGE -o $@ -c $<
+
 clean: 
 	rm -rf ${REBUILDABLES} *.dep out results *.log callgrind*
