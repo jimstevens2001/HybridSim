@@ -99,6 +99,11 @@ namespace HybridSim
 		set<uint64_t> pending_pages; // If a page is in the pending set, then skip subsequent transactions to the page.
 
 		set<uint64_t> pending_sets; // If a page is in the pending set, then skip subsequent transactions to the page.
+
+		bool check_queue; // If there is nothing to do, don't check the queue until the next event occurs that will make new work.
+
+		uint64_t delay_counter; // Used to stall the controller while it is "doing work".
+
 		int64_t pending_count;
 		set<uint64_t> dram_pending_set;
 		list<uint64_t> dram_bad_address;

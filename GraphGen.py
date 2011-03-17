@@ -1,3 +1,5 @@
+import matplotlib
+
 def parse_file(logfile):
 	section = '================================================================================'
 
@@ -103,4 +105,4 @@ access_dict = parse_accesses(sections['access'])
 
 #print epoch_list
 
-print epoch_list[304]['total']['average miss latency cycles']
+print total_dict

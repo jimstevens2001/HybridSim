@@ -48,6 +48,13 @@ namespace HybridSim {
 		flash->RegisterCallbacks(read_cb, write_cb, NULL);
 #endif
 
+		// Need to check the queue when we start.
+		check_queue = true;
+
+		// No delay to start with.
+		delay_counter = 0;
+
+
 		// Power stuff
 		idle_energy = vector<double>(NUM_PACKAGES, 0.0); 
 		access_energy = vector<double>(NUM_PACKAGES, 0.0); 
@@ -93,33 +100,12 @@ namespace HybridSim {
 			trans_queue_max = trans_queue.size();
 
 
+		// Used to see if any work is done on this cycle.
+		bool sent_transaction = false;
 
-		//if (trans_queue.size() > 0)
-		//if (currentClockCycle % 1000 == 0)
-		if (false)
-		{
-			cout << currentClockCycle << ": ";
-			cout << trans_queue.size() << "/" << pending_pages.size() << " is length of trans_queue/pending_pages (";
-			//		set<uint64_t>::iterator it;
-			//		for (it=pending_pages.begin(); it != pending_pages.end(); ++it)
-			//		{
-			//			cout << " " << *it;
-			//		}
-			cout << ")\n(";
-			list<DRAMSim::Transaction>::iterator it2;
-			for (it2=trans_queue.begin(); it2 != trans_queue.end(); ++it2)
-			{
-				cout << " " << (*it2).address;
-			}
-			cout << ")\n";
-			cout << "dram_queue=" << dram_queue.size() << " flash_queue=" << flash_queue.size() << "\n";
-			cout << "dram_pending=" << dram_pending.size() << " flash_pending=" << flash_pending.size() << "\n\n";
-		}
+
 		list<DRAMSim::Transaction>::iterator it = trans_queue.begin();
-		//while(!trans_queue.empty())
-		//for (list<Transaction>::iterator it = trans_queue.begin(); it != trans_queue.end(); ++it)
-		//while(it != trans_queue.end())
-		while((it != trans_queue.end()) && (pending_sets.size() < (CACHE_PAGES / SET_SIZE)))
+		while((it != trans_queue.end()) && (pending_sets.size() < (CACHE_PAGES / SET_SIZE)) && (check_queue) && (delay_counter == 0))
 		{
 			//ProcessTransaction(trans_queue.front());
 			//trans_queue.pop_front();
@@ -147,6 +133,10 @@ namespace HybridSim {
 				// Delete this item and skip to the next.
 				it = trans_queue.erase(it);
 
+				sent_transaction = true;
+
+				delay_counter = CONTROLLER_DELAY;
+
 				break;
 			}
 			else
@@ -158,9 +148,21 @@ namespace HybridSim {
 			}
 		}
 
+		// If there is nothing to do, wait until a new transaction arrives or a pending set is released.
+		// Only set check_queue to false if the delay counter is 0. Otherwise, a transaction that arrives
+		// while delay_counter is running might get missed and stuck in the queue.
+		if ((sent_transaction == false) && (delay_counter == 0))
+		{
+			this->check_queue = false;
+		}
+
+
 		// Process DRAM transaction queue until it is empty or addTransaction returns false.
+		// Note: This used to be a while, but was changed ot an if to only allow one
+		// transaction to be sent to the DRAM per cycle.
 		bool not_full = true;
-		while(not_full && !dram_queue.empty())
+		//if (not_full && !dram_queue.empty() && (delay_counter == 0))
+		if (not_full && !dram_queue.empty())
 		{
 			DRAMSim::Transaction tmp = dram_queue.front();
 			bool isWrite;
@@ -177,8 +179,11 @@ namespace HybridSim {
 		}
 
 		// Process Flash transaction queue until it is empty or addTransaction returns false.
+		// Note: This used to be a while, but was changed ot an if to only allow one
+		// transaction to be sent to the flash per cycle.
 		not_full = true;
-		while(not_full && !flash_queue.empty())
+		//if (not_full && !flash_queue.empty() && (delay_counter == 0))
+		if (not_full && !flash_queue.empty())
 		{
 #if FDSIM
 			// put some code to deal with FDSim interactions here
@@ -207,6 +212,13 @@ namespace HybridSim {
 				//cout << "popping front of flash queue" << endl;
 			}
 		}
+
+		// Decrement the delay counter.
+		if (delay_counter > 0)
+		{
+			delay_counter--;
+		}
+
 
 		// Update the logger.
 		log.update();
@@ -245,6 +257,9 @@ namespace HybridSim {
 
 		// Start the logging for this access.
 		log.access_start(trans.address);
+
+		// Restart queue checking.
+		this->check_queue = true;
 
 		return true; // TODO: Figure out when this could be false.
 	}
@@ -674,13 +689,17 @@ namespace HybridSim {
 		// Erase the page from the pending set.
 		int num = pending_pages.erase(PAGE_ADDRESS(p.flash_addr));
 		int num2 = pending_sets.erase(SET_INDEX(PAGE_ADDRESS(p.flash_addr)));
-		pending_count -= 1;
+
 		if ((num != 1) || (num2 != 1))
 		{
 			cout << "pending_pages.erase() was called after CACHE_READ and num was 0.\n";
 			cout << "orig:" << p.orig_addr << " aligned:" << p.flash_addr << "\n\n";
 			abort();
 		}
+
+		// Restart queue checking.
+		this->check_queue = true;
+		pending_count -= 1;
 	}
 
 	void HybridSystem::CacheWrite(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr)
@@ -722,12 +741,17 @@ namespace HybridSim {
 		int num = pending_pages.erase(PAGE_ADDRESS(flash_addr));
 		int num2 = pending_sets.erase(SET_INDEX(PAGE_ADDRESS(flash_addr)));
 		pending_count -= 1;
+
 		if ((num != 1) || (num2 != 1))
 		{
 			cout << "pending_pages.erase() was called after CACHE_WRITE and num was 0.\n";
 			cout << "orig:" << orig_addr << " aligned:" << flash_addr << "\n\n";
 			abort();
 		}
+
+		// Restart queue checking.
+		this->check_queue = true;
+		pending_count -= 1;
 	}
 
 

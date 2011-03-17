@@ -509,8 +509,9 @@ namespace HybridSim
 		savefile << "average hit latency: " << this->latency_cycles(sum_hit_latency, num_hits) << " cycles";
 		savefile << " (" << this->latency_us(sum_hit_latency, num_hits) << " us)\n";
 		savefile << "throughput: " << this->compute_throughput(this->currentClockCycle, num_accesses) << " KB/s\n";
-		savefile << "working set size in pages: " << pages_used.size() << " (pagesize = " << PAGE_SIZE << " bytes)\n";
+		savefile << "working set size in pages: " << pages_used.size() << "\n";
 		savefile << "working set size in bytes: " << pages_used.size() * PAGE_SIZE << " bytes\n";
+		savefile << "page size: " << PAGE_SIZE << "\n";
 		savefile << "\n";
 
 		savefile << "reads: " << num_reads << "\n";
