@@ -60,6 +60,15 @@ namespace HybridSim {
 		// debug stuff to remove later
 		pending_count = 0;
 		max_dram_pending = 0;
+
+		if (DEBUG_VICTIM) 
+			debug_victim.open("debug_victim.log", ios_base::out | ios_base::trunc);
+	}
+
+	HybridSystem::~HybridSystem()
+	{
+		if (DEBUG_VICTIM)
+			debug_victim.close();
 	}
 
 	// static allocator for the library interface
@@ -137,6 +146,8 @@ namespace HybridSim {
 
 				// Delete this item and skip to the next.
 				it = trans_queue.erase(it);
+
+				break;
 			}
 			else
 			{
@@ -324,30 +335,70 @@ namespace HybridSim {
 
 			// Select a victim offset within the set (LRU)
 			uint64_t victim = *(set_address_list.begin());
-			uint64_t min_ts = 0;
+			uint64_t min_ts = (uint64_t) 18446744073709551615U; // Max uint64_t
 			bool min_init = false;
 
+			if (DEBUG_VICTIM)
+			{
+				debug_victim << "--------------------------------------------------------------------\n";
+				debug_victim << currentClockCycle << ": new miss. time to pick the unlucky line.\n";
+				debug_victim << "set: " << set_index << "\n";
+				debug_victim << "new flash addr: 0x" << hex << addr << dec << "\n";
+				debug_victim << "new tag: " << TAG(addr)<< "\n";
+				debug_victim << "scanning set address list...\n\n";
+			}
+
+			uint64_t victim_counter = 0;
+			uint64_t victim_set_offset = 0;
 			for (list<uint64_t>::iterator it=set_address_list.begin(); it != set_address_list.end(); it++)
 			{
 				cur_address = *it;
 				cur_line = cache[cur_address];
+
+				if (DEBUG_VICTIM)
+				{
+					debug_victim << "cur_address= 0x" << hex << cur_address << dec << "\n";
+					debug_victim << "cur_tag= " << cur_line.tag << "\n";
+					debug_victim << "dirty= " << cur_line.dirty << "\n";
+					debug_victim << "valid= " << cur_line.valid << "\n";
+					debug_victim << "ts= " << cur_line.ts << "\n";
+					debug_victim << "min_ts= " << min_ts << "\n\n";
+				}
+
 				if ((cur_line.ts < min_ts) || (!min_init))
 				{
 					victim = cur_address;	
 					min_ts = cur_line.ts;
 					min_init = true;
+
+					victim_set_offset = victim_counter;
+					if (DEBUG_VICTIM)
+					{
+						debug_victim << "FOUND NEW MINIMUM!\n\n";
+					}
 				}
+
+				victim_counter++;
+				
+			}
+
+			if (DEBUG_VICTIM)
+			{
+				debug_victim << "Victim in set_offset: " << victim_set_offset << "\n\n";
 			}
 
 			// Log the miss 
 			log.access_cache(trans.address, false);
 
-			// Log the victim, set, etc.
-			uint64_t victim_flash_addr = (cur_line.tag * NUM_SETS + set_index) * PAGE_SIZE; 
-			log.access_miss(PAGE_ADDRESS(addr), victim_flash_addr, set_index, victim, cur_line.dirty, cur_line.valid);
 
 			cache_address = victim;
 			cur_line = cache[cache_address];
+
+			// Log the victim, set, etc.
+			// THIS MUST HAPPEN AFTER THE CUR_LINE IS SET TO THE VICTIM LINE.
+			//uint64_t victim_flash_addr = (cur_line.tag * NUM_SETS + set_index) * PAGE_SIZE; 
+			uint64_t victim_flash_addr = FLASH_ADDRESS(cur_line.tag, set_index);
+			log.access_miss(PAGE_ADDRESS(addr), victim_flash_addr, set_index, victim, cur_line.dirty, cur_line.valid);
 
 #if DEBUG_CACHE
 			cout << currentClockCycle << ": " << "MISS: victim is cache_address " << cache_address << endl;
@@ -590,6 +641,8 @@ namespace HybridSim {
 		dram_queue.push_back(t);
 
 		// Update the cache state
+		// This could be done here or in CacheReadFinish
+		// It really doesn't matter (AFAICT) as long as it is consistent.
 		cache_line cur_line = cache[cache_addr];
 		cur_line.ts = currentClockCycle;
 		cache[cache_addr] = cur_line;
@@ -604,6 +657,7 @@ namespace HybridSim {
 		assert(dram_pending.count(cache_addr) == 0);
 		dram_pending[cache_addr] = p;
 
+		// Assertions for "this can't happen" situations.
 		assert(dram_pending.count(PAGE_ADDRESS(data_addr)) != 0);
 		assert(dram_pending.count(cache_addr) != 0);
 	}

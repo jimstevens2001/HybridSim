@@ -4,6 +4,8 @@
 // Default values for alternate code.
 #define DEBUG_CACHE 0
 #define DEBUG_LOGGER 0
+#define DEBUG_VICTIM 0
+
 #define SINGLE_WORD 0
 #define FDSIM 0
 #define NVDSIM 1
@@ -13,6 +15,7 @@
 
 
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <sstream>
 #include <list>
@@ -84,6 +87,7 @@ const uint64_t NUM_SETS = CACHE_PAGES / SET_SIZE;
 #define PAGE_OFFSET(addr) (addr % PAGE_SIZE)
 #define SET_INDEX(addr) (PAGE_NUMBER(addr) % NUM_SETS)
 #define TAG(addr) (PAGE_NUMBER(addr) / NUM_SETS)
+#define FLASH_ADDRESS(tag, set) ((tag * NUM_SETS + set) * PAGE_SIZE)
 #define ALIGN(addr) (((addr / BURST_SIZE) * BURST_SIZE) % (TOTAL_PAGES * PAGE_SIZE))
 
 

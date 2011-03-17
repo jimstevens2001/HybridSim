@@ -16,6 +16,7 @@ namespace HybridSim
 	{
 		public:
 		HybridSystem(uint id);
+		~HybridSystem();
 		void update();
 		bool addTransaction(bool isWrite, uint64_t addr);
 		bool addTransaction(DRAMSim::Transaction &trans);
@@ -120,6 +121,8 @@ namespace HybridSim
 		vector<double> vpp_idle_energy;
 		vector<double> vpp_access_energy;
 		vector<double> vpp_erase_energy;
+
+		ofstream debug_victim;
 
 	};
 

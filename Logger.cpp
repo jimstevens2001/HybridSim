@@ -347,6 +347,7 @@ namespace HybridSim
 	{
 		this->read_latency(cycles);
 		this->hit_latency(cycles);
+		sum_read_hit_latency += cycles;
 
 		cur_sum_read_hit_latency += cycles;
 	}
@@ -634,10 +635,10 @@ namespace HybridSim
 			uint64_t cache_set = (*mit).cache_set;
 			uint64_t cache_page = (*mit).cache_page;
 			bool dirty = (*mit).dirty;
-			bool valid = (*mit).dirty;
+			bool valid = (*mit).valid;
 
 			savefile << cycle << ": missed= 0x" << hex << missed_page << "; victim= 0x" << victim_page 
-					<< "; set= " << dec << cache_set << "; victim_tag= " << TAG(victim_page)
+					<< "; set= " << dec << cache_set << "; missed_tag= " << TAG(missed_page) << "; victim_tag= " << TAG(victim_page)
 					<< "; cache_page= 0x" << hex << cache_page << dec <<"; dirty = " << dirty
 					<< "; valid= " << valid << ";\n";
 		}
