@@ -11,7 +11,7 @@
 #define NVDSIM 1
 #define PRINT_POWER_CB 1
 #define SAVE_POWER_CB 1
-#define CONTROLLER_DELAY 10
+#define CONTROLLER_DELAY 2
 #define EPOCH_LENGTH 200000
 
 

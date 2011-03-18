@@ -54,6 +54,9 @@ namespace HybridSim {
 		// No delay to start with.
 		delay_counter = 0;
 
+		// No active transaction to start with.
+		active_transaction_flag = false;
+
 
 		// Power stuff
 		idle_energy = vector<double>(NUM_PACKAGES, 0.0); 
@@ -100,6 +103,15 @@ namespace HybridSim {
 			trans_queue_max = trans_queue.size();
 
 
+		// See if there are any transactions ready to be processed.
+		if ((active_transaction_flag) && (delay_counter == 0))
+		{
+				ProcessTransaction(active_transaction);
+				active_transaction_flag = false;
+		}
+		
+
+
 		// Used to see if any work is done on this cycle.
 		bool sent_transaction = false;
 
@@ -114,9 +126,7 @@ namespace HybridSim {
 			uint64_t page_addr = PAGE_ADDRESS(ALIGN((*it).address));
 
 
-			//if (pending_pages.count(page_addr) == 0)
 			if (pending_sets.count(SET_INDEX(page_addr)) == 0)
-				//if (true)
 			{
 				//cout << "PAGE NOT IN PENDING" << page_addr << "\n";
 				// Add to the pending 
@@ -127,15 +137,15 @@ namespace HybridSim {
 				// Log the page access.
 				log.access_page(page_addr);
 
-				// Process the transaction.
-				ProcessTransaction(*it);
+				// Set this transaction as active and start the delay counter, which
+				// simulates the SRAM cache tag lookup time.
+				active_transaction = *it;
+				active_transaction_flag = true;
+				delay_counter = CONTROLLER_DELAY;
+				sent_transaction = true;
 
 				// Delete this item and skip to the next.
 				it = trans_queue.erase(it);
-
-				sent_transaction = true;
-
-				delay_counter = CONTROLLER_DELAY;
 
 				break;
 			}
@@ -161,7 +171,6 @@ namespace HybridSim {
 		// Note: This used to be a while, but was changed ot an if to only allow one
 		// transaction to be sent to the DRAM per cycle.
 		bool not_full = true;
-		//if (not_full && !dram_queue.empty() && (delay_counter == 0))
 		if (not_full && !dram_queue.empty())
 		{
 			DRAMSim::Transaction tmp = dram_queue.front();
@@ -182,7 +191,6 @@ namespace HybridSim {
 		// Note: This used to be a while, but was changed ot an if to only allow one
 		// transaction to be sent to the flash per cycle.
 		not_full = true;
-		//if (not_full && !flash_queue.empty() && (delay_counter == 0))
 		if (not_full && !flash_queue.empty())
 		{
 #if FDSIM

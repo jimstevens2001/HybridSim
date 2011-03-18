@@ -103,6 +103,8 @@ namespace HybridSim
 		bool check_queue; // If there is nothing to do, don't check the queue until the next event occurs that will make new work.
 
 		uint64_t delay_counter; // Used to stall the controller while it is "doing work".
+		DRAMSim::Transaction active_transaction; // Used to hold the transaction waiting for SRAM.
+		bool active_transaction_flag; // Indicates that a transaction is waiting for SRAM.
 
 		int64_t pending_count;
 		set<uint64_t> dram_pending_set;
