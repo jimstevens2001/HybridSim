@@ -347,6 +347,7 @@ namespace HybridSim
 	{
 		this->read_latency(cycles);
 		this->hit_latency(cycles);
+		sum_read_hit_latency += cycles;
 
 		cur_sum_read_hit_latency += cycles;
 	}
@@ -493,7 +494,9 @@ namespace HybridSim
 		savefile.open("hybridsim.log", ios_base::out | ios_base::trunc);
 
 		savefile << "total accesses: " << num_accesses << "\n";
-		savefile << "cycles: " << this->currentClockCycle << " (" << (this->currentClockCycle / (double)CYCLES_PER_SECOND) * 1000000 << " us)\n";
+		savefile << "cycles: " << this->currentClockCycle << "\n";
+		savefile << "execution time: " << (this->currentClockCycle / (double)CYCLES_PER_SECOND) * 1000000 << " us\n";
+		savefile << "frequency: " << CYCLES_PER_SECOND << "\n";
 		savefile << "misses: " << num_misses << "\n";
 		savefile << "hits: " << num_hits << "\n";
 		savefile << "miss rate: " << miss_rate() << "\n";
@@ -506,8 +509,9 @@ namespace HybridSim
 		savefile << "average hit latency: " << this->latency_cycles(sum_hit_latency, num_hits) << " cycles";
 		savefile << " (" << this->latency_us(sum_hit_latency, num_hits) << " us)\n";
 		savefile << "throughput: " << this->compute_throughput(this->currentClockCycle, num_accesses) << " KB/s\n";
-		savefile << "working set size in pages: " << pages_used.size() << " (pagesize = " << PAGE_SIZE << " bytes)\n";
+		savefile << "working set size in pages: " << pages_used.size() << "\n";
 		savefile << "working set size in bytes: " << pages_used.size() * PAGE_SIZE << " bytes\n";
+		savefile << "page size: " << PAGE_SIZE << "\n";
 		savefile << "\n";
 
 		savefile << "reads: " << num_reads << "\n";
@@ -546,7 +550,8 @@ namespace HybridSim
 
 			// Print everything out.
 			savefile << "total accesses: " << num_accesses_list.front() << "\n";
-			savefile << "cycles: " << EPOCH_LENGTH << " (" << (EPOCH_LENGTH / (double)CYCLES_PER_SECOND) * 1000000 << " us)\n";
+			savefile << "cycles: " << EPOCH_LENGTH << "\n";
+			savefile << "execution time: " << (EPOCH_LENGTH / (double)CYCLES_PER_SECOND) * 1000000 << " us\n";
 			savefile << "misses: " << num_misses_list.front() << "\n";
 			savefile << "hits: " << num_hits_list.front() << "\n";
 			savefile << "miss rate: " << this->divide(num_misses_list.front(), num_accesses_list.front()) << "\n";
@@ -559,7 +564,7 @@ namespace HybridSim
 			savefile << "average hit latency: " << this->latency_cycles(sum_hit_latency_list.front(), num_hits_list.front()) << " cycles";
 			savefile << " (" << this->latency_us(sum_hit_latency_list.front(), num_hits_list.front()) << " us)\n";
 			savefile << "throughput: " << this->compute_throughput(EPOCH_LENGTH, num_accesses_list.front()) << " KB/s\n";
-			savefile << "working set size in pages: " << pages_used_list.front().size() << " (pagesize = " << PAGE_SIZE << " bytes)\n";
+			savefile << "working set size in pages: " << pages_used_list.front().size() << "\n";
 			savefile << "working set size in bytes: " << pages_used_list.front().size() * PAGE_SIZE << " bytes\n";
 			savefile << "current queue length: " << access_queue.size() << "\n";
 			savefile << "\n";
@@ -634,10 +639,10 @@ namespace HybridSim
 			uint64_t cache_set = (*mit).cache_set;
 			uint64_t cache_page = (*mit).cache_page;
 			bool dirty = (*mit).dirty;
-			bool valid = (*mit).dirty;
+			bool valid = (*mit).valid;
 
 			savefile << cycle << ": missed= 0x" << hex << missed_page << "; victim= 0x" << victim_page 
-					<< "; set= " << dec << cache_set << "; victim_tag= " << TAG(victim_page)
+					<< "; set= " << dec << cache_set << "; missed_tag= " << TAG(missed_page) << "; victim_tag= " << TAG(victim_page)
 					<< "; cache_page= 0x" << hex << cache_page << dec <<"; dirty = " << dirty
 					<< "; valid= " << valid << ";\n";
 		}

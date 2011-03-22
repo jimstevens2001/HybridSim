@@ -16,6 +16,7 @@ namespace HybridSim
 	{
 		public:
 		HybridSystem(uint id);
+		~HybridSystem();
 		void update();
 		bool addTransaction(bool isWrite, uint64_t addr);
 		bool addTransaction(DRAMSim::Transaction &trans);
@@ -98,6 +99,13 @@ namespace HybridSim
 		set<uint64_t> pending_pages; // If a page is in the pending set, then skip subsequent transactions to the page.
 
 		set<uint64_t> pending_sets; // If a page is in the pending set, then skip subsequent transactions to the page.
+
+		bool check_queue; // If there is nothing to do, don't check the queue until the next event occurs that will make new work.
+
+		uint64_t delay_counter; // Used to stall the controller while it is "doing work".
+		DRAMSim::Transaction active_transaction; // Used to hold the transaction waiting for SRAM.
+		bool active_transaction_flag; // Indicates that a transaction is waiting for SRAM.
+
 		int64_t pending_count;
 		set<uint64_t> dram_pending_set;
 		list<uint64_t> dram_bad_address;
@@ -120,6 +128,8 @@ namespace HybridSim
 		vector<double> vpp_idle_energy;
 		vector<double> vpp_access_energy;
 		vector<double> vpp_erase_energy;
+
+		ofstream debug_victim;
 
 	};
 
