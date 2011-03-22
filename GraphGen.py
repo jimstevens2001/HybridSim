@@ -88,6 +88,7 @@ def parse_misses(miss_lines):
 			if j == '':
 				continue
 			key, val = j.split('=')
+			key = key.strip()
 			val = val.strip()
 			if val.startswith('0x'):
 				cur_dict[key] = int(val, 16)
@@ -151,7 +152,7 @@ def pretty_print(log_data, d=6):
 	pp = pprint.PrettyPrinter(depth=d)
 	pp.pprint(log_data)
 
-def new_figure(plt):
+def new_figure():
 	global FIGURE_CNT
 	plt.figure(FIGURE_CNT)
 	FIGURE_CNT += 1
@@ -171,7 +172,7 @@ def plot_latency_histogram(log_data, output_file):
 
 	# Make the plot.
 	ind = np.arange(N)    # the x locations 
-	new_figure(plt)
+	new_figure()
 	p1 = plt.bar(ind, vals)
 
 	# Label it.
@@ -182,9 +183,27 @@ def plot_latency_histogram(log_data, output_file):
 	# Save to file.
 	plt.savefig(output_file)
 
+def plot_misses(log_data, output_file):
+	miss_list = log_data['miss']
+	x_vals = []
+	y_vals = []
+	for i in miss_list:
+		x_vals.append(i['address'])
+		y_vals.append(i['missed'])
+
+	new_figure()
+	p1 = plt.scatter(x_vals, y_vals)
+
+	plt.ylabel('Address')
+	plt.xlabel('Cycle')
+	plt.title('HybridSim Cache Misses')
+
+	plt.savefig(output_file)
+	
 
 log_data = parse_log('hybridsim.log')
 
-#pretty_print(log_data['latency'], 2)
+#pretty_print(log_data['miss'], 2)
 
-plot_latency_histogram(log_data, 'plots/latency.png')
+#plot_latency_histogram(log_data, 'plots/latency.png')
+plot_misses(log_data, 'plots/misses.png')
