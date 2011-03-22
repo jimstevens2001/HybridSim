@@ -10,6 +10,7 @@ results/
 *.log
 *.png
 *~
+out
 \.#*
 *#
 HybridSim

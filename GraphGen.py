@@ -46,13 +46,17 @@ def parse_total(total_lines):
 		tmp = i.split(':')
 		key = tmp[0].strip()
 		val = tmp[1].strip()
-		total_dict[sections[cur_section]][key] = val
 		if key.endswith('latency'):
 			latency_vals = [v.strip(') ') for v in val.split('(')]
 			total_dict[sections[cur_section]][key+' cycles'] = float(latency_vals[0].split(' ')[0])
 			total_dict[sections[cur_section]][key+' us'] = float(latency_vals[1].split(' ')[0])
-			
-			
+		else:
+			try:
+				# Try to parse it as an int.
+				total_dict[sections[cur_section]][key] = int(val.split()[0])
+			except:
+				# If that doesn't work, then parse it as a float.
+				total_dict[sections[cur_section]][key] = float(val.split()[0])
 
 	return total_dict
 
@@ -113,11 +117,9 @@ def parse_latency(latency_lines):
 	for i in latency_lines:
 		if i != '':
 			tmp = i.split(':')		
-			try:
-				key = int(tmp[0].strip())
-			except:
-				# Deal with strings, somewhat sloppy, but whatever.
-				key = tmp[0].strip()
+			key = tmp[0].strip()
+			if key.isdigit():
+				key = int(key)
 			val = int(tmp[1].strip())
 			latency_dict[key] = val
 
@@ -199,11 +201,32 @@ def plot_misses(log_data, output_file):
 	plt.title('HybridSim Cache Misses')
 
 	plt.savefig(output_file)
+
+def plot_epochs(log_data, output_file, a, b):
+	epoch_list = log_data['epoch'] 
 	
+	x_vals = []
+	y_vals = []
+	for i in range(len(epoch_list)):
+		x_vals.append(i)
+		y_vals.append(epoch_list[i][a][b])
+
+	new_figure()
+	p1 = plt.scatter(x_vals, y_vals)
+
+	y_label = a+' '+b
+	plt.ylabel(y_label)
+	plt.xlabel('Epoch')
+	plt.title('HybridSim '+y_label+' per epoch')
+
+	plt.savefig(output_file)
+
 
 log_data = parse_log('hybridsim.log')
 
 #pretty_print(log_data['miss'], 2)
+#pretty_print(log_data, 6)
 
-#plot_latency_histogram(log_data, 'plots/latency.png')
+plot_latency_histogram(log_data, 'plots/latency.png')
 plot_misses(log_data, 'plots/misses.png')
+plot_epochs(log_data, 'plots/accesses_per_epoch.png', 'total', 'total accesses')
