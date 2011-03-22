@@ -102,6 +102,12 @@ namespace HybridSim {
 		if (trans_queue.size() > trans_queue_max)
 			trans_queue_max = trans_queue.size();
 
+		// Log the queue length.
+		bool idle = (trans_queue.size() == 0) && (pending_sets.size() == 0);
+		bool flash_idle = (flash_queue.size() == 0) && (flash_pending.size() == 0);
+		bool dram_idle = (dram_queue.size() == 0) && (dram_pending.size() == 0);
+		log.access_update(trans_queue.size(), idle, flash_idle, dram_idle);
+
 
 		// See if there are any transactions ready to be processed.
 		if ((active_transaction_flag) && (delay_counter == 0))
@@ -119,18 +125,14 @@ namespace HybridSim {
 		list<DRAMSim::Transaction>::iterator it = trans_queue.begin();
 		while((it != trans_queue.end()) && (pending_sets.size() < (CACHE_PAGES / SET_SIZE)) && (check_queue) && (delay_counter == 0))
 		{
-			//ProcessTransaction(trans_queue.front());
-			//trans_queue.pop_front();
-
 			// Compute the page address.
 			uint64_t page_addr = PAGE_ADDRESS(ALIGN((*it).address));
 
 
+			// Check to see if this pending set is open.
 			if (pending_sets.count(SET_INDEX(page_addr)) == 0)
 			{
-				//cout << "PAGE NOT IN PENDING" << page_addr << "\n";
 				// Add to the pending 
-				//cout << "Inserted " << page_addr << " into pending pages set\n";
 				pending_pages.insert(page_addr);
 				pending_sets.insert(SET_INDEX(page_addr));
 
@@ -151,6 +153,9 @@ namespace HybridSim {
 			}
 			else
 			{
+				// Log the set conflict.
+				log.access_set_conflict(SET_INDEX(page_addr));
+
 				// Skip to the next and do nothing else.
 				// cout << "PAGE IN PENDING" << page_addr << "\n";
 				++it;
@@ -283,8 +288,6 @@ namespace HybridSim {
 	{
 		uint64_t addr = ALIGN(trans.address);
 
-		// Tell the logger when the access is processed (used for timing the time in queue).
-		log.access_process(trans.address, trans.transactionType == DATA_READ);
 
 		//	if (addr != trans.address)
 		//	{
@@ -315,7 +318,7 @@ namespace HybridSim {
 		}
 
 		bool hit = false;
-		uint64_t cache_address;
+		uint64_t cache_address = *(set_address_list.begin());
 		uint64_t cur_address;
 		cache_line cur_line;
 		for (list<uint64_t>::iterator it = set_address_list.begin(); it != set_address_list.end(); ++it)
@@ -341,10 +344,14 @@ namespace HybridSim {
 
 		}
 
+		// Place access_process here and combine it with access_cache.
+		// Tell the logger when the access is processed (used for timing the time in queue).
+		log.access_process(trans.address, trans.transactionType == DATA_READ, hit);
+
 		if (hit)
 		{
 			// Log the hit. 
-			log.access_cache(trans.address, true);
+			//log.access_cache(trans.address, true);
 
 			// Issue operation to the DRAM.
 			if (trans.transactionType == DATA_READ)
@@ -411,7 +418,7 @@ namespace HybridSim {
 			}
 
 			// Log the miss 
-			log.access_cache(trans.address, false);
+			//log.access_cache(trans.address, false);
 
 
 			cache_address = victim;

@@ -8,6 +8,7 @@ results/
 *.h~
 *.cpp~
 *.log
+*.png
 *~
 \.#*
 *#

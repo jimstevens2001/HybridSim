@@ -14,6 +14,9 @@
 #define CONTROLLER_DELAY 2
 #define EPOCH_LENGTH 200000
 
+#define HISTOGRAM_BIN 100
+#define HISTOGRAM_MAX 20000
+
 
 #include <iostream>
 #include <fstream>

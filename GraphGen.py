@@ -1,4 +1,12 @@
+import numpy as np
+
 import matplotlib
+matplotlib.use('Agg') # To allow for running without X.
+import matplotlib.pyplot as plt
+
+import pprint
+
+FIGURE_CNT = 1
 
 def parse_file(logfile):
 	section = '================================================================================'
@@ -17,7 +25,9 @@ def parse_file(logfile):
 	sections['total'] = lines[0:section_list[0]-2]	
 	sections['epoch'] = lines[section_list[0]+5:section_list[1]]	
 	sections['miss'] = lines[section_list[1]+3:section_list[2]-2]	
-	sections['access'] = lines[section_list[2]+3:]
+	sections['access'] = lines[section_list[2]+3:section_list[3]-2]
+	sections['latency'] = lines[section_list[3]+4:section_list[4]-2]
+	sections['sets'] = lines[section_list[4]+4:]
 
 	return sections
 
@@ -96,13 +106,85 @@ def parse_accesses(access_lines):
 		access_dict[key] = val
 	return access_dict
 
+def parse_latency(latency_lines):
+	latency_dict = {}
 
-sections = parse_file('hybridsim.log')
-total_dict = parse_total(sections['total'])
-epoch_list = parse_epoch(sections['epoch'])
-miss_list = parse_misses(sections['miss'])
-access_dict = parse_accesses(sections['access'])
+	for i in latency_lines:
+		if i != '':
+			tmp = i.split(':')		
+			try:
+				key = int(tmp[0].strip())
+			except:
+				# Deal with strings, somewhat sloppy, but whatever.
+				key = tmp[0].strip()
+			val = int(tmp[1].strip())
+			latency_dict[key] = val
 
-#print epoch_list
+	return latency_dict
 
-print total_dict
+def parse_sets(set_lines):
+	set_dict = {}
+
+	for i in set_lines:
+		if i != '':
+			tmp = i.split(':')		
+			key = int(tmp[0].strip())
+			val = int(tmp[1].strip())
+			set_dict[key] = val
+
+	return set_dict
+
+def parse_log(filename):
+	sections = parse_file(filename)
+
+	log_data = {}
+	log_data['total'] = parse_total(sections['total'])
+	log_data['epoch'] = parse_epoch(sections['epoch'])
+	log_data['miss'] = parse_misses(sections['miss'])
+	log_data['access'] = parse_accesses(sections['access'])
+	log_data['latency'] = parse_latency(sections['latency'])
+	log_data['sets'] = parse_sets(sections['sets'])
+
+	return log_data
+	
+def pretty_print(log_data, d=6):
+	pp = pprint.PrettyPrinter(depth=d)
+	pp.pprint(log_data)
+
+def new_figure(plt):
+	global FIGURE_CNT
+	plt.figure(FIGURE_CNT)
+	FIGURE_CNT += 1
+	
+
+def plot_latency_histogram(log_data, output_file):
+	# Get the latency data.
+	latency_dict = log_data['latency']
+
+	# Number of bins.
+	N = latency_dict['HISTOGRAM_MAX'] / latency_dict['HISTOGRAM_BIN'] + 1
+
+	# Get the latency histogram values.
+	vals = []
+	for i in range(N):
+		vals.append(latency_dict[i*latency_dict['HISTOGRAM_BIN']])
+
+	# Make the plot.
+	ind = np.arange(N)    # the x locations 
+	new_figure(plt)
+	p1 = plt.bar(ind, vals)
+
+	# Label it.
+	plt.ylabel('Accesses')
+	plt.xlabel('Latency (x100)')
+	plt.title('Histogram of HybridSim Latencies')
+
+	# Save to file.
+	plt.savefig(output_file)
+
+
+log_data = parse_log('hybridsim.log')
+
+#pretty_print(log_data['latency'], 2)
+
+plot_latency_histogram(log_data, 'plots/latency.png')
