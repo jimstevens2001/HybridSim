@@ -149,6 +149,12 @@ def parse_log(filename):
 	log_data['sets'] = parse_sets(sections['sets'])
 
 	return log_data
+
+def parse_logs(file_dict):
+	log_dict = {}
+	for i in file_dict:
+		log_dict[i] = parse_log(file_dict[i])
+	return log_dict
 	
 def pretty_print(log_data, d=6):
 	pp = pprint.PrettyPrinter(depth=d)
@@ -222,11 +228,13 @@ def plot_epochs(log_data, output_file, a, b):
 	plt.savefig(output_file)
 
 
-log_data = parse_log('hybridsim.log')
+log_dict = parse_logs({1: 'hybridsim.log', 2: 'hybridsim2.log'})
+print log_dict[2]
+#log_data = parse_log('hybridsim.log')
 
 #pretty_print(log_data['miss'], 2)
 #pretty_print(log_data, 6)
 
-plot_latency_histogram(log_data, 'plots/latency.png')
-plot_misses(log_data, 'plots/misses.png')
-plot_epochs(log_data, 'plots/accesses_per_epoch.png', 'total', 'total accesses')
+#plot_latency_histogram(log_data, 'plots/latency.png')
+#plot_misses(log_data, 'plots/misses.png')
+#plot_epochs(log_data, 'plots/accesses_per_epoch.png', 'total', 'total accesses')
