@@ -44,6 +44,13 @@ namespace HybridSim
 		uint64_t sum_write_hit_latency;
 		uint64_t sum_write_miss_latency;
 
+		uint64_t max_queue_length;
+		uint64_t sum_queue_length;
+
+		uint64_t idle_counter;
+		uint64_t flash_idle_counter;
+		uint64_t dram_idle_counter;
+
 		unordered_map<uint64_t, uint64_t> pages_used; // maps page_addr to num_accesses
 
 		// Epoch state (reset at the beginning of each epoch)
@@ -75,6 +82,13 @@ namespace HybridSim
 		uint64_t cur_sum_write_hit_latency;
 		uint64_t cur_sum_write_miss_latency;
 
+		uint64_t cur_max_queue_length;
+		uint64_t cur_sum_queue_length;
+
+		uint64_t cur_idle_counter;
+		uint64_t cur_flash_idle_counter;
+		uint64_t cur_dram_idle_counter;
+
 		unordered_map<uint64_t, uint64_t> cur_pages_used; // maps page_addr to num_accesses
 
 
@@ -104,6 +118,15 @@ namespace HybridSim
 
 		list<uint64_t> sum_write_hit_latency_list;
 		list<uint64_t> sum_write_miss_latency_list;
+
+		list<uint64_t> max_queue_length_list;
+		list<uint64_t> sum_queue_length_list;
+
+		list<uint64_t> idle_counter_list;
+		list<uint64_t> flash_idle_counter_list;
+		list<uint64_t> dram_idle_counter_list;
+
+		list<uint64_t> access_queue_length_list;
 
 		list<unordered_map<uint64_t, uint64_t>> pages_used_list; // maps page_addr to num_accesses
 
@@ -137,6 +160,9 @@ namespace HybridSim
 		list<MissedPageEntry> missed_page_list;
 
 
+		unordered_map<uint64_t, uint64_t> latency_histogram; 
+		unordered_map<uint64_t, uint64_t> set_conflicts; 
+
 		// -----------------------------------------------------------
 		// Processing state (used to keep track of current transactions, but not part of logging state)
 
@@ -159,6 +185,7 @@ namespace HybridSim
 			}
 		};
 
+
 		// Store access info while the access is being processed.
 		unordered_map<uint64_t, AccessMapEntry> access_map;
 
@@ -174,14 +201,19 @@ namespace HybridSim
 
 		// External logging methods.
 		void access_start(uint64_t addr);
-		void access_process(uint64_t addr, bool read_op);
+		void access_process(uint64_t addr, bool read_op, bool hit);
 		void access_stop(uint64_t addr);
 
-		void access_cache(uint64_t addr, bool hit);
+		void access_update(uint64_t queue_length, bool idle, bool flash_idle, bool dram_idle);
+
+		//void access_cache(uint64_t addr, bool hit);
 
 		void access_page(uint64_t page_addr);
 
+		void access_set_conflict(uint64_t cache_set);
+
 		void access_miss(uint64_t missed_page, uint64_t victim_page, uint64_t cache_set, uint64_t cache_page, bool dirty, bool valid);
+
 
 		void print();
 

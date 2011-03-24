@@ -9,7 +9,9 @@ results/
 *.h~
 *.cpp~
 *.log
+*.png
 *~
+out
 \.#*
 *#
 HybridSim

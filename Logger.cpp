@@ -32,6 +32,26 @@ namespace HybridSim
 		sum_write_hit_latency = 0;
 		sum_write_miss_latency = 0;
 
+		max_queue_length = 0;
+		sum_queue_length = 0;
+
+		idle_counter = 0;
+		flash_idle_counter = 0;
+		dram_idle_counter = 0;
+
+
+		// Init the latency histogram.
+		for (uint64_t i = 0; i <= HISTOGRAM_MAX; i += HISTOGRAM_BIN)
+		{
+			latency_histogram[i] = 0;
+		}
+
+		// Init the set conflicts.
+		for (uint64_t i = 0; i < NUM_SETS; i++)
+		{
+			set_conflicts[i] = 0;
+		}
+
 		// Resetting the epoch state will initialize it.
 		epoch_count = 0;
 		this->epoch_reset(true);
@@ -67,7 +87,7 @@ namespace HybridSim
 		}
 	}
 
-	void Logger::access_process(uint64_t addr, bool read_op)
+	void Logger::access_process(uint64_t addr, bool read_op, bool hit)
 	{
 		if (DEBUG_LOGGER)
 			debug << "access_process( " << addr << " , " << read_op << " )\n";
@@ -113,13 +133,10 @@ namespace HybridSim
 		AccessMapEntry a;
 		a.start = start_cycle;
 		a.read_op = read_op;
+		a.hit = hit;
 		a.process = this->currentClockCycle;
 		access_map[addr] = a;
 
-		if (read_op)
-			this->read();
-		else
-			this->write();
 
 		uint64_t time_in_queue = a.process - a.start;
 		this->queue_latency(time_in_queue);
@@ -145,14 +162,27 @@ namespace HybridSim
 
 		uint64_t latency = a.stop - a.start;
 
+		// Log cache event type and latency.
 		if (a.read_op && a.hit)
+		{
+			this->read_hit();
 			this->read_hit_latency(latency);
+		}
 		else if (a.read_op && !a.hit)
+		{
+			this->read_miss();
 			this->read_miss_latency(latency);
+		}
 		else if (!a.read_op && a.hit)
+		{
+			this->write_hit();
 			this->write_hit_latency(latency);
+		}
 		else if (!a.read_op && !a.hit)
+		{
+			this->write_miss();
 			this->write_miss_latency(latency);
+		}
 
 		
 		access_map.erase(addr);
@@ -161,28 +191,56 @@ namespace HybridSim
 			debug << "finished access_stop. latency = " << latency << "\n\n";
 	}
 
-	void Logger::access_cache(uint64_t addr, bool hit)
+
+	void Logger::access_update(uint64_t queue_length, bool idle, bool flash_idle, bool dram_idle)
 	{
-		if (access_map.count(addr) == 0)
+		return;
+		// Log the queue length.
+		if (queue_length > max_queue_length)
+			max_queue_length = queue_length;
+		sum_queue_length += queue_length;
+
+		// Log the queue length for the current epoch.
+		if (queue_length > cur_max_queue_length)
+			cur_max_queue_length = queue_length;
+		cur_sum_queue_length += queue_length;
+
+		//cout << "access_queue length = " << access_queue.size() << "; queue_length = " << queue_length << ";\n";
+
+		// Update idle counters.
+		if (idle)
 		{
-			cerr << "ERROR: Logger.access_cache() called with address not in access_map. address=" << hex << addr << "\n" << dec;
-			abort();
+			idle_counter++;
+			cur_idle_counter++;
 		}
 
-		AccessMapEntry a = access_map[addr];
-		a.hit = hit;
-		access_map[addr] = a;
+		if (flash_idle)
+		{
+			flash_idle_counter++;
+			cur_flash_idle_counter++;
+		}
 
-		// Log cache event type.
-		if (hit && a.read_op)
-			this->read_hit();
-		else if (hit && !a.read_op)
-			this->write_hit();
-		else if (!hit && a.read_op)
-			this->read_miss();
-		else if (!hit && !a.read_op)
-			this->write_miss();
+		if (dram_idle)
+		{
+			dram_idle_counter++;
+			cur_dram_idle_counter++;
+		}
 	}
+
+
+//	void Logger::access_cache(uint64_t addr, bool hit)
+//	{
+//		if (access_map.count(addr) == 0)
+//		{
+//			cerr << "ERROR: Logger.access_cache() called with address not in access_map. address=" << hex << addr << "\n" << dec;
+//			abort();
+//		}
+//
+//		AccessMapEntry a = access_map[addr];
+//		a.hit = hit;
+//		access_map[addr] = a;
+//
+//	}
 
 	void Logger::access_page(uint64_t page_addr)
 	{
@@ -217,6 +275,12 @@ namespace HybridSim
 		cur_pages_used[page_addr] = cur_count;
 	}
 
+	void Logger::access_set_conflict(uint64_t cache_set)
+	{
+		// Increment the conflict counter for this set.
+		uint64_t tmp = set_conflicts[cache_set];
+		set_conflicts[cache_set] = tmp + 1;
+	}
 
 	void Logger::access_miss(uint64_t missed_page, uint64_t victim_page, uint64_t cache_set, uint64_t cache_page, bool dirty, bool valid)
 	{
@@ -261,6 +325,7 @@ namespace HybridSim
 
 	void Logger::read_hit()
 	{
+		read();
 		hit();
 		num_read_hits += 1;
 
@@ -269,6 +334,7 @@ namespace HybridSim
 
 	void Logger::read_miss()
 	{
+		read();
 		miss();
 		num_read_misses += 1;
 
@@ -277,6 +343,7 @@ namespace HybridSim
 
 	void Logger::write_hit()
 	{
+		write();
 		hit();
 		num_write_hits += 1;
 
@@ -285,6 +352,7 @@ namespace HybridSim
 
 	void Logger::write_miss()
 	{
+		write();
 		miss();
 		num_write_misses += 1;
 
@@ -303,6 +371,13 @@ namespace HybridSim
 		sum_latency += cycles;
 
 		cur_sum_latency += cycles;
+
+		// Update the latency histogram.
+		uint64_t bin = (cycles / HISTOGRAM_BIN) * HISTOGRAM_BIN;
+		if (cycles >= HISTOGRAM_MAX)
+			bin = HISTOGRAM_MAX;
+		uint64_t bin_cnt = latency_histogram[bin];
+		latency_histogram[bin] = bin_cnt + 1;
 	}
 
 	void Logger::read_latency(uint64_t cycles)
@@ -453,6 +528,15 @@ namespace HybridSim
 			sum_write_hit_latency_list.push_back(cur_sum_write_hit_latency);
 			sum_write_miss_latency_list.push_back(cur_sum_write_miss_latency);
 
+			max_queue_length_list.push_back(cur_max_queue_length);
+			sum_queue_length_list.push_back(cur_sum_queue_length);
+
+			idle_counter_list.push_back(cur_idle_counter);
+			flash_idle_counter_list.push_back(cur_flash_idle_counter);
+			dram_idle_counter_list.push_back(cur_dram_idle_counter);
+
+			access_queue_length_list.push_back(access_queue.size());
+
 			pages_used_list.push_back(cur_pages_used); // maps page_addr to num_accesses
 
 			epoch_count++;
@@ -484,6 +568,13 @@ namespace HybridSim
 		cur_sum_write_hit_latency = 0;
 		cur_sum_write_miss_latency = 0;
 
+		cur_max_queue_length = 0;
+		cur_sum_queue_length = 0;
+
+		cur_idle_counter = 0;
+		cur_flash_idle_counter = 0;
+		cur_dram_idle_counter = 0;
+
 		// Clear cur_pages_used
 		cur_pages_used.clear();
 	}
@@ -512,6 +603,14 @@ namespace HybridSim
 		savefile << "working set size in pages: " << pages_used.size() << "\n";
 		savefile << "working set size in bytes: " << pages_used.size() * PAGE_SIZE << " bytes\n";
 		savefile << "page size: " << PAGE_SIZE << "\n";
+		savefile << "max queue length: " << max_queue_length << "\n";
+		savefile << "average queue length: " << this->divide(sum_queue_length, this->currentClockCycle) << "\n";
+		savefile << "idle counter: " << idle_counter << "\n";
+		savefile << "idle percentage: " << this->divide(idle_counter, currentClockCycle) << "\n";
+		savefile << "flash idle counter: " << flash_idle_counter << "\n";
+		savefile << "flash idle percentage: " << this->divide(flash_idle_counter, currentClockCycle) << "\n";
+		savefile << "dram idle counter: " << dram_idle_counter << "\n";
+		savefile << "dram idle percentage: " << this->divide(dram_idle_counter, currentClockCycle) << "\n";
 		savefile << "\n";
 
 		savefile << "reads: " << num_reads << "\n";
@@ -566,7 +665,15 @@ namespace HybridSim
 			savefile << "throughput: " << this->compute_throughput(EPOCH_LENGTH, num_accesses_list.front()) << " KB/s\n";
 			savefile << "working set size in pages: " << pages_used_list.front().size() << "\n";
 			savefile << "working set size in bytes: " << pages_used_list.front().size() * PAGE_SIZE << " bytes\n";
-			savefile << "current queue length: " << access_queue.size() << "\n";
+			savefile << "current queue length: " << access_queue_length_list.front() << "\n";
+			savefile << "max queue length: " << max_queue_length_list.front() << "\n";
+			savefile << "average queue length: " << this->divide(sum_queue_length_list.front(), EPOCH_LENGTH) << "\n";
+			savefile << "idle counter: " << idle_counter_list.front() << "\n";
+			savefile << "idle percentage: " << this->divide(idle_counter_list.front(), EPOCH_LENGTH) << "\n";
+			savefile << "flash idle counter: " << flash_idle_counter_list.front() << "\n";
+			savefile << "flash idle percentage: " << this->divide(flash_idle_counter_list.front(), EPOCH_LENGTH) << "\n";
+			savefile << "dram idle counter: " << dram_idle_counter_list.front() << "\n";
+			savefile << "dram idle percentage: " << this->divide(dram_idle_counter_list.front(), EPOCH_LENGTH) << "\n";
 			savefile << "\n";
 
 			savefile << "reads: " << num_reads_list.front() << "\n";
@@ -624,6 +731,15 @@ namespace HybridSim
 			sum_write_hit_latency_list.pop_front();
 			sum_write_miss_latency_list.pop_front();
 
+			max_queue_length_list.pop_front();
+			sum_queue_length_list.pop_front();
+
+			idle_counter_list.pop_front();
+			flash_idle_counter_list.pop_front();
+			dram_idle_counter_list.pop_front();
+
+			access_queue_length_list.pop_front();
+
 			pages_used_list.pop_front();
 		}
 
@@ -662,8 +778,29 @@ namespace HybridSim
 			savefile << hex << "0x" << page_addr << " : " << dec << num_accesses << "\n";
 		}
 
+		savefile << "\n\n";
+
+		savefile << "================================================================================\n\n";
+		savefile << "Latency Histogram:\n\n";
+
+		savefile << "HISTOGRAM_BIN: " << HISTOGRAM_BIN << "\n";
+		savefile << "HISTOGRAM_MAX: " << HISTOGRAM_MAX << "\n\n";
+		for (uint64_t bin = 0; bin <= HISTOGRAM_MAX; bin += HISTOGRAM_BIN)
+		{
+			savefile << bin << ": " << latency_histogram[bin] << "\n";
+		}
+
+		savefile << "\n\n";
+
+		savefile << "================================================================================\n\n";
+		savefile << "Set Conflicts:\n\n";
+
+		for (uint64_t set = 0; set < NUM_SETS; set++)
+		{
+			savefile << set << ": " << set_conflicts[set] << "\n";
+		}
 
 		savefile.close();
 	}
-
 }
+
