@@ -72,11 +72,8 @@ namespace HybridSim
 		inFile.close();
 
 		list<string>::iterator it;
-		//cout << "------------- START INI LINES --------------\n";
 		for (it = lines.begin(); it != lines.end(); it++)
 		{
-			//cout << (*it) << endl;
-
 			list<string> split_line = split((*it), "=", 2);
 
 			if (split_line.size() != 2)
@@ -93,17 +90,9 @@ namespace HybridSim
 			if (key.compare("CONTROLLER_DELAY") == 0)
 				convert_uint64_t(CONTROLLER_DELAY, key, value);
 			else if (key.compare("EPOCH_LENGTH") == 0)
-			{
 				convert_uint64_t(EPOCH_LENGTH, key, value);
-				cout << "value " << value << "\n";
-				cout << "EPOCH_LENGTH " << EPOCH_LENGTH << "\n\n";
-			}
 			else if (key.compare("HISTOGRAM_BIN") == 0)
-			{
 				convert_uint64_t(HISTOGRAM_BIN, key, value);
-				cout << "value " << value << "\n";
-				cout << "HISTOGRAM_BIN " << HISTOGRAM_BIN << "\n\n";
-			}
 			else if (key.compare("HISTOGRAM_MAX") == 0)
 				convert_uint64_t(HISTOGRAM_MAX, key, value);
 			else if (key.compare("PAGE_SIZE") == 0)
@@ -132,32 +121,25 @@ namespace HybridSim
 				cout << "This could either be due to an illegal key or the incorrect value type for a key\n";
 				abort();
 			}
-
-			//cout << "key = /" << key << "/  value = /" << value << "/\n";
-
 		}
-		//cout << "------------- END INI LINES --------------\n";
-
-		//abort();
-
 	}
 
 	void IniReader::convert_uint64_t(uint64_t &var, string key, string value)
 	{
-			// Check that each character in value is a digit.
-			for(size_t i = 0; i < value.size(); i++)
+		// Check that each character in value is a digit.
+		for(size_t i = 0; i < value.size(); i++)
+		{
+			if(!isdigit(value[i]))
 			{
-				if(!isdigit(value[i]))
-				{
-					cout << "ERROR: Non-digit character found in HybridSim Ini File for key " << key << " (value=" << value << ")\n";
-					abort();
-				}
+				cout << "ERROR: Non-digit character found in HybridSim Ini File for key " << key << " (value=" << value << ")\n";
+				abort();
 			}
+		}
 
-			// Convert it
-			stringstream ss;
-			ss << value;
-			ss >> var;
+		// Convert it
+		stringstream ss;
+		ss << value;
+		ss >> var;
 	}
 
 	string IniReader::strip(string input, string chars)
@@ -198,19 +180,15 @@ namespace HybridSim
 			pos = cur.find_first_of(chars);
 			string tmp = cur.substr(0, pos);
 			ret.push_back(tmp);
-			//cout << "pos = " << pos << endl;
-			//cout << "split pushed /" << tmp << "/" << endl;
 			if (pos == string::npos)
 				cur.erase();
 			else
 				cur.erase(0, pos+1);
-			//cout << "cur =  /" << cur << "/\n\n";
 		}
 
 		// If not at npos, then there is still an extra empty string at the end.
 		if (pos != string::npos)
 		{
-			//cout << "split pushed EXTRA //\n\n";
 			ret.push_back("");
 		}
 
