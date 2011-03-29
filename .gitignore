@@ -12,6 +12,7 @@ results/
 *.png
 *~
 out
+tmp
 \.#*
 *#
 HybridSim

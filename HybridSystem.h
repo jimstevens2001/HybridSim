@@ -9,6 +9,7 @@
 #include "config.h"
 #include "CallbackHybrid.h"
 #include "Logger.h"
+#include "IniReader.h"
 
 namespace HybridSim
 {
@@ -77,6 +78,8 @@ namespace HybridSim
 		list<uint64_t> get_valid_pages();
 
 		// State
+		IniReader iniReader;
+
 		TransactionCompleteCB *ReadDone;
 		TransactionCompleteCB *WriteDone;
 		uint systemID;

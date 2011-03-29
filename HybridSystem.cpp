@@ -8,18 +8,21 @@ namespace HybridSim {
 
 	HybridSystem::HybridSystem(uint id)
 	{
+		iniReader.read("../HybridSim/ini/hybridsim.ini");
+
 		systemID = id;
 		cout << "Creating DRAM" << endl;
-		//dram = new DRAMSim::MemorySystem(0, dram_ini, sys_ini, ".", "resultsfilename"); 
 		dram = DRAMSim::getMemorySystemInstance(0, dram_ini, sys_ini, "../HybridSim", "resultsfilename", (CACHE_PAGES * PAGE_SIZE) >> 20);
 		cout << "Creating Flash" << endl;
 #if FDSIM
+		// Note: this old code is likely broken and should be removed on the next cleanup pass.
 		flash = new FDSim::FlashDIMM(1,"ini/samsung_K9XXG08UXM.ini","ini/def_system.ini","../HybridSim","");
 #elif NVDSIM
-		flash = new NVDSim::NVDIMM(1,"ini/samsung_K9XXG08UXM(mod).ini","ini/def_system.ini","../HybridSim","");
+		flash = new NVDSim::NVDIMM(1,flash_ini,"ini/def_system.ini","../HybridSim","");
 		cout << "Did NVDSIM" << endl;
 #else
-		flash = DRAMSim::getMemorySystemInstance(1, flash_ini, sys_ini, "../HybridSim", "resultsfilename2", (TOTAL_PAGES * PAGE_SIZE) >> 20); 
+		// Note: this old code is likely broken and should be removed on the next cleanup pass.
+		flash = DRAMSim::getMemorySystemInstance(1, dram_ini, sys_ini, "../HybridSim", "resultsfilename2", (TOTAL_PAGES * PAGE_SIZE) >> 20); 
 #endif
 		cout << "Done with creating memories" << endl;
 
@@ -72,7 +75,14 @@ namespace HybridSim {
 		max_dram_pending = 0;
 
 		if (DEBUG_VICTIM) 
+		{
 			debug_victim.open("debug_victim.log", ios_base::out | ios_base::trunc);
+			if (!debug_victim.is_open())
+			{
+				cout << "ERROR: HybridSim debug_victim file failed to open.\n";
+				abort();
+			}
+		}
 	}
 
 	HybridSystem::~HybridSystem()
@@ -123,7 +133,7 @@ namespace HybridSim {
 
 
 		list<DRAMSim::Transaction>::iterator it = trans_queue.begin();
-		while((it != trans_queue.end()) && (pending_sets.size() < (CACHE_PAGES / SET_SIZE)) && (check_queue) && (delay_counter == 0))
+		while((it != trans_queue.end()) && (pending_sets.size() < NUM_SETS) && (check_queue) && (delay_counter == 0))
 		{
 			// Compute the page address.
 			uint64_t page_addr = PAGE_ADDRESS(ALIGN((*it).address));

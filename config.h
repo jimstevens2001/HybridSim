@@ -1,5 +1,5 @@
-#ifndef CONFIG_H
-#define CONFIG_H
+#ifndef HYBRIDSYSTEM_CONFIG_H
+#define HYBRIDSYSTEM_CONFIG_H
 
 // Default values for alternate code.
 #define DEBUG_CACHE 0
@@ -11,11 +11,8 @@
 #define NVDSIM 1
 #define PRINT_POWER_CB 1
 #define SAVE_POWER_CB 1
-#define CONTROLLER_DELAY 2
-#define EPOCH_LENGTH 200000
 
-#define HISTOGRAM_BIN 100
-#define HISTOGRAM_MAX 20000
+
 
 
 #include <iostream>
@@ -52,40 +49,49 @@ using DRAMSim::DATA_WRITE;
 
 using namespace std;
 
+
+
+
 // GLOBAL CONSTANTS (move to ini file eventually)
 
+// Other constants
+extern uint64_t CONTROLLER_DELAY;
+extern uint64_t EPOCH_LENGTH;
+extern uint64_t HISTOGRAM_BIN;
+extern uint64_t HISTOGRAM_MAX;
+
 // these values are also specified in the ini file of the nvdimm but have a different name
-const uint64_t WORD_SIZE = 8; // This should never change, but is just paranoia just in case we need 32-bit words.
-const uint64_t PAGE_SIZE = 1024*4; // in bytes, so divide this by 64 to get the number of DDR3 transfers per page
+extern uint64_t PAGE_SIZE; // in bytes, so divide this by 64 to get the number of DDR3 transfers per page
 
 
 
-const uint64_t SET_SIZE = 64; // associativity of cache
+extern uint64_t SET_SIZE; // associativity of cache
 
-const uint64_t BURST_SIZE = 64; // number of bytes in a single transaction, this means with PAGE_SIZE=1024, 16 transactions are needed
-const uint64_t FLASH_BURST_SIZE = 4096; // number of bytes in a single flash transaction
+extern uint64_t BURST_SIZE; // number of bytes in a single transaction, this means with PAGE_SIZE=1024, 16 transactions are needed
+extern uint64_t FLASH_BURST_SIZE; // number of bytes in a single flash transaction
 
 // Number of pages total and number of pages in the cache
-const uint64_t TOTAL_PAGES = 2097152/4; // 2 GB
-//const uint64_t TOTAL_PAGES = 4194304; // 4 GB
-const uint64_t CACHE_PAGES = 1048576/4; // 1 GB
+extern uint64_t TOTAL_PAGES; // 2 GB
+extern uint64_t CACHE_PAGES; // 1 GB
 
 
 // Defined in marss memoryHierachy.cpp.
 // Need to confirm this and make it more flexible later.
-const uint64_t CYCLES_PER_SECOND = 667000000;
+extern uint64_t CYCLES_PER_SECOND;
 
 // INI files
-const string dram_ini = "ini/DDR3_micron_8M_8B_x8_sg15.ini";
-const string flash_ini = "ini/samsung_K9XXG08UXM(mod).ini";
-const string sys_ini = "ini/system.ini";
+extern string dram_ini;
+extern string flash_ini;
+extern string sys_ini;
 
 
 
-// Derived constants/macros
 
-const uint64_t NUM_SETS = CACHE_PAGES / SET_SIZE;
 
+
+// Derived constant macros
+
+#define NUM_SETS (CACHE_PAGES / SET_SIZE)
 #define PAGE_NUMBER(addr) (addr / PAGE_SIZE)
 #define PAGE_ADDRESS(addr) ((addr / PAGE_SIZE) * PAGE_SIZE)
 #define PAGE_OFFSET(addr) (addr % PAGE_SIZE)

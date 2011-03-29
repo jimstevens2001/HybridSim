@@ -57,7 +57,14 @@ namespace HybridSim
 		this->epoch_reset(true);
 
 		if (DEBUG_LOGGER) 
+		{
 			debug.open("debug.log", ios_base::out | ios_base::trunc);
+			if (!debug.is_open())
+			{
+				cout << "ERROR: HybridSim Logger debug file failed to open.\n";
+				abort();
+			}
+		}
 	}
 
 	Logger::~Logger()
@@ -194,7 +201,6 @@ namespace HybridSim
 
 	void Logger::access_update(uint64_t queue_length, bool idle, bool flash_idle, bool dram_idle)
 	{
-		return;
 		// Log the queue length.
 		if (queue_length > max_queue_length)
 			max_queue_length = queue_length;
@@ -583,6 +589,11 @@ namespace HybridSim
 	{
 		ofstream savefile;
 		savefile.open("hybridsim.log", ios_base::out | ios_base::trunc);
+		if (!savefile.is_open())
+		{
+			cout << "ERROR: HybridSim Logger output file failed to open.\n";
+			abort();
+		}
 
 		savefile << "total accesses: " << num_accesses << "\n";
 		savefile << "cycles: " << this->currentClockCycle << "\n";
