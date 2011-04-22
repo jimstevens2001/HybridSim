@@ -69,77 +69,114 @@ int some_object::add_one_and_run()
 	Callback_t *write_cb = new Callback<some_object, void, uint, uint64_t, uint64_t>(this, &some_object::write_complete);
 	mem->RegisterCallbacks(read_cb, write_cb);
 
-	// The cycle counter is used to keep track of what cycle we are on.
-	uint64_t cycle_counter = 0;
+	srand (time(NULL));
 
-	// Open input file
-	ifstream inFile;
-	inFile.open("traces/test.txt", ifstream::in);
-	char char_line[256];
-	string line;
-
-	while (inFile.good())
+	mem->addTransaction(false, 140708070030063);
+	for (uint64_t i=0; i<10000; i++)
 	{
-		// Read the next line.
-		inFile.getline(char_line, 256);
-		line = (string)char_line;
+		mem->update();
+	}
+	
 
-		// Filter comments out.
-		size_t pos = line.find("#");
-		line = line.substr(0, pos);
-
-		// Strip whitespace from the ends.
-		line = strip(line);
-
-		// Filter newlines out.
-		if (line.empty())
-			continue;
-
-		// Split and parse.
-		list<string> split_line = split(line);
-
-		if (split_line.size() != 3)
-		{
-			cout << "ERROR: Parsing trace failed on line:\n" << line << "\n";
-			cout << "There should be exactly three numbers per line\n";
-			cout << "There are " << split_line.size() << endl;
-			abort();
-		}
-
-		uint64_t line_vals[3];
-
-		int i = 0;
-		for (list<string>::iterator it = split_line.begin(); it != split_line.end(); it++, i++)
-		{
-			// convert string to integer
-			uint64_t tmp;
-			convert_uint64_t(tmp, (*it));
-			line_vals[i] = tmp;
-		}
-
-		// Finish parsing.
-		uint64_t trans_cycle = line_vals[0];
-		bool write = line_vals[1] % 2;
-		uint64_t addr = line_vals[2];
-
-		// increment the counter until >= the clock cycle of cur transaction
-		// for each cycle, call the update() function.
-		while (cycle_counter < trans_cycle)
-		{
-			mem->update();
-			cycle_counter++;
-		}
-
-		// add the transaction and continue
-		mem->addTransaction(write, addr);
+	cout << "Preparing transactions to preload cache with data...\n";
+	//uint64_t num_init = 10000;
+	/*for (uint64_t i=0; i<num_init; i++)
+	{
+		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, i*PAGE_SIZE, NULL);
+		//cout << i << "calling HybridSystem::addTransaction\n";
+		mem->addTransaction(t);
+		if (i%10000 == 0)
+			cout << i << "/" << num_init << endl;
 	}
 
-	inFile.close();
+	cout << "Running transactions to preload cache with data...\n";
+	int factor = 10;
+	for (uint64_t i=0; i<num_init*factor; i++)
+	{
+		mem->update();
+		if (i%1000000 == 0)
+		{
+			cout << i << "/" << num_init*factor << endl;
+		}
+		}*/
 
-	// TODO: run update until all transactions come back.
+	uint64_t cur_addr = 0;
 
-	// Run the counter for awhile to let the last transaction finish (let's say a million cycles for now)
-	for (int i=0; i < 1000000; i++)
+	//const uint64_t NUM_ACCESSES = 100;
+	//const int MISS_RATE = 10;
+
+	cout << "Number of sets is" << NUM_SETS << endl;
+	cout << "Starting flash test...\n";
+	cout << "triggering writebacks to flash..." << endl;
+	for (uint64_t i=0; i<64; i++)
+	{
+		TransactionType type = DATA_WRITE;
+
+		cur_addr = (i*4096)*4096; //set size 64 so mod 64 should fill only one set	
+
+		DRAMSim::Transaction t = DRAMSim::Transaction(type, cur_addr, NULL);
+		mem->addTransaction(t);
+
+#if DEBUG_CACHE
+		cout << "\n\tAdded transaction " << i << " of type=" << type << " addr=" << cur_addr << " set=" << SET_INDEX(cur_addr) 
+			<< " tag=" << TAG(cur_addr) << endl;
+#endif
+		
+		// TODO: not sure this update factor is correct for this test
+		for (int j=0; j<10000; j++)
+		{
+			mem->update();
+		}
+	}
+	
+	// the misses
+	cur_addr = 262144;
+	for (uint64_t i=0; i<36; i++)
+	{
+		TransactionType type = DATA_WRITE;
+
+		cur_addr = 1073741824+((i*4096)*4096); //set size 64 so mod 64 should fill only one set	
+
+		DRAMSim::Transaction t = DRAMSim::Transaction(type, cur_addr, NULL);
+		mem->addTransaction(t);
+
+#if DEBUG_CACHE
+		cout << "\n\tAdded transaction " << i << " of type=" << type << " addr=" << cur_addr << " set=" << SET_INDEX(cur_addr) 
+			<< " tag=" << TAG(cur_addr) << endl;
+#endif
+		
+		// TODO: not sure this update factor is correct for this test
+		for (int j=0; j<10000; j++)
+		{
+			mem->update();
+		}
+	}
+
+	cur_addr = 0;
+	
+	cout << "reading from flash... hopefully" << endl;
+	for (uint64_t i=0; i<1000; i++)
+	  {
+	    TransactionType type = DATA_READ;
+
+	    cur_addr = (i*4096)*4096; //set size 64 so mod 64 should fill only one set 
+
+		DRAMSim::Transaction t = DRAMSim::Transaction(type, cur_addr, NULL);
+		mem->addTransaction(t);
+
+#if DEBUG_CACHE
+		cout << "\n\tAdded transaction " << i << " of type=" << type << " addr=" << cur_addr << " set=" << SET_INDEX(cur_addr) 
+			<< " tag=" << TAG(cur_addr) << endl;
+#endif
+		
+		// TODO: not sure this update factor is correct for this test
+		for (int j=0; j<10000; j++)
+		{
+			mem->update();
+		}	    
+	  }
+
+	for (int i=0; i<50000000; i++)
 	{
 		mem->update();
 	}
@@ -168,6 +205,7 @@ int some_object::add_one_and_run()
 	cout << "trans_queue_max = " << mem->trans_queue_max << "\n\n";
 	
 	mem->saveStats();
+	//mem->flash->printStats();
 	mem->reportPower();
 
 	mem->printLogfile();

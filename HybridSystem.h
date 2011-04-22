@@ -7,6 +7,7 @@
 #include <fstream>
 
 #include "config.h"
+#include "util.h"
 #include "CallbackHybrid.h"
 #include "Logger.h"
 #include "IniReader.h"
