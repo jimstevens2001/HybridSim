@@ -7,6 +7,8 @@
 #include <list>
 #include <sstream>
 
+#include "util.h"
+
 using namespace std;
 
 namespace HybridSim
@@ -15,9 +17,6 @@ namespace HybridSim
 	{
 		public:
 		void read(string inifile);
-		void convert_uint64_t(uint64_t &var, string key, string value);
-		string strip(string input, string chars = " \t\f\v\n\r");
-		list<string> split(string input, string chars = " \t\f\v\n\r", size_t maxsplit=string::npos);
 	};
 }
 

@@ -11,7 +11,7 @@ using namespace std;
 
 // Utility Library for HybridSim
 
-void convert_uint64_t(uint64_t &var, string value);
+void convert_uint64_t(uint64_t &var, string value, string infostring = "");
 string strip(string input, string chars = " \t\f\v\n\r");
 list<string> split(string input, string chars = " \t\f\v\n\r", size_t maxsplit=string::npos);
 

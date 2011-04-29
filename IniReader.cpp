@@ -88,27 +88,27 @@ namespace HybridSim
 
 			// Place the value into the appropriate global.
 			if (key.compare("CONTROLLER_DELAY") == 0)
-				convert_uint64_t(CONTROLLER_DELAY, key, value);
+				convert_uint64_t(CONTROLLER_DELAY, value, key);
 			else if (key.compare("EPOCH_LENGTH") == 0)
-				convert_uint64_t(EPOCH_LENGTH, key, value);
+				convert_uint64_t(EPOCH_LENGTH, value, key);
 			else if (key.compare("HISTOGRAM_BIN") == 0)
-				convert_uint64_t(HISTOGRAM_BIN, key, value);
+				convert_uint64_t(HISTOGRAM_BIN, value, key);
 			else if (key.compare("HISTOGRAM_MAX") == 0)
-				convert_uint64_t(HISTOGRAM_MAX, key, value);
+				convert_uint64_t(HISTOGRAM_MAX, value, key);
 			else if (key.compare("PAGE_SIZE") == 0)
-				convert_uint64_t(PAGE_SIZE, key, value);
+				convert_uint64_t(PAGE_SIZE, value, key);
 			else if (key.compare("SET_SIZE") == 0)
-				convert_uint64_t(SET_SIZE, key, value);
+				convert_uint64_t(SET_SIZE, value, key);
 			else if (key.compare("BURST_SIZE") == 0)
-				convert_uint64_t(BURST_SIZE, key, value);
+				convert_uint64_t(BURST_SIZE, value, key);
 			else if (key.compare("FLASH_BURST_SIZE") == 0)
-				convert_uint64_t(FLASH_BURST_SIZE, key, value);
+				convert_uint64_t(FLASH_BURST_SIZE, value, key);
 			else if (key.compare("TOTAL_PAGES") == 0)
-				convert_uint64_t(TOTAL_PAGES, key, value);
+				convert_uint64_t(TOTAL_PAGES, value, key);
 			else if (key.compare("CACHE_PAGES") == 0)
-				convert_uint64_t(CACHE_PAGES, key, value);
+				convert_uint64_t(CACHE_PAGES, value, key);
 			else if (key.compare("CYCLES_PER_SECOND") == 0)
-				convert_uint64_t(CYCLES_PER_SECOND, key, value);
+				convert_uint64_t(CYCLES_PER_SECOND, value, key);
 			else if (key.compare("dram_ini") == 0)
 				dram_ini = value;
 			else if (key.compare("flash_ini") == 0)
@@ -123,76 +123,4 @@ namespace HybridSim
 			}
 		}
 	}
-
-	void IniReader::convert_uint64_t(uint64_t &var, string key, string value)
-	{
-		// Check that each character in value is a digit.
-		for(size_t i = 0; i < value.size(); i++)
-		{
-			if(!isdigit(value[i]))
-			{
-				cout << "ERROR: Non-digit character found in HybridSim Ini File for key " << key << " (value=" << value << ")\n";
-				abort();
-			}
-		}
-
-		// Convert it
-		stringstream ss;
-		ss << value;
-		ss >> var;
-	}
-
-	string IniReader::strip(string input, string chars)
-	{
-		size_t pos;
-
-		// Strip front.
-		pos = input.find_first_not_of(chars);
-		input.erase(0, pos);
-
-		// Strip back.
-		pos = input.find_last_not_of(chars);
-		input.erase(pos+1);
-
-		return input;
-	}
-
-
-	list<string> IniReader::split(string input, string chars, size_t maxsplit)
-	{
-		list<string> ret;
-
-		string cur = input;
-
-		size_t pos = 0;
-
-		if (maxsplit == 0)
-			maxsplit = 1;
-
-		while (!cur.empty())
-		{
-			if (ret.size() == (maxsplit-1))
-			{
-				ret.push_back(cur);
-				return ret;
-			}
-
-			pos = cur.find_first_of(chars);
-			string tmp = cur.substr(0, pos);
-			ret.push_back(tmp);
-			if (pos == string::npos)
-				cur.erase();
-			else
-				cur.erase(0, pos+1);
-		}
-
-		// If not at npos, then there is still an extra empty string at the end.
-		if (pos != string::npos)
-		{
-			ret.push_back("");
-		}
-
-		return ret;
-	}
-
 }

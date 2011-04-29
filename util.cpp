@@ -1,13 +1,13 @@
 #include "util.h"
 
-void convert_uint64_t(uint64_t &var, string value)
+void convert_uint64_t(uint64_t &var, string value, string infostring)
 {
 	// Check that each character in value is a digit.
 	for(size_t i = 0; i < value.size(); i++)
 	{
 		if(!isdigit(value[i]))
 		{
-			cout << "ERROR: Non-digit character found: " << value << "\n";
+			cout << "ERROR: Non-digit character found: " << infostring << " : " << value << "\n";
 			abort();
 		}
 	}
