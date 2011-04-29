@@ -49,6 +49,10 @@ namespace HybridSim
 		// Print out the logging data for HybridSim only.
 		void printLogfile();
 
+		// Save/Restore cache table functions
+		void restoreCacheTable();
+		void saveCacheTable();
+
 		// Functions that schedule pending operations (second part to these operations is in the callbacks).
 //		void VictimRead(uint64_t flash_addr, uint64_t victim_cache_addr, uint64_t victim_tag, TransactionType type);
 //		void VictimWrite(uint64_t flash_addr, uint64_t victim_cache_addr, uint64_t victim_tag);

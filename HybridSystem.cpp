@@ -60,6 +60,10 @@ namespace HybridSim {
 		// No active transaction to start with.
 		active_transaction_flag = false;
 
+		// Call the restore cache state function.
+		// If ENABLE_RESTORE is set, then this will fill the cache table.
+		restoreCacheTable();
+
 
 		// Power stuff
 		idle_energy = vector<double>(NUM_PACKAGES, 0.0); 
@@ -1208,6 +1212,10 @@ namespace HybridSim {
 
 	void HybridSystem::printLogfile()
 	{
+		// Save the cache table if necessary.
+		saveCacheTable();
+
+		// Print out the log file.
 		log.print();
 	}
 
@@ -1231,6 +1239,101 @@ namespace HybridSim {
 		}
 
 		return valid_pages;
+	}
+
+
+	void HybridSystem::restoreCacheTable()
+	{
+		if (ENABLE_RESTORE)
+		{
+			cout << "PERFORMING RESTORE OF CACHE TABLE!!!\n";
+
+			ifstream inFile;
+			inFile.open(HYBRIDSIM_RESTORE_FILE);
+			if (!inFile.is_open())
+			{
+				cout << "ERROR: Failed to load HybridSim's state restore file: " << HYBRIDSIM_RESTORE_FILE << "\n";
+				abort();
+			}
+
+			uint64_t tmp;
+
+			// Read the parameters and confirm that they are the same as the current HybridSystem instance.
+			inFile >> tmp;
+			if (tmp != PAGE_SIZE)
+			{
+				cout << "ERROR: Attempted to restore state and PAGE_SIZE does not match in restore file and ini file."  << "\n";
+				abort();
+			}
+			inFile >> tmp;
+			if (tmp != SET_SIZE)
+			{
+				cout << "ERROR: Attempted to restore state and SET_SIZE does not match in restore file and ini file."  << "\n";
+				abort();
+			}
+			inFile >> tmp;
+			if (tmp != CACHE_PAGES)
+			{
+				cout << "ERROR: Attempted to restore state and CACHE_PAGES does not match in restore file and ini file."  << "\n";
+				abort();
+			}
+			inFile >> tmp;
+			if (tmp != TOTAL_PAGES)
+			{
+				cout << "ERROR: Attempted to restore state and TOTAL_PAGES does not match in restore file and ini file."  << "\n";
+				abort();
+			}
+				
+			// Read the cache table.
+			while(inFile.good())
+			{
+				uint64_t cache_addr;
+				cache_line line;
+
+				// Get the cache line data from the file.
+				inFile >> cache_addr;
+				inFile >> line.valid;
+				inFile >> line.dirty;
+				inFile >> line.tag;
+				inFile >> line.data;
+				inFile >> line.ts;
+
+				// Put this in the cache.
+				cache[cache_addr] = line;
+			}
+		
+
+			inFile.close();
+		}
+	}
+
+	void HybridSystem::saveCacheTable()
+	{
+		if (ENABLE_SAVE)
+		{
+			
+			ofstream savefile;
+			savefile.open(HYBRIDSIM_SAVE_FILE, ios_base::out | ios_base::trunc);
+			if (!savefile.is_open())
+			{
+				cout << "ERROR: Failed to load HybridSim's state save file: " << HYBRIDSIM_SAVE_FILE << "\n";
+				abort();
+			}
+			cout << "PERFORMING SAVE OF CACHE TABLE!!!\n";
+
+			savefile << PAGE_SIZE << " " << SET_SIZE << " " << CACHE_PAGES << " " << TOTAL_PAGES << "\n";
+
+			unordered_map<uint64_t, cache_line>::iterator it;
+			for (it = cache.begin(); it != cache.end(); it++)
+			{
+				uint64_t cache_addr = (*it).first;
+				cache_line line = (*it).second;
+
+				savefile << cache_addr << " " << line.valid << " " << line.dirty << " " << line.tag << " " << line.data << " " << line.ts << "\n";
+			}
+
+			savefile.close();
+		}
 	}
 
 	// TODO: probably need to change these computations to work on a finer granularity than pages

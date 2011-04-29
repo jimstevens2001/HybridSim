@@ -22,3 +22,4 @@ libnvhybridsim.so
 dramsim.log
 hybridsim.log
 tags
+state/
