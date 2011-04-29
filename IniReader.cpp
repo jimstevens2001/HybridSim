@@ -33,6 +33,14 @@ string dram_ini = "ini/DDR3_micron_8M_8B_x8_sg15.ini";
 string flash_ini = "ini/samsung_K9XXG08UXM(mod).ini";
 string sys_ini = "ini/system.ini";
 
+// Save/Restore options
+uint64_t ENABLE_RESTORE = 0;
+uint64_t ENABLE_SAVE = 0;
+string HYBRIDSIM_RESTORE_FILE = "none";
+string NVDIMM_RESTORE_FILE = "none";
+string HYBRIDSIM_SAVE_FILE = "none";
+string NVDIMM_SAVE_FILE = "none";
+
 
 namespace HybridSim 
 {
@@ -115,6 +123,18 @@ namespace HybridSim
 				flash_ini = value;
 			else if (key.compare("sys_ini") == 0)
 				sys_ini = value;
+			else if (key.compare("ENABLE_RESTORE") == 0)
+				convert_uint64_t(ENABLE_RESTORE, value, key);
+			else if (key.compare("ENABLE_SAVE") == 0)
+				convert_uint64_t(ENABLE_SAVE, value, key);
+			else if (key.compare("HYBRIDSIM_RESTORE_FILE") == 0)
+				HYBRIDSIM_RESTORE_FILE = value;
+			else if (key.compare("HYBRIDSIM_SAVE_FILE") == 0)
+				HYBRIDSIM_SAVE_FILE = value;
+			else if (key.compare("NVDIMM_RESTORE_FILE") == 0)
+				NVDIMM_RESTORE_FILE = value;
+			else if (key.compare("NVDIMM_SAVE_FILE") == 0)
+				NVDIMM_SAVE_FILE = value;
 			else
 			{
 				cout << "ERROR: Illegal key/value pair in HybridSim ini file: " << key << "=" << value << "\n";

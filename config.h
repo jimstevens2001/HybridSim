@@ -84,6 +84,13 @@ extern string dram_ini;
 extern string flash_ini;
 extern string sys_ini;
 
+// Save/Restore options
+extern uint64_t ENABLE_RESTORE;
+extern uint64_t ENABLE_SAVE;
+extern string HYBRIDSIM_RESTORE_FILE;
+extern string NVDIMM_RESTORE_FILE;
+extern string HYBRIDSIM_SAVE_FILE;
+extern string NVDIMM_SAVE_FILE;
 
 
 
