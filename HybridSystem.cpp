@@ -1323,14 +1323,31 @@ namespace HybridSim {
 
 			savefile << PAGE_SIZE << " " << SET_SIZE << " " << CACHE_PAGES << " " << TOTAL_PAGES << "\n";
 
-			unordered_map<uint64_t, cache_line>::iterator it;
-			for (it = cache.begin(); it != cache.end(); it++)
+			for (uint64_t i=0; i < CACHE_PAGES; i++)
 			{
-				uint64_t cache_addr = (*it).first;
-				cache_line line = (*it).second;
+				uint64_t cache_addr= i * PAGE_SIZE;
 
+				if (cache.count(cache_addr) == 0)
+					// Skip to next page if this cache_line entry is not in the cache table.
+					continue;
+
+				// Get the line entry.
+				cache_line line = cache[cache_addr];
+
+				if (!line.valid)
+					// If the line isn't valid, then don't need to save it.
+					continue;
+				
 				savefile << cache_addr << " " << line.valid << " " << line.dirty << " " << line.tag << " " << line.data << " " << line.ts << "\n";
 			}
+//			unordered_map<uint64_t, cache_line>::iterator it;
+//			for (it = cache.begin(); it != cache.end(); it++)
+//			{
+//				uint64_t cache_addr = (*it).first;
+//				cache_line line = (*it).second;
+//
+//				savefile << cache_addr << " " << line.valid << " " << line.dirty << " " << line.tag << " " << line.data << " " << line.ts << "\n";
+//			}
 
 			savefile.close();
 		}
