@@ -1,10 +1,15 @@
+// TODO: Fix License
 /****************************************************************************
-*	 DRAMSim2: A Cycle Accurate DRAM simulator 
+*	 HybridSim: Simulator for hybrid main memories
 *	 
-*	 Copyright (C) 2010   	Elliott Cooper-Balis
-*									Paul Rosenfeld 
-*									Bruce Jacob
-*									University of Maryland
+*	 Copyright (C) 2010   	Jim Stevens
+* 							Peter Enns
+*							Paul Tschirhart
+*							Ishwar Bhati
+*							Mutien Chang
+*							Paul Rosenfeld 
+*							Bruce Jacob
+*							University of Maryland
 *
 *	 This program is free software: you can redistribute it and/or modify
 *	 it under the terms of the GNU General Public License as published by
@@ -30,21 +35,31 @@ using namespace std;
 
 int complete = 0;
 
-int main()
+int main(int argc, char *argv[])
 {
 	printf("hybridsim_test main()\n");
-	some_object obj;
-	obj.add_one_and_run();
+	HybridSimTBS obj;
+
+	string tracefile = "traces/test.txt";
+	if (argc > 1)
+	{
+		cout << "Using trace file " << tracefile << "\n";
+		tracefile = argv[1];
+	}
+	else
+		cout << "Using default trace file (traces/test.txt)\n";
+
+	obj.run_trace(tracefile);
 }
 
 
-void some_object::read_complete(uint id, uint64_t address, uint64_t clock_cycle)
+void HybridSimTBS::read_complete(uint id, uint64_t address, uint64_t clock_cycle)
 {
 	printf("[Callback] read complete: %d 0x%lx cycle=%lu\n", id, address, clock_cycle);
 	complete++;
 }
 
-void some_object::write_complete(uint id, uint64_t address, uint64_t clock_cycle)
+void HybridSimTBS::write_complete(uint id, uint64_t address, uint64_t clock_cycle)
 {
 	printf("[Callback] write complete: %d 0x%lx cycle=%lu\n", id, address, clock_cycle);
 	complete++;
@@ -56,7 +71,7 @@ void some_object::write_complete(uint id, uint64_t address, uint64_t clock_cycle
 	printf("power callback: %0.3f, %0.3f, %0.3f, %0.3f\n",a,b,c,d);
 }*/
 
-int some_object::add_one_and_run()
+int HybridSimTBS::run_trace(string tracefile)
 {
 	/* pick a DRAM part to simulate */
 	HybridSystem *mem = new HybridSystem(1);
@@ -65,8 +80,8 @@ int some_object::add_one_and_run()
 
 	/* create and register our callback functions */
 	typedef CallbackBase<void,uint,uint64_t,uint64_t> Callback_t;
-	Callback_t *read_cb = new Callback<some_object, void, uint, uint64_t, uint64_t>(this, &some_object::read_complete);
-	Callback_t *write_cb = new Callback<some_object, void, uint, uint64_t, uint64_t>(this, &some_object::write_complete);
+	Callback_t *read_cb = new Callback<HybridSimTBS, void, uint, uint64_t, uint64_t>(this, &HybridSimTBS::read_complete);
+	Callback_t *write_cb = new Callback<HybridSimTBS, void, uint, uint64_t, uint64_t>(this, &HybridSimTBS::write_complete);
 	mem->RegisterCallbacks(read_cb, write_cb);
 
 	// The cycle counter is used to keep track of what cycle we are on.
@@ -74,7 +89,7 @@ int some_object::add_one_and_run()
 
 	// Open input file
 	ifstream inFile;
-	inFile.open("traces/test.txt", ifstream::in);
+	inFile.open(tracefile, ifstream::in);
 	char char_line[256];
 	string line;
 

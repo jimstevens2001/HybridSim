@@ -25,5 +25,5 @@ with open(sys.argv[1], 'r') as f:
         print str(cycle) + '\t\t' + str(writebit) + '\t\t' + str(paddr)
         cycle += 1000 # space out 1000 cycles to keep queue from jamming up.
 
-        if cycle > 100000:
-            break
+#        if cycle > 100000:
+#            break

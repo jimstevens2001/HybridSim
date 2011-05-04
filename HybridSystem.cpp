@@ -1249,7 +1249,7 @@ namespace HybridSim {
 			cout << "PERFORMING RESTORE OF CACHE TABLE!!!\n";
 
 			ifstream inFile;
-			inFile.open(HYBRIDSIM_RESTORE_FILE);
+			inFile.open("../HybridSim/"+HYBRIDSIM_RESTORE_FILE);
 			if (!inFile.is_open())
 			{
 				cout << "ERROR: Failed to load HybridSim's state restore file: " << HYBRIDSIM_RESTORE_FILE << "\n";
@@ -1313,7 +1313,7 @@ namespace HybridSim {
 		{
 			
 			ofstream savefile;
-			savefile.open(HYBRIDSIM_SAVE_FILE, ios_base::out | ios_base::trunc);
+			savefile.open("../HybridSim/"+HYBRIDSIM_SAVE_FILE, ios_base::out | ios_base::trunc);
 			if (!savefile.is_open())
 			{
 				cout << "ERROR: Failed to load HybridSim's state save file: " << HYBRIDSIM_SAVE_FILE << "\n";
