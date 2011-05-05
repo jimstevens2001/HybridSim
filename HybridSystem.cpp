@@ -8,18 +8,21 @@ namespace HybridSim {
 
 	HybridSystem::HybridSystem(uint id)
 	{
+		iniReader.read("../HybridSim/ini/hybridsim.ini");
+
 		systemID = id;
 		cout << "Creating DRAM" << endl;
-		//dram = new DRAMSim::MemorySystem(0, dram_ini, sys_ini, ".", "resultsfilename"); 
 		dram = DRAMSim::getMemorySystemInstance(0, dram_ini, sys_ini, "../HybridSim", "resultsfilename", (CACHE_PAGES * PAGE_SIZE) >> 20);
 		cout << "Creating Flash" << endl;
 #if FDSIM
+		// Note: this old code is likely broken and should be removed on the next cleanup pass.
 		flash = new FDSim::FlashDIMM(1,"ini/samsung_K9XXG08UXM.ini","ini/def_system.ini","../HybridSim","");
 #elif NVDSIM
-		flash = new NVDSim::NVDIMM(1,"ini/samsung_K9XXG08UXM(pcm).ini","ini/def_system.ini","../HybridSim","");
+		flash = new NVDSim::NVDIMM(1,flash_ini,"ini/def_system.ini","../HybridSim","");
 		cout << "Did NVDSIM" << endl;
 #else
-		flash = DRAMSim::getMemorySystemInstance(1, flash_ini, sys_ini, "../HybridSim", "resultsfilename2", (TOTAL_PAGES * PAGE_SIZE) >> 20); 
+		// Note: this old code is likely broken and should be removed on the next cleanup pass.
+		flash = DRAMSim::getMemorySystemInstance(1, dram_ini, sys_ini, "../HybridSim", "resultsfilename2", (TOTAL_PAGES * PAGE_SIZE) >> 20); 
 #endif
 		cout << "Done with creating memories" << endl;
 
@@ -57,6 +60,10 @@ namespace HybridSim {
 		// No active transaction to start with.
 		active_transaction_flag = false;
 
+		// Call the restore cache state function.
+		// If ENABLE_RESTORE is set, then this will fill the cache table.
+		restoreCacheTable();
+
 
 		// Power stuff
 		idle_energy = vector<double>(NUM_PACKAGES, 0.0); 
@@ -72,7 +79,14 @@ namespace HybridSim {
 		max_dram_pending = 0;
 
 		if (DEBUG_VICTIM) 
+		{
 			debug_victim.open("debug_victim.log", ios_base::out | ios_base::trunc);
+			if (!debug_victim.is_open())
+			{
+				cout << "ERROR: HybridSim debug_victim file failed to open.\n";
+				abort();
+			}
+		}
 	}
 
 	HybridSystem::~HybridSystem()
@@ -123,7 +137,7 @@ namespace HybridSim {
 
 
 		list<DRAMSim::Transaction>::iterator it = trans_queue.begin();
-		while((it != trans_queue.end()) && (pending_sets.size() < (CACHE_PAGES / SET_SIZE)) && (check_queue) && (delay_counter == 0))
+		while((it != trans_queue.end()) && (pending_sets.size() < NUM_SETS) && (check_queue) && (delay_counter == 0))
 		{
 			// Compute the page address.
 			uint64_t page_addr = PAGE_ADDRESS(ALIGN((*it).address));
@@ -1198,6 +1212,10 @@ namespace HybridSim {
 
 	void HybridSystem::printLogfile()
 	{
+		// Save the cache table if necessary.
+		saveCacheTable();
+
+		// Print out the log file.
 		log.print();
 	}
 
@@ -1221,6 +1239,118 @@ namespace HybridSim {
 		}
 
 		return valid_pages;
+	}
+
+
+	void HybridSystem::restoreCacheTable()
+	{
+		if (ENABLE_RESTORE)
+		{
+			cout << "PERFORMING RESTORE OF CACHE TABLE!!!\n";
+
+			ifstream inFile;
+			inFile.open("../HybridSim/"+HYBRIDSIM_RESTORE_FILE);
+			if (!inFile.is_open())
+			{
+				cout << "ERROR: Failed to load HybridSim's state restore file: " << HYBRIDSIM_RESTORE_FILE << "\n";
+				abort();
+			}
+
+			uint64_t tmp;
+
+			// Read the parameters and confirm that they are the same as the current HybridSystem instance.
+			inFile >> tmp;
+			if (tmp != PAGE_SIZE)
+			{
+				cout << "ERROR: Attempted to restore state and PAGE_SIZE does not match in restore file and ini file."  << "\n";
+				abort();
+			}
+			inFile >> tmp;
+			if (tmp != SET_SIZE)
+			{
+				cout << "ERROR: Attempted to restore state and SET_SIZE does not match in restore file and ini file."  << "\n";
+				abort();
+			}
+			inFile >> tmp;
+			if (tmp != CACHE_PAGES)
+			{
+				cout << "ERROR: Attempted to restore state and CACHE_PAGES does not match in restore file and ini file."  << "\n";
+				abort();
+			}
+			inFile >> tmp;
+			if (tmp != TOTAL_PAGES)
+			{
+				cout << "ERROR: Attempted to restore state and TOTAL_PAGES does not match in restore file and ini file."  << "\n";
+				abort();
+			}
+				
+			// Read the cache table.
+			while(inFile.good())
+			{
+				uint64_t cache_addr;
+				cache_line line;
+
+				// Get the cache line data from the file.
+				inFile >> cache_addr;
+				inFile >> line.valid;
+				inFile >> line.dirty;
+				inFile >> line.tag;
+				inFile >> line.data;
+				inFile >> line.ts;
+
+				// Put this in the cache.
+				cache[cache_addr] = line;
+			}
+		
+
+			inFile.close();
+		}
+	}
+
+	void HybridSystem::saveCacheTable()
+	{
+		if (ENABLE_SAVE)
+		{
+			
+			ofstream savefile;
+			savefile.open("../HybridSim/"+HYBRIDSIM_SAVE_FILE, ios_base::out | ios_base::trunc);
+			if (!savefile.is_open())
+			{
+				cout << "ERROR: Failed to load HybridSim's state save file: " << HYBRIDSIM_SAVE_FILE << "\n";
+				abort();
+			}
+			cout << "PERFORMING SAVE OF CACHE TABLE!!!\n";
+
+			savefile << PAGE_SIZE << " " << SET_SIZE << " " << CACHE_PAGES << " " << TOTAL_PAGES << "\n";
+
+			for (uint64_t i=0; i < CACHE_PAGES; i++)
+			{
+				uint64_t cache_addr= i * PAGE_SIZE;
+
+				if (cache.count(cache_addr) == 0)
+					// Skip to next page if this cache_line entry is not in the cache table.
+					continue;
+
+				// Get the line entry.
+				cache_line line = cache[cache_addr];
+
+				if (!line.valid)
+					// If the line isn't valid, then don't need to save it.
+					continue;
+				
+				savefile << cache_addr << " " << line.valid << " " << line.dirty << " " << line.tag << " " << line.data << " " << line.ts << "\n";
+			}
+//			unordered_map<uint64_t, cache_line>::iterator it;
+//			for (it = cache.begin(); it != cache.end(); it++)
+//			{
+//				uint64_t cache_addr = (*it).first;
+//				cache_line line = (*it).second;
+//
+//				savefile << cache_addr << " " << line.valid << " " << line.dirty << " " << line.tag << " " << line.data << " " << line.ts << "\n";
+//			}
+
+			savefile.close();
+		}
 	}
 
 	// TODO: probably need to change these computations to work on a finer granularity than pages

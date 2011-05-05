@@ -1,10 +1,15 @@
+// TODO: Fix License
 /****************************************************************************
-*	 DRAMSim2: A Cycle Accurate DRAM simulator 
+*	 HybridSim: Simulator for hybrid main memories
 *	 
-*	 Copyright (C) 2010   	Elliott Cooper-Balis
-*									Paul Rosenfeld 
-*									Bruce Jacob
-*									University of Maryland
+*	 Copyright (C) 2010   	Jim Stevens
+* 							Peter Enns
+*							Paul Tschirhart
+*							Ishwar Bhati
+*							Mutien Chang
+*							Paul Rosenfeld 
+*							Bruce Jacob
+*							University of Maryland
 *
 *	 This program is free software: you can redistribute it and/or modify
 *	 it under the terms of the GNU General Public License as published by
@@ -30,21 +35,31 @@ using namespace std;
 
 int complete = 0;
 
-int main()
+int main(int argc, char *argv[])
 {
 	printf("hybridsim_test main()\n");
-	some_object obj;
-	obj.add_one_and_run();
+	HybridSimTBS obj;
+
+	string tracefile = "traces/test.txt";
+	if (argc > 1)
+	{
+		cout << "Using trace file " << tracefile << "\n";
+		tracefile = argv[1];
+	}
+	else
+		cout << "Using default trace file (traces/test.txt)\n";
+
+	obj.run_trace(tracefile);
 }
 
 
-void some_object::read_complete(uint id, uint64_t address, uint64_t clock_cycle)
+void HybridSimTBS::read_complete(uint id, uint64_t address, uint64_t clock_cycle)
 {
 	printf("[Callback] read complete: %d 0x%lx cycle=%lu\n", id, address, clock_cycle);
 	complete++;
 }
 
-void some_object::write_complete(uint id, uint64_t address, uint64_t clock_cycle)
+void HybridSimTBS::write_complete(uint id, uint64_t address, uint64_t clock_cycle)
 {
 	printf("[Callback] write complete: %d 0x%lx cycle=%lu\n", id, address, clock_cycle);
 	complete++;
@@ -56,7 +71,7 @@ void some_object::write_complete(uint id, uint64_t address, uint64_t clock_cycle
 	printf("power callback: %0.3f, %0.3f, %0.3f, %0.3f\n",a,b,c,d);
 }*/
 
-int some_object::add_one_and_run()
+int HybridSimTBS::run_trace(string tracefile)
 {
 	/* pick a DRAM part to simulate */
 	HybridSystem *mem = new HybridSystem(1);
@@ -65,118 +80,81 @@ int some_object::add_one_and_run()
 
 	/* create and register our callback functions */
 	typedef CallbackBase<void,uint,uint64_t,uint64_t> Callback_t;
-	Callback_t *read_cb = new Callback<some_object, void, uint, uint64_t, uint64_t>(this, &some_object::read_complete);
-	Callback_t *write_cb = new Callback<some_object, void, uint, uint64_t, uint64_t>(this, &some_object::write_complete);
+	Callback_t *read_cb = new Callback<HybridSimTBS, void, uint, uint64_t, uint64_t>(this, &HybridSimTBS::read_complete);
+	Callback_t *write_cb = new Callback<HybridSimTBS, void, uint, uint64_t, uint64_t>(this, &HybridSimTBS::write_complete);
 	mem->RegisterCallbacks(read_cb, write_cb);
 
-	srand (time(NULL));
+	// The cycle counter is used to keep track of what cycle we are on.
+	uint64_t cycle_counter = 0;
 
-	mem->addTransaction(false, 140708070030063);
-	for (uint64_t i=0; i<10000; i++)
-	{
-		mem->update();
-	}
-	
+	// Open input file
+	ifstream inFile;
+	inFile.open(tracefile, ifstream::in);
+	char char_line[256];
+	string line;
 
-	cout << "Preparing transactions to preload cache with data...\n";
-	//uint64_t num_init = 10000;
-	/*for (uint64_t i=0; i<num_init; i++)
+	while (inFile.good())
 	{
-		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, i*PAGE_SIZE, NULL);
-		//cout << i << "calling HybridSystem::addTransaction\n";
-		mem->addTransaction(t);
-		if (i%10000 == 0)
-			cout << i << "/" << num_init << endl;
-	}
+		// Read the next line.
+		inFile.getline(char_line, 256);
+		line = (string)char_line;
 
-	cout << "Running transactions to preload cache with data...\n";
-	int factor = 10;
-	for (uint64_t i=0; i<num_init*factor; i++)
-	{
-		mem->update();
-		if (i%1000000 == 0)
+		// Filter comments out.
+		size_t pos = line.find("#");
+		line = line.substr(0, pos);
+
+		// Strip whitespace from the ends.
+		line = strip(line);
+
+		// Filter newlines out.
+		if (line.empty())
+			continue;
+
+		// Split and parse.
+		list<string> split_line = split(line);
+
+		if (split_line.size() != 3)
 		{
-			cout << i << "/" << num_init*factor << endl;
+			cout << "ERROR: Parsing trace failed on line:\n" << line << "\n";
+			cout << "There should be exactly three numbers per line\n";
+			cout << "There are " << split_line.size() << endl;
+			abort();
 		}
-		}*/
 
-	uint64_t cur_addr = 0;
+		uint64_t line_vals[3];
 
-	//const uint64_t NUM_ACCESSES = 100;
-	//const int MISS_RATE = 10;
+		int i = 0;
+		for (list<string>::iterator it = split_line.begin(); it != split_line.end(); it++, i++)
+		{
+			// convert string to integer
+			uint64_t tmp;
+			convert_uint64_t(tmp, (*it));
+			line_vals[i] = tmp;
+		}
 
-	cout << "Number of sets is" << NUM_SETS << endl;
-	cout << "Starting flash test...\n";
-	cout << "triggering writebacks to flash..." << endl;
-	for (uint64_t i=0; i<64; i++)
-	{
-		TransactionType type = DATA_WRITE;
+		// Finish parsing.
+		uint64_t trans_cycle = line_vals[0];
+		bool write = line_vals[1] % 2;
+		uint64_t addr = line_vals[2];
 
-		cur_addr = (i*4096)*4096; //set size 64 so mod 64 should fill only one set	
-
-		DRAMSim::Transaction t = DRAMSim::Transaction(type, cur_addr, NULL);
-		mem->addTransaction(t);
-
-#if DEBUG_CACHE
-		cout << "\n\tAdded transaction " << i << " of type=" << type << " addr=" << cur_addr << " set=" << SET_INDEX(cur_addr) 
-			<< " tag=" << TAG(cur_addr) << endl;
-#endif
-		
-		// TODO: not sure this update factor is correct for this test
-		for (int j=0; j<10000; j++)
+		// increment the counter until >= the clock cycle of cur transaction
+		// for each cycle, call the update() function.
+		while (cycle_counter < trans_cycle)
 		{
 			mem->update();
+			cycle_counter++;
 		}
-	}
-	
-	// the misses
-	cur_addr = 262144;
-	for (uint64_t i=0; i<36; i++)
-	{
-		TransactionType type = DATA_WRITE;
 
-		cur_addr = 1073741824+((i*4096)*4096); //set size 64 so mod 64 should fill only one set	
-
-		DRAMSim::Transaction t = DRAMSim::Transaction(type, cur_addr, NULL);
-		mem->addTransaction(t);
-
-#if DEBUG_CACHE
-		cout << "\n\tAdded transaction " << i << " of type=" << type << " addr=" << cur_addr << " set=" << SET_INDEX(cur_addr) 
-			<< " tag=" << TAG(cur_addr) << endl;
-#endif
-		
-		// TODO: not sure this update factor is correct for this test
-		for (int j=0; j<10000; j++)
-		{
-			mem->update();
-		}
+		// add the transaction and continue
+		mem->addTransaction(write, addr);
 	}
 
-	cur_addr = 0;
-	
-	cout << "reading from flash... hopefully" << endl;
-	for (uint64_t i=0; i<1000; i++)
-	  {
-	    TransactionType type = DATA_READ;
+	inFile.close();
 
-	    cur_addr = (i*4096)*4096; //set size 64 so mod 64 should fill only one set 
+	// TODO: run update until all transactions come back.
 
-		DRAMSim::Transaction t = DRAMSim::Transaction(type, cur_addr, NULL);
-		mem->addTransaction(t);
-
-#if DEBUG_CACHE
-		cout << "\n\tAdded transaction " << i << " of type=" << type << " addr=" << cur_addr << " set=" << SET_INDEX(cur_addr) 
-			<< " tag=" << TAG(cur_addr) << endl;
-#endif
-		
-		// TODO: not sure this update factor is correct for this test
-		for (int j=0; j<10000; j++)
-		{
-			mem->update();
-		}	    
-	  }
-
-	for (int i=0; i<50000000; i++)
+	// Run the counter for awhile to let the last transaction finish (let's say a million cycles for now)
+	for (int i=0; i < 1000000; i++)
 	{
 		mem->update();
 	}
@@ -205,7 +183,6 @@ int some_object::add_one_and_run()
 	cout << "trans_queue_max = " << mem->trans_queue_max << "\n\n";
 	
 	mem->saveStats();
-	//mem->flash->printStats();
 	mem->reportPower();
 
 	mem->printLogfile();
