@@ -43,8 +43,8 @@ int main(int argc, char *argv[])
 	string tracefile = "traces/test.txt";
 	if (argc > 1)
 	{
-		cout << "Using trace file " << tracefile << "\n";
 		tracefile = argv[1];
+		cout << "Using trace file " << tracefile << "\n";
 	}
 	else
 		cout << "Using default trace file (traces/test.txt)\n";
@@ -90,6 +90,13 @@ int HybridSimTBS::run_trace(string tracefile)
 	// Open input file
 	ifstream inFile;
 	inFile.open(tracefile, ifstream::in);
+	if (!inFile.is_open())
+	{
+		cout << "ERROR: Failed to load tracefile: " << tracefile << "\n";
+		abort();
+	}
+	
+
 	char char_line[256];
 	string line;
 
