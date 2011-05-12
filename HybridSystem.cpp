@@ -1304,6 +1304,8 @@ namespace HybridSim {
 		
 
 			inFile.close();
+
+			flash->loadNVState(NVDIMM_RESTORE_FILE);
 		}
 	}
 
@@ -1311,7 +1313,6 @@ namespace HybridSim {
 	{
 		if (ENABLE_SAVE)
 		{
-			
 			ofstream savefile;
 			savefile.open("../HybridSim/"+HYBRIDSIM_SAVE_FILE, ios_base::out | ios_base::trunc);
 			if (!savefile.is_open())
@@ -1350,6 +1351,8 @@ namespace HybridSim {
 //			}
 
 			savefile.close();
+
+			flash->saveNVState(NVDIMM_SAVE_FILE);
 		}
 	}
 

@@ -1,0 +1,40 @@
+hybridsim_test main()
+Using trace file traces/test.txt
+Creating DRAM
+===== MemorySystem 0 =====
+== Loading device model file '../HybridSim/ini/DDR3_micron_64M_8B_x8_sg15.ini' == 
+== Loading system model file '../HybridSim/ini/system.ini' == 
+TOTAL_STORAGE : 4096MB | 1 Ranks | 8 Devices per rank
+WARNING: KEY VIS_FILE_OUTPUT NOT FOUND IN INI FILE.
+	Setting Default: VIS_FILE_OUTPUT=false
+Creating Flash
+Did NVDSIM
+Done with creating memories
+
+
+1000000: completed 0
+
+dram_pending=0 flash_pending=0
+
+dram_queue=0 flash_queue=0
+
+pending_pages=0
+
+
+
+pending_count=0
+
+dram_pending_set.size() =0
+
+dram_bad_address.size() = 0
+
+
+pending_sets.size() = 0
+
+pending_sets_max = 0
+
+pending_pages_max = 0
+
+trans_queue_max = 0
+
+PERFORMING SAVE OF CACHE TABLE!!!
