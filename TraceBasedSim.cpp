@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
 		cout << "Using trace file " << tracefile << "\n";
 	}
 	else
-		cout << "Using default trace file (traces/test.txt)\n";
+	cout << "Using default trace file (traces/test.txt)\n";
 
 	obj.run_trace(tracefile);
 }
