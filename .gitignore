@@ -12,6 +12,7 @@ results/
 *.png
 *~
 out
+nohup.out
 tmp
 \.#*
 *#
