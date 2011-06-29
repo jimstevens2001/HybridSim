@@ -2,7 +2,7 @@ import sys
 import struct
 
 base = sys.argv[1]
-num_input = sys.argv[2]
+num_input = int(sys.argv[2])
 
 files = [base+str(i) for i in range(num_input)]
 
