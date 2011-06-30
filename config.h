@@ -56,6 +56,8 @@ using namespace std;
 
 // Other constants
 extern uint64_t CONTROLLER_DELAY;
+
+extern uint64_t ENABLE_LOGGER;
 extern uint64_t EPOCH_LENGTH;
 extern uint64_t HISTOGRAM_BIN;
 extern uint64_t HISTOGRAM_MAX;

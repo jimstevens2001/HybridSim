@@ -8,7 +8,10 @@ namespace HybridSim {
 
 	HybridSystem::HybridSystem(uint id)
 	{
+
 		iniReader.read("../HybridSim/ini/hybridsim.ini");
+		if (ENABLE_LOGGER)
+			log.init();
 
 		systemID = id;
 		cout << "Creating DRAM" << endl;
@@ -120,7 +123,8 @@ namespace HybridSim {
 		bool idle = (trans_queue.size() == 0) && (pending_sets.size() == 0);
 		bool flash_idle = (flash_queue.size() == 0) && (flash_pending.size() == 0);
 		bool dram_idle = (dram_queue.size() == 0) && (dram_pending.size() == 0);
-		log.access_update(trans_queue.size(), idle, flash_idle, dram_idle);
+		if (ENABLE_LOGGER)
+			log.access_update(trans_queue.size(), idle, flash_idle, dram_idle);
 
 
 		// See if there are any transactions ready to be processed.
@@ -151,7 +155,8 @@ namespace HybridSim {
 				pending_sets.insert(SET_INDEX(page_addr));
 
 				// Log the page access.
-				log.access_page(page_addr);
+				if (ENABLE_LOGGER)
+					log.access_page(page_addr);
 
 				// Set this transaction as active and start the delay counter, which
 				// simulates the SRAM cache tag lookup time.
@@ -168,7 +173,8 @@ namespace HybridSim {
 			else
 			{
 				// Log the set conflict.
-				log.access_set_conflict(SET_INDEX(page_addr));
+				if (ENABLE_LOGGER)
+					log.access_set_conflict(SET_INDEX(page_addr));
 
 				// Skip to the next and do nothing else.
 				// cout << "PAGE IN PENDING" << page_addr << "\n";
@@ -248,7 +254,8 @@ namespace HybridSim {
 
 
 		// Update the logger.
-		log.update();
+		if (ENABLE_LOGGER)
+			log.update();
 
 		// Update the memories.
 		dram->update();
@@ -283,7 +290,8 @@ namespace HybridSim {
 		//cout << "pushed\n";
 
 		// Start the logging for this access.
-		log.access_start(trans.address);
+		if (ENABLE_LOGGER)
+			log.access_start(trans.address);
 
 		// Restart queue checking.
 		this->check_queue = true;
@@ -360,7 +368,8 @@ namespace HybridSim {
 
 		// Place access_process here and combine it with access_cache.
 		// Tell the logger when the access is processed (used for timing the time in queue).
-		log.access_process(trans.address, trans.transactionType == DATA_READ, hit);
+		if (ENABLE_LOGGER)
+			log.access_process(trans.address, trans.transactionType == DATA_READ, hit);
 
 		if (hit)
 		{
@@ -442,7 +451,8 @@ namespace HybridSim {
 			// THIS MUST HAPPEN AFTER THE CUR_LINE IS SET TO THE VICTIM LINE.
 			//uint64_t victim_flash_addr = (cur_line.tag * NUM_SETS + set_index) * PAGE_SIZE; 
 			uint64_t victim_flash_addr = FLASH_ADDRESS(cur_line.tag, set_index);
-			log.access_miss(PAGE_ADDRESS(addr), victim_flash_addr, set_index, victim, cur_line.dirty, cur_line.valid);
+			if (ENABLE_LOGGER)
+				log.access_miss(PAGE_ADDRESS(addr), victim_flash_addr, set_index, victim, cur_line.dirty, cur_line.valid);
 
 #if DEBUG_CACHE
 			cout << currentClockCycle << ": " << "MISS: victim is cache_address " << cache_address << endl;
@@ -982,7 +992,8 @@ namespace HybridSim {
 		}
 
 		// Finish the logging for this access.
-		log.access_stop(orig_addr);
+		if (ENABLE_LOGGER)
+			log.access_stop(orig_addr);
 	}
 
 
@@ -995,7 +1006,8 @@ namespace HybridSim {
 		}
 
 		// Finish the logging for this access.
-		log.access_stop(orig_addr);
+		if (ENABLE_LOGGER)
+			log.access_stop(orig_addr);
 	}
 
 
@@ -1216,7 +1228,8 @@ namespace HybridSim {
 		saveCacheTable();
 
 		// Print out the log file.
-		log.print();
+		if (ENABLE_LOGGER)
+			log.print();
 	}
 
 	list<uint64_t> HybridSystem::get_valid_pages()

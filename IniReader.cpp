@@ -5,6 +5,8 @@
 
 // Other constants
 uint64_t CONTROLLER_DELAY = 2;
+
+uint64_t ENABLE_LOGGER = 1;
 uint64_t EPOCH_LENGTH = 200000;
 uint64_t HISTOGRAM_BIN = 100;
 uint64_t HISTOGRAM_MAX = 20000;
@@ -97,6 +99,8 @@ namespace HybridSim
 			// Place the value into the appropriate global.
 			if (key.compare("CONTROLLER_DELAY") == 0)
 				convert_uint64_t(CONTROLLER_DELAY, value, key);
+			else if (key.compare("ENABLE_LOGGER") == 0)
+				convert_uint64_t(ENABLE_LOGGER, value, key);
 			else if (key.compare("EPOCH_LENGTH") == 0)
 				convert_uint64_t(EPOCH_LENGTH, value, key);
 			else if (key.compare("HISTOGRAM_BIN") == 0)

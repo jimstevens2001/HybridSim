@@ -17,6 +17,8 @@ namespace HybridSim
 		Logger();
 		~Logger();
 
+		void init();
+
 		// Overall state
 		uint64_t num_accesses;
 		uint64_t num_reads;

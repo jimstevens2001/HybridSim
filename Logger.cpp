@@ -6,6 +6,16 @@ namespace HybridSim
 {
 	Logger::Logger()
 	{
+	}
+
+	Logger::~Logger()
+	{
+		if (DEBUG_LOGGER && debug.is_open()) 
+			debug.close();
+	}
+
+	void Logger::init()
+	{
 		// Overall state
 		num_accesses = 0;
 		num_reads = 0;
@@ -67,11 +77,6 @@ namespace HybridSim
 		}
 	}
 
-	Logger::~Logger()
-	{
-		if (DEBUG_LOGGER) 
-			debug.close();
-	}
 
 	void Logger::update()
 	{
@@ -760,7 +765,9 @@ namespace HybridSim
 
 		for (uint64_t set = 0; set < NUM_SETS; set++)
 		{
-			savefile << set << ": " << set_conflicts[set] << "\n";
+			// Only print the sets that have greater than 0 conflicts.
+			if (set_conflicts[set])
+				savefile << set << ": " << set_conflicts[set] << "\n";
 		}
 
 		savefile.close();
