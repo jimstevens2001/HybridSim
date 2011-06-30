@@ -1,4 +1,3 @@
-// TODO: Fix License
 /****************************************************************************
 *	 HybridSim: Simulator for hybrid main memories
 *	 
@@ -7,7 +6,6 @@
 *							Paul Tschirhart
 *							Ishwar Bhati
 *							Mutien Chang
-*							Paul Rosenfeld 
 *							Bruce Jacob
 *							University of Maryland
 *

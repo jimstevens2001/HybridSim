@@ -92,45 +92,6 @@ namespace HybridSim
 		unordered_map<uint64_t, uint64_t> cur_pages_used; // maps page_addr to num_accesses
 
 
-		// Epoch lists (used to store state from previous epochs)
-		list<uint64_t> num_accesses_list;
-		list<uint64_t> num_reads_list;
-		list<uint64_t> num_writes_list;
-
-		list<uint64_t> num_misses_list;
-		list<uint64_t> num_hits_list;
-
-		list<uint64_t> num_read_misses_list;
-		list<uint64_t> num_read_hits_list;
-		list<uint64_t> num_write_misses_list;
-		list<uint64_t> num_write_hits_list;
-		
-		list<uint64_t> sum_latency_list;
-		list<uint64_t> sum_read_latency_list;
-		list<uint64_t> sum_write_latency_list;
-		list<uint64_t> sum_queue_latency_list;
-
-		list<uint64_t> sum_hit_latency_list;
-		list<uint64_t> sum_miss_latency_list;
-
-		list<uint64_t> sum_read_hit_latency_list;
-		list<uint64_t> sum_read_miss_latency_list;
-
-		list<uint64_t> sum_write_hit_latency_list;
-		list<uint64_t> sum_write_miss_latency_list;
-
-		list<uint64_t> max_queue_length_list;
-		list<uint64_t> sum_queue_length_list;
-
-		list<uint64_t> idle_counter_list;
-		list<uint64_t> flash_idle_counter_list;
-		list<uint64_t> dram_idle_counter_list;
-
-		list<uint64_t> access_queue_length_list;
-
-		list<unordered_map<uint64_t, uint64_t>> pages_used_list; // maps page_addr to num_accesses
-
-
 		// -----------------------------------------------------------
 		// Missed Page Record
 

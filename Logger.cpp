@@ -505,45 +505,122 @@ namespace HybridSim
 	void Logger::epoch_reset(bool init)
 	{
 		// If this is not initialization, then save the epoch state to the lists.
+		if (init)
+		{
+			// Open up the hybridsim_epoch.log
+			ofstream savefile;
+			savefile.open("hybridsim_epoch.log", ios_base::out | ios_base::trunc);
+			if (!savefile.is_open())
+			{
+				cout << "ERROR: HybridSim Logger epoch output file failed to open.\n";
+				abort();
+			}
+
+			savefile << "================================================================================\n\n";
+			savefile << "Epoch data:\n\n";
+
+			savefile.close();
+		}
+
 		if (!init)
 		{
-			// Save all of the state in the epoch lists.
-			num_accesses_list.push_back(cur_num_accesses);
-			num_reads_list.push_back(cur_num_reads);
-			num_writes_list.push_back(cur_num_writes);
+			// Open up the hybridsim_epoch.log
+			ofstream savefile;
+			savefile.open("hybridsim_epoch.log", ios_base::out | ios_base::app);
+			if (!savefile.is_open())
+			{
+				cout << "ERROR: HybridSim Logger epoch output file failed to open.\n";
+				abort();
+			}
 
-			num_misses_list.push_back(cur_num_misses);
-			num_hits_list.push_back(cur_num_hits);
+			// Output the current epoch data.
+			savefile << "---------------------------------------------------\n";
+			savefile << "Epoch number: " << epoch_count << "\n";
 
-			num_read_misses_list.push_back(cur_num_read_misses);
-			num_read_hits_list.push_back(cur_num_read_hits);
-			num_write_misses_list.push_back(cur_num_write_misses);
-			num_write_hits_list.push_back(cur_num_write_hits);
+			// Print everything out.
+			savefile << "total accesses: " << cur_num_accesses << "\n";
+			savefile << "cycles: " << EPOCH_LENGTH << "\n";
+			savefile << "execution time: " << (EPOCH_LENGTH / (double)CYCLES_PER_SECOND) * 1000000 << " us\n";
+			savefile << "misses: " << cur_num_misses << "\n";
+			savefile << "hits: " << cur_num_hits << "\n";
+			savefile << "miss rate: " << this->divide(cur_num_misses, cur_num_accesses) << "\n";
+			savefile << "average latency: " << this->latency_cycles(cur_sum_latency, cur_num_accesses) << " cycles";
+			savefile << " (" << this->latency_us(cur_sum_latency, cur_num_accesses) << " us)\n";
+			savefile << "average queue latency: " << this->latency_cycles(cur_sum_queue_latency, cur_num_accesses) << " cycles";
+			savefile << " (" << this->latency_us(cur_sum_queue_latency, cur_num_accesses) << " us)\n";
+			savefile << "average miss latency: " << this->latency_cycles(cur_sum_miss_latency, cur_num_misses) << " cycles";
+			savefile << " (" << this->latency_us(cur_sum_miss_latency, cur_num_misses) << " us)\n";
+			savefile << "average hit latency: " << this->latency_cycles(cur_sum_hit_latency, cur_num_hits) << " cycles";
+			savefile << " (" << this->latency_us(cur_sum_hit_latency, cur_num_hits) << " us)\n";
+			savefile << "throughput: " << this->compute_throughput(EPOCH_LENGTH, cur_num_accesses) << " KB/s\n";
+			savefile << "working set size in pages: " << cur_pages_used.size() << "\n";
+			savefile << "working set size in bytes: " << cur_pages_used.size() * PAGE_SIZE << " bytes\n";
+			savefile << "current queue length: " << access_queue.size() << "\n";
+			savefile << "max queue length: " << cur_max_queue_length << "\n";
+			savefile << "average queue length: " << this->divide(cur_sum_queue_length, EPOCH_LENGTH) << "\n";
+			savefile << "idle counter: " << cur_idle_counter << "\n";
+			savefile << "idle percentage: " << this->divide(cur_idle_counter, EPOCH_LENGTH) << "\n";
+			savefile << "flash idle counter: " << cur_flash_idle_counter << "\n";
+			savefile << "flash idle percentage: " << this->divide(cur_flash_idle_counter, EPOCH_LENGTH) << "\n";
+			savefile << "dram idle counter: " << cur_dram_idle_counter << "\n";
+			savefile << "dram idle percentage: " << this->divide(cur_dram_idle_counter, EPOCH_LENGTH) << "\n";
+			savefile << "\n";
+
+			savefile << "reads: " << cur_num_reads << "\n";
+			savefile << "misses: " << cur_num_read_misses << "\n";
+			savefile << "hits: " << cur_num_read_hits << "\n";
+			savefile << "miss rate: " << this->divide(cur_num_read_misses, cur_num_reads) << "\n";
+			savefile << "average latency: " << this->latency_cycles(cur_sum_read_latency, cur_num_reads) << " cycles";
+			savefile << " (" << this->latency_us(cur_sum_read_latency, cur_num_reads) << " us)\n";
+			savefile << "average miss latency: " << this->latency_cycles(cur_sum_read_miss_latency, cur_num_read_misses) << " cycles";
+			savefile << " (" << this->latency_us(cur_sum_read_miss_latency, cur_num_read_misses) << " us)\n";
+			savefile << "average hit latency: " << this->latency_cycles(cur_sum_read_hit_latency, cur_num_read_hits) << " cycles";
+			savefile << " (" << this->latency_us(cur_sum_read_hit_latency, cur_num_read_hits) << " us)\n";
+			savefile << "throughput: " << this->compute_throughput(EPOCH_LENGTH, cur_num_reads) << " KB/s\n";
+			savefile << "\n";
+
+			savefile << "writes: " << cur_num_writes << "\n";
+			savefile << "misses: " << cur_num_write_misses << "\n";
+			savefile << "hits: " << cur_num_write_hits << "\n";
+			savefile << "miss rate: " << this->divide(cur_num_write_misses, cur_num_writes) << "\n";
+			savefile << "average latency: " << this->latency_cycles(cur_sum_write_latency, cur_num_writes) << " cycles";
+			savefile << " (" << this->latency_us(cur_sum_write_latency, cur_num_writes) << " us)\n";
+			savefile << "average miss latency: " << this->latency_cycles(cur_sum_write_miss_latency, cur_num_write_misses) << " cycles";
+			savefile << " (" << this->latency_us(cur_sum_write_miss_latency, cur_num_write_misses) << " us)\n";
+			savefile << "average hit latency: " << this->latency_cycles(cur_sum_write_hit_latency, cur_num_write_hits) << " cycles";
+			savefile << " (" << this->latency_us(cur_sum_write_hit_latency, cur_num_write_hits) << " us)\n";
+			savefile << "throughput: " << this->compute_throughput(EPOCH_LENGTH, cur_num_writes) << " KB/s\n";
+			savefile << "\n\n";
+
+			// Output the missed page data.
+			savefile << "Missed Page Data:\n";
+
+			list<MissedPageEntry>::iterator mit;
+			for (mit = missed_page_list.begin(); mit != missed_page_list.end(); mit++)
+			{
+				uint64_t cycle = (*mit).cycle;
+				uint64_t missed_page = (*mit).missed_page;
+				uint64_t victim_page = (*mit).victim_page;
+				uint64_t cache_set = (*mit).cache_set;
+				uint64_t cache_page = (*mit).cache_page;
+				bool dirty = (*mit).dirty;
+				bool valid = (*mit).valid;
+
+				savefile << cycle << ": missed= 0x" << hex << missed_page << "; victim= 0x" << victim_page 
+						<< "; set= " << dec << cache_set << "; missed_tag= " << TAG(missed_page) << "; victim_tag= " << TAG(victim_page)
+						<< "; cache_page= 0x" << hex << cache_page << dec <<"; dirty = " << dirty
+						<< "; valid= " << valid << ";\n";
+			}
+
+			savefile << "\n\n";
+
+			// Clear the missed page data.
+			missed_page_list.clear();
 			
-			sum_latency_list.push_back(cur_sum_latency);
-			sum_read_latency_list.push_back(cur_sum_read_latency);
-			sum_write_latency_list.push_back(cur_sum_write_latency);
-			sum_queue_latency_list.push_back(cur_sum_queue_latency);
 
-			sum_hit_latency_list.push_back(cur_sum_hit_latency);
-			sum_miss_latency_list.push_back(cur_sum_miss_latency);
 
-			sum_read_hit_latency_list.push_back(cur_sum_read_hit_latency);
-			sum_read_miss_latency_list.push_back(cur_sum_read_miss_latency);
-
-			sum_write_hit_latency_list.push_back(cur_sum_write_hit_latency);
-			sum_write_miss_latency_list.push_back(cur_sum_write_miss_latency);
-
-			max_queue_length_list.push_back(cur_max_queue_length);
-			sum_queue_length_list.push_back(cur_sum_queue_length);
-
-			idle_counter_list.push_back(cur_idle_counter);
-			flash_idle_counter_list.push_back(cur_flash_idle_counter);
-			dram_idle_counter_list.push_back(cur_dram_idle_counter);
-
-			access_queue_length_list.push_back(access_queue.size());
-
-			pages_used_list.push_back(cur_pages_used); // maps page_addr to num_accesses
+			// Close the output file.
+			savefile.close();
 
 			epoch_count++;
 		}
@@ -650,131 +727,6 @@ namespace HybridSim
 		savefile << "throughput: " << this->compute_throughput(this->currentClockCycle, num_writes) << " KB/s\n";
 		savefile << "\n\n";
 
-		savefile << "================================================================================\n\n";
-		savefile << "Epoch data:\n\n";
-
-		for (uint64_t i = 0; i < epoch_count; i++)
-		{
-			savefile << "---------------------------------------------------\n";
-			savefile << "Epoch number: " << i << "\n";
-
-			// Print everything out.
-			savefile << "total accesses: " << num_accesses_list.front() << "\n";
-			savefile << "cycles: " << EPOCH_LENGTH << "\n";
-			savefile << "execution time: " << (EPOCH_LENGTH / (double)CYCLES_PER_SECOND) * 1000000 << " us\n";
-			savefile << "misses: " << num_misses_list.front() << "\n";
-			savefile << "hits: " << num_hits_list.front() << "\n";
-			savefile << "miss rate: " << this->divide(num_misses_list.front(), num_accesses_list.front()) << "\n";
-			savefile << "average latency: " << this->latency_cycles(sum_latency_list.front(), num_accesses_list.front()) << " cycles";
-			savefile << " (" << this->latency_us(sum_latency_list.front(), num_accesses_list.front()) << " us)\n";
-			savefile << "average queue latency: " << this->latency_cycles(sum_queue_latency_list.front(), num_accesses_list.front()) << " cycles";
-			savefile << " (" << this->latency_us(sum_queue_latency_list.front(), num_accesses_list.front()) << " us)\n";
-			savefile << "average miss latency: " << this->latency_cycles(sum_miss_latency_list.front(), num_misses_list.front()) << " cycles";
-			savefile << " (" << this->latency_us(sum_miss_latency_list.front(), num_misses_list.front()) << " us)\n";
-			savefile << "average hit latency: " << this->latency_cycles(sum_hit_latency_list.front(), num_hits_list.front()) << " cycles";
-			savefile << " (" << this->latency_us(sum_hit_latency_list.front(), num_hits_list.front()) << " us)\n";
-			savefile << "throughput: " << this->compute_throughput(EPOCH_LENGTH, num_accesses_list.front()) << " KB/s\n";
-			savefile << "working set size in pages: " << pages_used_list.front().size() << "\n";
-			savefile << "working set size in bytes: " << pages_used_list.front().size() * PAGE_SIZE << " bytes\n";
-			savefile << "current queue length: " << access_queue_length_list.front() << "\n";
-			savefile << "max queue length: " << max_queue_length_list.front() << "\n";
-			savefile << "average queue length: " << this->divide(sum_queue_length_list.front(), EPOCH_LENGTH) << "\n";
-			savefile << "idle counter: " << idle_counter_list.front() << "\n";
-			savefile << "idle percentage: " << this->divide(idle_counter_list.front(), EPOCH_LENGTH) << "\n";
-			savefile << "flash idle counter: " << flash_idle_counter_list.front() << "\n";
-			savefile << "flash idle percentage: " << this->divide(flash_idle_counter_list.front(), EPOCH_LENGTH) << "\n";
-			savefile << "dram idle counter: " << dram_idle_counter_list.front() << "\n";
-			savefile << "dram idle percentage: " << this->divide(dram_idle_counter_list.front(), EPOCH_LENGTH) << "\n";
-			savefile << "\n";
-
-			savefile << "reads: " << num_reads_list.front() << "\n";
-			savefile << "misses: " << num_read_misses_list.front() << "\n";
-			savefile << "hits: " << num_read_hits_list.front() << "\n";
-			savefile << "miss rate: " << this->divide(num_read_misses_list.front(), num_reads_list.front()) << "\n";
-			savefile << "average latency: " << this->latency_cycles(sum_read_latency_list.front(), num_reads_list.front()) << " cycles";
-			savefile << " (" << this->latency_us(sum_read_latency_list.front(), num_reads_list.front()) << " us)\n";
-			savefile << "average miss latency: " << this->latency_cycles(sum_read_miss_latency_list.front(), num_read_misses_list.front()) << " cycles";
-			savefile << " (" << this->latency_us(sum_read_miss_latency_list.front(), num_read_misses_list.front()) << " us)\n";
-			savefile << "average hit latency: " << this->latency_cycles(sum_read_hit_latency_list.front(), num_read_hits_list.front()) << " cycles";
-			savefile << " (" << this->latency_us(sum_read_hit_latency_list.front(), num_read_hits_list.front()) << " us)\n";
-			savefile << "throughput: " << this->compute_throughput(EPOCH_LENGTH, num_reads_list.front()) << " KB/s\n";
-			savefile << "\n";
-
-			savefile << "writes: " << num_writes_list.front() << "\n";
-			savefile << "misses: " << num_write_misses_list.front() << "\n";
-			savefile << "hits: " << num_write_hits_list.front() << "\n";
-			savefile << "miss rate: " << this->divide(num_write_misses_list.front(), num_writes_list.front()) << "\n";
-			savefile << "average latency: " << this->latency_cycles(sum_write_latency_list.front(), num_writes_list.front()) << " cycles";
-			savefile << " (" << this->latency_us(sum_write_latency_list.front(), num_writes_list.front()) << " us)\n";
-			savefile << "average miss latency: " << this->latency_cycles(sum_write_miss_latency_list.front(), num_write_misses_list.front()) << " cycles";
-			savefile << " (" << this->latency_us(sum_write_miss_latency_list.front(), num_write_misses_list.front()) << " us)\n";
-			savefile << "average hit latency: " << this->latency_cycles(sum_write_hit_latency_list.front(), num_write_hits_list.front()) << " cycles";
-			savefile << " (" << this->latency_us(sum_write_hit_latency_list.front(), num_write_hits_list.front()) << " us)\n";
-			savefile << "throughput: " << this->compute_throughput(EPOCH_LENGTH, num_writes_list.front()) << " KB/s\n";
-			savefile << "\n\n";
-			
-
-
-			// Pop all of the lists.
-			num_accesses_list.pop_front();
-			num_reads_list.pop_front();
-			num_writes_list.pop_front();
-
-			num_misses_list.pop_front();
-			num_hits_list.pop_front();
-
-			num_read_misses_list.pop_front();
-			num_read_hits_list.pop_front();
-			num_write_misses_list.pop_front();
-			num_write_hits_list.pop_front();
-					
-			sum_latency_list.pop_front();
-			sum_read_latency_list.pop_front();
-			sum_write_latency_list.pop_front();
-			sum_queue_latency_list.pop_front();
-
-			sum_hit_latency_list.pop_front();
-			sum_miss_latency_list.pop_front();
-
-			sum_read_hit_latency_list.pop_front();
-			sum_read_miss_latency_list.pop_front();
-
-			sum_write_hit_latency_list.pop_front();
-			sum_write_miss_latency_list.pop_front();
-
-			max_queue_length_list.pop_front();
-			sum_queue_length_list.pop_front();
-
-			idle_counter_list.pop_front();
-			flash_idle_counter_list.pop_front();
-			dram_idle_counter_list.pop_front();
-
-			access_queue_length_list.pop_front();
-
-			pages_used_list.pop_front();
-		}
-
-		savefile << "================================================================================\n\n";
-		savefile << "Missed Page Data:\n";
-
-		list<MissedPageEntry>::iterator mit;
-		for (mit = missed_page_list.begin(); mit != missed_page_list.end(); mit++)
-		{
-			uint64_t cycle = (*mit).cycle;
-			uint64_t missed_page = (*mit).missed_page;
-			uint64_t victim_page = (*mit).victim_page;
-			uint64_t cache_set = (*mit).cache_set;
-			uint64_t cache_page = (*mit).cache_page;
-			bool dirty = (*mit).dirty;
-			bool valid = (*mit).valid;
-
-			savefile << cycle << ": missed= 0x" << hex << missed_page << "; victim= 0x" << victim_page 
-					<< "; set= " << dec << cache_set << "; missed_tag= " << TAG(missed_page) << "; victim_tag= " << TAG(victim_page)
-					<< "; cache_page= 0x" << hex << cache_page << dec <<"; dirty = " << dirty
-					<< "; valid= " << valid << ";\n";
-		}
-
-		savefile << "\n\n";
 
 		savefile << "================================================================================\n\n";
 		savefile << "Pages accessed:\n";
