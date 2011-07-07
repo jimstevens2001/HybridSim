@@ -31,7 +31,13 @@
 using namespace HybridSim;
 using namespace std;
 
-int complete = 0;
+const uint64_t MAX_PENDING = 100;
+//const uint64_t MAX_PENDING = 1000000000;
+const uint64_t MIN_PENDING = 50;
+uint64_t complete = 0;
+uint64_t pending = 0;
+uint64_t throttle_count = 0;
+
 
 int main(int argc, char *argv[])
 {
@@ -50,30 +56,41 @@ int main(int argc, char *argv[])
 	obj.run_trace(tracefile);
 }
 
+void transaction_complete(uint64_t clock_cycle)
+{
+	complete++;
+	pending--;
+
+	if (complete % 10000 == 0)
+	{
+		cout << "complete= " << complete << "\t\tpending= " << pending << "\t\t cycle_count= "<< clock_cycle << "\t\tthrottle_count=" << throttle_count << "\n";
+	}
+
+	//if (complete == 10000000)
+	//	abort();
+}
 
 void HybridSimTBS::read_complete(uint id, uint64_t address, uint64_t clock_cycle)
 {
-	printf("[Callback] read complete: %d 0x%lx cycle=%lu\n", id, address, clock_cycle);
-	complete++;
+	//printf("[Callback] read complete: %d 0x%lx cycle=%lu\n", id, address, clock_cycle);
+	//complete++;
+	//pending--;
+
+	transaction_complete(clock_cycle);
 }
 
 void HybridSimTBS::write_complete(uint id, uint64_t address, uint64_t clock_cycle)
 {
-	printf("[Callback] write complete: %d 0x%lx cycle=%lu\n", id, address, clock_cycle);
-	complete++;
-}
+	//printf("[Callback] write complete: %d 0x%lx cycle=%lu\n", id, address, clock_cycle);
+	//complete++;
+	//pending--;
 
-/* FIXME: this may be broken, currently */
-/*void power_callback(double a, double b, double c, double d)
-{
-	printf("power callback: %0.3f, %0.3f, %0.3f, %0.3f\n",a,b,c,d);
-}*/
+	transaction_complete(clock_cycle);
+}
 
 int HybridSimTBS::run_trace(string tracefile)
 {
-	/* pick a DRAM part to simulate */
 	HybridSystem *mem = new HybridSystem(1);
-	//MemorySystem *mem = new MemorySystem(0, "ini/DDR3_micron_32M_8B_x8_sg15.ini", "ini/system.ini", "", "");
 
 
 	/* create and register our callback functions */
@@ -142,6 +159,9 @@ int HybridSimTBS::run_trace(string tracefile)
 		bool write = line_vals[1] % 2;
 		uint64_t addr = line_vals[2];
 
+		// Uncomment this to stress test the MAX_PENDING code.
+		trans_cycle = trans_cycle / 100;
+
 		// increment the counter until >= the clock cycle of cur transaction
 		// for each cycle, call the update() function.
 		while (cycle_counter < trans_cycle)
@@ -152,16 +172,31 @@ int HybridSimTBS::run_trace(string tracefile)
 
 		// add the transaction and continue
 		mem->addTransaction(write, addr);
+		pending++;
+
+		// If the pending count goes above MAX_PENDING, wait until it goes back below MIN_PENDING before adding more 
+		// transactions. This throttling will prevent the memory system from getting overloaded.
+		if (pending >= MAX_PENDING)
+		{
+			//cout << "MAX_PENDING REACHED! Throttling the trace until pending is back below MIN_PENDING.\t\tcycle= " << cycle_counter << "\n";
+			throttle_count++;
+			while (pending > MIN_PENDING)
+			{
+				mem->update();
+				cycle_counter++;
+			}
+			//cout << "Back to MIN_PENDING. Allowing transactions to be added again.\t\tcycle= " << cycle_counter << "\n";
+		}
+
 	}
 
 	inFile.close();
 
-	// TODO: run update until all transactions come back.
-
-	// Run the counter for awhile to let the last transaction finish (let's say a million cycles for now)
-	for (int i=0; i < 1000000; i++)
+	// Run update until all transactions come back.
+	while (pending > 0)
 	{
 		mem->update();
+		cycle_counter++;
 	}
 
 
