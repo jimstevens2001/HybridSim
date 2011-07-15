@@ -38,6 +38,12 @@ uint64_t complete = 0;
 uint64_t pending = 0;
 uint64_t throttle_count = 0;
 
+// The cycle counter is used to keep track of what cycle we are on.
+uint64_t cycle_counter = 0;
+
+uint64_t last_clock = 0;
+uint64_t CLOCK_DELAY = 1000000;
+
 
 int main(int argc, char *argv[])
 {
@@ -61,9 +67,10 @@ void transaction_complete(uint64_t clock_cycle)
 	complete++;
 	pending--;
 
-	if (complete % 10000 == 0)
+	if ((complete % 10000 == 0) || (clock_cycle - last_clock > CLOCK_DELAY))
 	{
 		cout << "complete= " << complete << "\t\tpending= " << pending << "\t\t cycle_count= "<< clock_cycle << "\t\tthrottle_count=" << throttle_count << "\n";
+		last_clock = clock_cycle;
 	}
 
 	//if (complete == 10000000)
@@ -98,9 +105,6 @@ int HybridSimTBS::run_trace(string tracefile)
 	Callback_t *read_cb = new Callback<HybridSimTBS, void, uint, uint64_t, uint64_t>(this, &HybridSimTBS::read_complete);
 	Callback_t *write_cb = new Callback<HybridSimTBS, void, uint, uint64_t, uint64_t>(this, &HybridSimTBS::write_complete);
 	mem->RegisterCallbacks(read_cb, write_cb);
-
-	// The cycle counter is used to keep track of what cycle we are on.
-	uint64_t cycle_counter = 0;
 
 	// Open input file
 	ifstream inFile;
