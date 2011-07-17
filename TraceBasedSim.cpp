@@ -163,9 +163,6 @@ int HybridSimTBS::run_trace(string tracefile)
 		bool write = line_vals[1] % 2;
 		uint64_t addr = line_vals[2];
 
-		// Uncomment this to stress test the MAX_PENDING code.
-		trans_cycle = trans_cycle / 100;
-
 		// increment the counter until >= the clock cycle of cur transaction
 		// for each cycle, call the update() function.
 		while (cycle_counter < trans_cycle)
@@ -202,6 +199,11 @@ int HybridSimTBS::run_trace(string tracefile)
 		mem->update();
 		cycle_counter++;
 	}
+
+	// This is a hack for the moment to ensure that a final write completes.
+	// In the future, we need two callbacks to fix this.
+	for (int i=0; i<1000000; i++)
+		mem->update();
 
 
 	cout << "\n\n" << mem->currentClockCycle << ": completed " << complete << "\n\n";
