@@ -1,7 +1,13 @@
 /****************************************************************************
 *	 DRAMSim2: A Cycle Accurate DRAM simulator 
 *	 
-*	 Copyright (C) 2010   	Elliott Cooper-Balis
+*	 Copyright (C) 2010   		Jim Stevens
+*								Paul Tschirhart
+*								Peter Enns
+*								Ishwar Bhati
+*								Mu-Tien Chang
+*								Daniel Gerzhoy
+*								Elliott Cooper-Balis
 *									Paul Rosenfeld 
 *									Bruce Jacob
 *									University of Maryland
