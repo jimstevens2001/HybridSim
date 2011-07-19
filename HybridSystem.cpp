@@ -790,7 +790,6 @@ namespace HybridSim {
 
 		// Restart queue checking.
 		this->check_queue = true;
-		pending_count -= 1;
 	}
 
 
