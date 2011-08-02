@@ -228,9 +228,6 @@ int HybridSimTBS::run_trace(string tracefile)
 	cout << "pending_pages_max = " << mem->pending_pages_max << "\n\n";
 	cout << "trans_queue_max = " << mem->trans_queue_max << "\n\n";
 	
-	mem->saveStats();
-	mem->reportPower();
-
 	mem->printLogfile();
 
 	for (int i=0; i<500; i++)

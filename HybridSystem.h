@@ -42,8 +42,6 @@ namespace HybridSim
 		void WriteDoneCallback(uint sysID, uint64_t orig_addr, uint64_t cycle);
 
 		void reportPower();
-		void printStats();
-		void saveStats();
 		string SetOutputFileName(string tracefilename);
 
 		// Print out the logging data for HybridSim only.
