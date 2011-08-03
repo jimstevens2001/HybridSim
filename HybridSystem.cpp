@@ -151,7 +151,7 @@ namespace HybridSim {
 			{
 				// Add to the pending 
 				pending_pages.insert(page_addr);
-				pending_sets.insert(SET_INDEX(page_addr));
+				pending_sets[SET_INDEX(page_addr)] = 0;
 
 				// Log the page access.
 				if (ENABLE_LOGGER)
@@ -317,9 +317,9 @@ namespace HybridSim {
 		//		abort();
 		//	}
 
-#if DEBUG_CACHE
-		cout << currentClockCycle << ": " << "Starting transaction for address " << addr << endl;
-#endif
+		if (DEBUG_CACHE)
+			cout << "\n" << currentClockCycle << ": " << "Starting transaction for address " << addr << endl;
+
 
 		if (addr >= (TOTAL_PAGES * PAGE_SIZE))
 		{
@@ -357,9 +357,13 @@ namespace HybridSim {
 			{
 				hit = true;
 				cache_address = cur_address;
-#if DEBUG_CACHE
-				cout << currentClockCycle << ": " << "HIT: " << cur_address << " " << " " << cur_line.str() << endl;
-#endif
+
+				if (DEBUG_CACHE)
+				{
+					cout << currentClockCycle << ": " << "HIT: " << cur_address << " " << " " << cur_line.str() << 
+						" (set: " << set_index << ")" << endl;
+				}
+
 				break;
 			}
 
@@ -453,11 +457,13 @@ namespace HybridSim {
 			if (ENABLE_LOGGER)
 				log.access_miss(PAGE_ADDRESS(addr), victim_flash_addr, set_index, victim, cur_line.dirty, cur_line.valid);
 
-#if DEBUG_CACHE
-			cout << currentClockCycle << ": " << "MISS: victim is cache_address " << cache_address << endl;
-			cout << cur_line.str() << endl;
-			cout << currentClockCycle << ": " << "The victim is dirty? " << cur_line.dirty << endl;
-#endif
+			if (DEBUG_CACHE)
+			{
+				cout << currentClockCycle << ": " << "MISS: victim is cache_address " << cache_address <<
+						" (set: " << set_index << ")" << endl;
+				cout << cur_line.str() << endl;
+				cout << currentClockCycle << ": " << "The victim is dirty? " << cur_line.dirty << endl;
+			}
 
 			Pending p;
 			p.orig_addr = trans.address;
@@ -466,28 +472,30 @@ namespace HybridSim {
 			p.victim_tag = cur_line.tag;
 			p.type = trans.transactionType;
 
+			// Read the line that missed from the NVRAM.
+			// This is started immediately to minimize the latency of the waiting user of HybridSim.
+			LineRead(p);
+
 			// If the cur_line is dirty, then do a victim writeback process (starting with VictimRead).
-			// Otherwise, read the line.
 			if (cur_line.dirty)
 			{
 				VictimRead(p);
-			}
-			else
-			{
-				LineRead(p);
 			}
 		}
 	}
 
 	void HybridSystem::VictimRead(Pending p)
 	{
-#if DEBUG_CACHE
-		cout << currentClockCycle << ": " << "Performing VICTIM_READ for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
-#endif
+		if (DEBUG_CACHE)
+			cout << currentClockCycle << ": " << "Performing VICTIM_READ for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
 
 		// flash_addr is the original Flash address requested from the top level Transaction.
 		// victim is the base address of the DRAM page to read.
 		// victim_tag is the cache tag for the victim page (used to compute the victim's flash address).
+
+		// Increment the pending set counter (this is used to ensure that the pending set entry isn't removed until both LineRead
+		// and VictimRead (if needed) are completely done.
+		pending_sets[SET_INDEX(p.flash_addr)] += 1;
 
 #if SINGLE_WORD
 		// Schedule a read from DRAM to get the line being evicted.
@@ -513,10 +521,11 @@ namespace HybridSim {
 
 	void HybridSystem::VictimReadFinish(uint64_t addr, Pending p)
 	{
-#if DEBUG_CACHE
-		cout << currentClockCycle << ": " << "VICTIM_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ") offset="
-			<< PAGE_OFFSET(addr) << " num_left=" << p.wait->size() << "\n";
-#endif
+		if (DEBUG_CACHE)
+		{
+			cout << currentClockCycle << ": " << "VICTIM_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ") offset="
+				<< PAGE_OFFSET(addr) << " num_left=" << p.wait->size() << "\n";
+		}
 
 #if SINGLE_WORD
 #else
@@ -535,23 +544,48 @@ namespace HybridSim {
 		p.delete_wait();
 #endif
 
-#if DEBUG_CACHE
-		cout << "The read to DRAM line " << PAGE_ADDRESS(addr) << " has completed.\n";
-#endif
+		// Decrement the pending set counter (this is used to ensure that the pending set entry isn't removed until both LineRead
+		// and VictimRead (if needed) are completely done.
+		uint64_t set_index = SET_INDEX(PAGE_ADDRESS(p.flash_addr));
+		pending_sets[set_index] -= 1;
+
+		if (DEBUG_CACHE)
+		{
+			cout << "The victim read to DRAM line " << PAGE_ADDRESS(addr) << " has completed.\n";
+			cout << "pending_sets[" << set_index << "] = " << pending_sets[set_index] << "\n";
+		}
+
+		// If the pending_set counter is now 0, then we can go ahead and remove it.
+		// This means that LINE_READ finished first and that the pending set was not removed
+		// in the CacheReadFinish or CacheWriteFinish functions.
+		if (pending_sets[set_index] == 0)
+		{
+			if (DEBUG_CACHE)
+				cout << "ERASING PENDING SET IN VICTIM READ FINISH\n";
+
+			int num = pending_pages.erase(PAGE_ADDRESS(p.flash_addr));
+			int num2 = pending_sets.erase(set_index);
+			if ((num != 1) || (num2 != 1))
+			{
+				cout << "pending_sets.erase() was called after VICTIM_READ and num was 0.\n";
+				cout << "orig:" << p.orig_addr << " aligned:" << p.flash_addr << "\n\n";
+				abort();
+			}
+
+			// Restart queue checking.
+			this->check_queue = true;
+			pending_count -= 1;
+		}
+			
 
 		// Schedule a write to the flash to simulate the transfer
 		VictimWrite(p);
-
-		// Schedule a read to the flash to get the new line (can be done in parallel)
-		LineRead(p);
-
 	}
 
 	void HybridSystem::VictimWrite(Pending p)
 	{
-#if DEBUG_CACHE
-		cout << currentClockCycle << ": " << "Performing VICTIM_WRITE for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
-#endif
+		if (DEBUG_CACHE)
+			cout << currentClockCycle << ": " << "Performing VICTIM_WRITE for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
 
 		// Compute victim flash address.
 		// This is where the victim line is stored in the Flash address space.
@@ -575,12 +609,19 @@ namespace HybridSim {
 
 	void HybridSystem::LineRead(Pending p)
 	{
-#if DEBUG_CACHE
-		cout << currentClockCycle << ": " << "Performing LINE_READ for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
-		cout << "the page address was " << PAGE_ADDRESS(p.flash_addr) << endl;
-#endif
+		if (DEBUG_CACHE)
+		{
+			cout << currentClockCycle << ": " << "Performing LINE_READ for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
+			cout << "the page address was " << PAGE_ADDRESS(p.flash_addr) << endl;
+		}
 
 		uint64_t page_addr = PAGE_ADDRESS(p.flash_addr);
+
+
+		// Increment the pending set counter (this is used to ensure that the pending set entry isn't removed until both LineRead
+		// and VictimRead (if needed) are completely done.
+		pending_sets[SET_INDEX(PAGE_ADDRESS(p.flash_addr))] += 1;
+		
 
 #if SINGLE_WORD
 		// Schedule a read from Flash to get the new line 
@@ -607,10 +648,11 @@ namespace HybridSim {
 	void HybridSystem::LineReadFinish(uint64_t addr, Pending p)
 	{
 
-#if DEBUG_CACHE
-		cout << currentClockCycle << ": " << "LINE_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ") offset="
-			<< PAGE_OFFSET(addr) << " num_left=" << p.wait->size() << "\n";
-#endif
+		if (DEBUG_CACHE)
+		{
+			cout << currentClockCycle << ": " << "LINE_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ") offset="
+				<< PAGE_OFFSET(addr) << " num_left=" << p.wait->size() << "\n";
+		}
 
 #if SINGLE_WORD
 #else
@@ -628,9 +670,17 @@ namespace HybridSim {
 		p.delete_wait();
 #endif
 
-#if DEBUG_CACHE
-		cout << "The read to Flash line " << PAGE_ADDRESS(addr) << " has completed.\n";
-#endif
+		// Decrement the pending set counter (this is used to ensure that the pending set entry isn't removed until both LineRead
+		// and VictimRead (if needed) are completely done.
+		uint64_t set_index = SET_INDEX(PAGE_ADDRESS(p.flash_addr));
+		pending_sets[set_index] -= 1;
+
+		if (DEBUG_CACHE)
+		{
+			cout << "The line read to Flash line " << PAGE_ADDRESS(addr) << " has completed.\n";
+			cout << "pending_sets[" << set_index << "] = " << pending_sets[set_index] << "\n";
+		}
+
 
 		// Update the cache state
 		cache_line cur_line = cache[p.cache_addr];
@@ -658,9 +708,8 @@ namespace HybridSim {
 	{
 		// After a LineRead from flash completes, the LineWrite stores the read line into the DRAM.
 
-#if DEBUG_CACHE
-		cout << currentClockCycle << ": " << "Performing LINE_WRITE for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
-#endif
+		if (DEBUG_CACHE)
+			cout << currentClockCycle << ": " << "Performing LINE_WRITE for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
 
 #if SINGLE_WORD
 		// Schedule a write to DRAM to simulate the write of the line that was read from Flash.
@@ -681,9 +730,8 @@ namespace HybridSim {
 
 	void HybridSystem::CacheRead(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr)
 	{
-#if DEBUG_CACHE
-		cout << currentClockCycle << ": " << "Performing CACHE_READ for (" << flash_addr << ", " << cache_addr << ")\n";
-#endif
+		if (DEBUG_CACHE)
+			cout << currentClockCycle << ": " << "Performing CACHE_READ for (" << flash_addr << ", " << cache_addr << ")\n";
 
 		// Compute the actual DRAM address of the data word we care about.
 		uint64_t data_addr = cache_addr + PAGE_OFFSET(flash_addr);
@@ -717,34 +765,37 @@ namespace HybridSim {
 
 	void HybridSystem::CacheReadFinish(uint64_t addr, Pending p)
 	{
-#if DEBUG_CACHE
-		cout << currentClockCycle << ": " << "CACHE_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
-#endif
+		if (DEBUG_CACHE)
+			cout << currentClockCycle << ": " << "CACHE_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
 
 		// Read operation has completed, call the top level callback.
 		ReadDoneCallback(systemID, p.orig_addr, currentClockCycle);
 
 		// Erase the page from the pending set.
-		int num = pending_pages.erase(PAGE_ADDRESS(p.flash_addr));
-		int num2 = pending_sets.erase(SET_INDEX(PAGE_ADDRESS(p.flash_addr)));
-
-		if ((num != 1) || (num2 != 1))
+		// Note: the if statement is needed to ensure that the VictimRead operation (if it was invoked as part of a cache miss)
+		// is already complete. If not, the pending_set removal will be done in VictimReadFinish().
+		uint64_t set_index = SET_INDEX(PAGE_ADDRESS(p.flash_addr));
+		if (pending_sets[set_index] == 0)
 		{
-			cout << "pending_pages.erase() was called after CACHE_READ and num was 0.\n";
-			cout << "orig:" << p.orig_addr << " aligned:" << p.flash_addr << "\n\n";
-			abort();
-		}
+			int num = pending_pages.erase(PAGE_ADDRESS(p.flash_addr));
+			int num2 = pending_sets.erase(set_index);
+			if ((num != 1) || (num2 != 1))
+			{
+				cout << "pending_sets.erase() was called after CACHE_READ and num was 0.\n";
+				cout << "orig:" << p.orig_addr << " aligned:" << p.flash_addr << "\n\n";
+				abort();
+			}
 
-		// Restart queue checking.
-		this->check_queue = true;
-		pending_count -= 1;
+			// Restart queue checking.
+			this->check_queue = true;
+			pending_count -= 1;
+		}
 	}
 
 	void HybridSystem::CacheWrite(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr)
 	{
-#if DEBUG_CACHE
-		cout << currentClockCycle << ": " << "Performing CACHE_WRITE for (" << flash_addr << ", " << cache_addr << ")\n";
-#endif
+		if (DEBUG_CACHE)
+			cout << currentClockCycle << ": " << "Performing CACHE_WRITE for (" << flash_addr << ", " << cache_addr << ")\n";
 
 		// Compute the actual DRAM address of the data word we care about.
 		uint64_t data_addr = cache_addr + PAGE_OFFSET(flash_addr);
@@ -767,28 +818,33 @@ namespace HybridSim {
 		cur_line.valid = true;
 		cur_line.ts = currentClockCycle;
 		cache[cache_addr] = cur_line;
-#if DEBUG_CACHE
-		cout << cur_line.str() << endl;
-#endif
+
+		if (DEBUG_CACHE)
+			cout << cur_line.str() << endl;
 
 		// Call the top level callback.
 		// This is done immediately rather than waiting for callback.
 		WriteDoneCallback(systemID, orig_addr, currentClockCycle);
 
 		// Erase the page from the pending set.
-		int num = pending_pages.erase(PAGE_ADDRESS(flash_addr));
-		int num2 = pending_sets.erase(SET_INDEX(PAGE_ADDRESS(flash_addr)));
-		pending_count -= 1;
-
-		if ((num != 1) || (num2 != 1))
+		// Note: the if statement is needed to ensure that the VictimRead operation (if it was invoked as part of a cache miss)
+		// is already complete. If not, the pending_set removal will be done in VictimReadFinish().
+		uint64_t set_index = SET_INDEX(PAGE_ADDRESS(flash_addr));
+		if (pending_sets[set_index] == 0)
 		{
-			cout << "pending_pages.erase() was called after CACHE_WRITE and num was 0.\n";
-			cout << "orig:" << orig_addr << " aligned:" << flash_addr << "\n\n";
-			abort();
-		}
+			int num = pending_pages.erase(PAGE_ADDRESS(flash_addr));
+			int num2 = pending_sets.erase(set_index);
+			if ((num != 1) || (num2 != 1))
+			{
+				cout << "pending_pages.erase() was called after CACHE_WRITE and num was 0.\n";
+				cout << "orig:" << orig_addr << " aligned:" << flash_addr << "\n\n";
+				abort();
+			}
 
-		// Restart queue checking.
-		this->check_queue = true;
+			// Restart queue checking.
+			this->check_queue = true;
+			pending_count -= 1;
+		}
 	}
 
 
@@ -906,11 +962,8 @@ namespace HybridSim {
 	{
 		// Nothing to do (it doesn't matter when the flash write finishes for the cache controller, as long as it happens).
 
-#if DEBUG_CACHE
-		cout << "The write to Flash line " << PAGE_ADDRESS(addr) << " has completed.\n";
-		//Remove this pending object from flash_pending
-		//flash_pending.erase(PAGE_ADDRESS(addr));
-#endif
+		if (DEBUG_CACHE)
+			cout << "The write to Flash line " << PAGE_ADDRESS(addr) << " has completed.\n";
 	}
 
 

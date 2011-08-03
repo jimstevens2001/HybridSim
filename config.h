@@ -116,7 +116,7 @@ class cache_line
         uint64_t ts;
 
         cache_line() : valid(false), dirty(false), tag(0), data(0), ts(0) {}
-        string str() { stringstream out; out << "T=" << tag << " D=" << data << " V=" << valid << " D=" << dirty << " ts=" << ts; return out.str(); }
+        string str() { stringstream out; out << "tag=" << tag << " data=" << data << " valid=" << valid << " dirty=" << dirty << " ts=" << ts; return out.str(); }
 
 };
 
