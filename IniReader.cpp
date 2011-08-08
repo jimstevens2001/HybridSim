@@ -3,6 +3,9 @@
 // Define the globals read from the ini file here.
 // Also provide default values here.
 
+namespace HybridSim 
+{
+
 // Other constants
 uint64_t CONTROLLER_DELAY = 2;
 
@@ -44,8 +47,6 @@ string HYBRIDSIM_SAVE_FILE = "none";
 string NVDIMM_SAVE_FILE = "none";
 
 
-namespace HybridSim 
-{
 	void IniReader::read(string inifile)
 	{
 		ifstream inFile;

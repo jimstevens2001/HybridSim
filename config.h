@@ -45,6 +45,8 @@ using DRAMSim::DATA_WRITE;
 
 using namespace std;
 
+namespace HybridSim
+{
 
 
 
@@ -162,5 +164,6 @@ class Pending
 	}
 };
 
+} // namespace HybridSim
 
 #endif
