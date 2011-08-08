@@ -21,7 +21,8 @@ namespace HybridSim {
 		// Note: this old code is likely broken and should be removed on the next cleanup pass.
 		flash = new FDSim::FlashDIMM(1,"ini/samsung_K9XXG08UXM.ini","ini/def_system.ini","../HybridSim","");
 #elif NVDSIM
-		flash = new NVDSim::NVDIMM(1,flash_ini,"ini/def_system.ini","../HybridSim","");
+		//flash = new NVDSim::NVDIMM(1,flash_ini,"ini/def_system.ini","../HybridSim","");
+		flash = NVDSim::getNVDIMMInstance(1,flash_ini,"ini/def_system.ini","../HybridSim","");
 		cout << "Did NVDSIM" << endl;
 #else
 		// Note: this old code is likely broken and should be removed on the next cleanup pass.
@@ -65,15 +66,6 @@ namespace HybridSim {
 		// Call the restore cache state function.
 		// If ENABLE_RESTORE is set, then this will fill the cache table.
 		restoreCacheTable();
-
-
-		// Power stuff
-		idle_energy = vector<double>(NUM_PACKAGES, 0.0); 
-		access_energy = vector<double>(NUM_PACKAGES, 0.0); 
-		erase_energy = vector<double>(NUM_PACKAGES, 0.0); 
-		vpp_idle_energy = vector<double>(NUM_PACKAGES, 0.0); 
-		vpp_access_energy = vector<double>(NUM_PACKAGES, 0.0); 
-		vpp_erase_energy = vector<double>(NUM_PACKAGES, 0.0); 
 
 
 		// debug stuff to remove later
@@ -217,6 +209,7 @@ namespace HybridSim {
 		not_full = true;
 		if (not_full && !flash_queue.empty())
 		{
+			bool isWrite;
 #if FDSIM
 			// put some code to deal with FDSim interactions here
 			DRAMSim::Transaction t = flash_queue.front();
@@ -225,14 +218,19 @@ namespace HybridSim {
 #elif NVDSIM
 			// put some code to deal with NVDSim interactions here
 			//cout << "adding a flash transaction" << endl;
-			DRAMSim::Transaction t = flash_queue.front();
-			NVDSim::FlashTransaction ft = NVDSim::FlashTransaction(static_cast<NVDSim::TransactionType>(t.transactionType), t.address, t.data);
+			//DRAMSim::Transaction t = flash_queue.front();
+			//NVDSim::FlashTransaction ft = NVDSim::FlashTransaction(static_cast<NVDSim::TransactionType>(t.transactionType), t.address, t.data);
 			//cout << "the address sent to flash was " << t.address << endl;
-			not_full = flash->add(ft);
+			//not_full = flash->add(ft);
+			DRAMSim::Transaction tmp = flash_queue.front();
+			if (tmp.transactionType == DATA_WRITE)
+				isWrite = true;
+			else
+				isWrite = false;
+			not_full = flash->addTransaction(isWrite, tmp.address);
 #else
 			//not_full = flash->addTransaction(flash_queue.front());
 			DRAMSim::Transaction tmp = flash_queue.front();
-			bool isWrite;
 			if (tmp.transactionType == DATA_WRITE)
 				isWrite = true;
 			else

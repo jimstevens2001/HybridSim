@@ -127,14 +127,6 @@ namespace HybridSim
 		// Logger is used to store HybridSim-specific logging events.
 		Logger log;
 
-		//Power system variables
-		vector<double> idle_energy;
-		vector<double> access_energy;
-		vector<double> erase_energy;
-		vector<double> vpp_idle_energy;
-		vector<double> vpp_access_energy;
-		vector<double> vpp_erase_energy;
-
 		ofstream debug_victim;
 
 	};

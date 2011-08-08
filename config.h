@@ -24,6 +24,7 @@
 #include <ctime>
 #include <stdint.h>
 #include <vector>
+#include <assert.h>
 
 //#include <MemorySystem.h>
 #include <DRAMSim.h>
@@ -40,7 +41,7 @@ using DRAMSim::DATA_WRITE;
 //#include "FDSim.h"
 #include <FlashDIMM.h>
 #elif NVDSIM
-#include <NVDIMM.h>
+#include <NVDIMMSim.h>
 #endif
 
 using namespace std;
