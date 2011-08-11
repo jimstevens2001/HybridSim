@@ -43,11 +43,10 @@ namespace HybridSim {
 		FDSim::Callback_t *f_write_cb = new fdsim_callback_t(this, &HybridSystem::FlashWriteCallback);
 		flash->RegisterCallbacks(f_read_cb, f_write_cb);
 #elif NVDSIM
-		typedef NVDSim::Callback <HybridSystem, void, uint, uint64_t, uint64_t> nvdsim_callback_t;
-		typedef NVDSim::Callback <HybridSystem, void, uint, vector<vector<double>>, uint64_t> nvdsim_callback_v;
+		typedef NVDSim::Callback <HybridSystem, void, uint, uint64_t, uint64_t, bool> nvdsim_callback_t;
 		NVDSim::Callback_t *nv_read_cb = new nvdsim_callback_t(this, &HybridSystem::FlashReadCallback);
 		NVDSim::Callback_t *nv_write_cb = new nvdsim_callback_t(this, &HybridSystem::FlashWriteCallback);
-		flash->RegisterCallbacks(nv_read_cb, nv_write_cb, NULL);
+		flash->RegisterCallbacks(nv_read_cb, NULL, nv_write_cb, NULL);
 #else
 		read_cb = new dramsim_callback_t(this, &HybridSystem::FlashReadCallback);
 		write_cb = new dramsim_callback_t(this, &HybridSystem::FlashWriteCallback);
@@ -468,6 +467,7 @@ namespace HybridSim {
 			p.flash_addr = addr;
 			p.cache_addr = cache_address;
 			p.victim_tag = cur_line.tag;
+			p.callback_sent = false;
 			p.type = trans.transactionType;
 
 			// Read the line that missed from the NVRAM.
@@ -698,7 +698,7 @@ namespace HybridSim {
 		if (p.type == DATA_READ)
 			CacheReadFinish(p.cache_addr, p);
 		else if(p.type == DATA_WRITE)
-			CacheWriteFinish(p.orig_addr, p.flash_addr, p.cache_addr);
+			CacheWriteFinish(p.orig_addr, p.flash_addr, p.cache_addr, p.callback_sent);
 	}
 
 
@@ -752,6 +752,7 @@ namespace HybridSim {
 		p.orig_addr = orig_addr;
 		p.flash_addr = flash_addr;
 		p.cache_addr = cache_addr;
+		p.callback_sent = false;
 		p.type = DATA_READ;
 		assert(dram_pending.count(cache_addr) == 0);
 		dram_pending[cache_addr] = p;
@@ -767,7 +768,9 @@ namespace HybridSim {
 			cout << currentClockCycle << ": " << "CACHE_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
 
 		// Read operation has completed, call the top level callback.
-		ReadDoneCallback(systemID, p.orig_addr, currentClockCycle);
+		// Only do this if it hasn't been sent already by the critical cache line first callback.
+		if (!p.callback_sent)
+			ReadDoneCallback(systemID, p.orig_addr, currentClockCycle);
 
 		// Erase the page from the pending set.
 		// Note: the if statement is needed to ensure that the VictimRead operation (if it was invoked as part of a cache miss)
@@ -804,11 +807,11 @@ namespace HybridSim {
 		// Finish the operation by updating cache state, doing the callback, and removing the pending set.
 		// Note: This is only split up so the LineWrite operation can reuse the second half
 		// of CacheWrite without actually issuing a new write.
-		CacheWriteFinish(orig_addr, flash_addr, cache_addr);
+		CacheWriteFinish(orig_addr, flash_addr, cache_addr, false);
 
 	}
 
-	void HybridSystem::CacheWriteFinish(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr)
+	void HybridSystem::CacheWriteFinish(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr, bool callback_sent)
 	{
 		// Update the cache state
 		cache_line cur_line = cache[cache_addr];
@@ -822,7 +825,9 @@ namespace HybridSim {
 
 		// Call the top level callback.
 		// This is done immediately rather than waiting for callback.
-		WriteDoneCallback(systemID, orig_addr, currentClockCycle);
+		// Only do this if it hasn't been sent already by the critical cache line first callback.
+		if (!callback_sent)
+			WriteDoneCallback(systemID, orig_addr, currentClockCycle);
 
 		// Erase the page from the pending set.
 		// Note: the if statement is needed to ensure that the VictimRead operation (if it was invoked as part of a cache miss)
@@ -928,7 +933,7 @@ namespace HybridSim {
 		printf("power callback: %0.3f, %0.3f, %0.3f, %0.3f\n",a,b,c,d);
 	}
 
-	void HybridSystem::FlashReadCallback(uint id, uint64_t addr, uint64_t cycle)
+	void HybridSystem::FlashReadCallback(uint id, uint64_t addr, uint64_t cycle, bool unmapped)
 	{
 		//cout << flash_pending.count(PAGE_ADDRESS(addr)) << endl;
 		if (flash_pending.count(PAGE_ADDRESS(addr)) != 0)
@@ -956,7 +961,54 @@ namespace HybridSim {
 		}
 	}
 
-	void HybridSystem::FlashWriteCallback(uint id, uint64_t addr, uint64_t cycle)
+	void HybridSystem::FlashCriticalLineCallback(uint id, uint64_t addr, uint64_t cycle, bool unmapped)
+	{
+		// This function is called to implement critical line first for reads.
+		// This allows HybridSim to tell the external user it can make progress as soon as the data
+		// it is waiting for is back in the memory controller.
+
+		if (flash_pending.count(PAGE_ADDRESS(addr)) != 0)
+		{
+			// Get the pending object.
+			Pending p = flash_pending[PAGE_ADDRESS(addr)];
+
+			// Note: DO NOT REMOVE THIS FROM THE PENDING SET.
+
+
+			if (p.op == LINE_READ)
+			{
+				if (p.callback_sent)
+				{
+					ERROR("FlashCriticalLineCallback called twice on the same pending item.");
+					abort();
+				}
+					
+				// Make the callback and mark it as being called.
+				if (p.type == DATA_READ)
+					ReadDoneCallback(systemID, p.orig_addr, currentClockCycle);
+				else if(p.type == DATA_WRITE)
+					WriteDoneCallback(systemID, p.orig_addr, currentClockCycle);
+
+				// Mark the pending item's callback as being sent so it isn't sent again later.
+				p.callback_sent = true;
+
+				flash_pending[PAGE_ADDRESS(addr)] = p;
+			}
+			else
+			{
+				ERROR("FlashCriticalLineCallback received an invalid op.");
+				abort();
+			}
+		}
+		else
+		{
+			ERROR("FlashCriticalLineCallback received an address not in the pending set.");
+			abort();
+		}
+
+	}
+
+	void HybridSystem::FlashWriteCallback(uint id, uint64_t addr, uint64_t cycle, bool unmapped)
 	{
 		// Nothing to do (it doesn't matter when the flash write finishes for the cache controller, as long as it happens).
 

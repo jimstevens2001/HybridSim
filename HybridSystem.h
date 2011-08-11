@@ -33,9 +33,9 @@ namespace HybridSim
 		void DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle);
 		void DRAMWriteCallback(uint id, uint64_t addr, uint64_t cycle);
 		void DRAMPowerCallback(double a, double b, double c, double d);
-		void FlashReadCallback(uint id, uint64_t addr, uint64_t cycle);
-		void FlashWriteCallback(uint id, uint64_t addr, uint64_t cycle);
-		void FlashPowerCallback(uint id, vector<vector<double>> power_data, uint64_t cycle);
+		void FlashReadCallback(uint id, uint64_t addr, uint64_t cycle, bool unmapped);
+		void FlashCriticalLineCallback(uint id, uint64_t addr, uint64_t cycle, bool unmapped);
+		void FlashWriteCallback(uint id, uint64_t addr, uint64_t cycle, bool unmapped);
 
 		// Functions to run the callbacks to the module using HybridSim.
 		void ReadDoneCallback(uint systemID, uint64_t orig_addr, uint64_t cycle);
@@ -73,7 +73,7 @@ namespace HybridSim
 		void CacheReadFinish(uint64_t addr, Pending p);
 
 		void CacheWrite(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr);
-		void CacheWriteFinish(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr);
+		void CacheWriteFinish(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr, bool callback_sent);
 
 		// Testing function
 		bool is_hit(uint64_t address);

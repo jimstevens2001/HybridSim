@@ -140,6 +140,7 @@ class Pending
 	uint64_t flash_addr;
 	uint64_t cache_addr;
 	uint64_t victim_tag;
+	bool callback_sent;
 	DRAMSim::TransactionType type; // DATA_READ or DATA_WRITE
 	unordered_set<uint64_t> *wait;
 
