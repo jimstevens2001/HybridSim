@@ -80,12 +80,25 @@ namespace HybridSim {
 				abort();
 			}
 		}
+
+		if (DEBUG_NVDIMM_TRACE) 
+		{
+			debug_nvdimm_trace.open("nvdimm_trace.log", ios_base::out | ios_base::trunc);
+			if (!debug_nvdimm_trace.is_open())
+			{
+				cout << "ERROR: HybridSim debug_nvdimm_trace file failed to open.\n";
+				abort();
+			}
+		}
 	}
 
 	HybridSystem::~HybridSystem()
 	{
 		if (DEBUG_VICTIM)
 			debug_victim.close();
+
+		if (DEBUG_NVDIMM_TRACE)
+			debug_nvdimm_trace.close();
 	}
 
 	// static allocator for the library interface
@@ -236,9 +249,15 @@ namespace HybridSim {
 				isWrite = false;
 			not_full = flash->addTransaction(isWrite, tmp.address);
 #endif
-			if (not_full){
+			if (not_full)
+			{
 				flash_queue.pop_front();
 				//cout << "popping front of flash queue" << endl;
+				if (DEBUG_NVDIMM_TRACE)
+				{
+					debug_nvdimm_trace << currentClockCycle << " " << (isWrite ? 1 : 0) << " " << tmp.address << "\n";
+					debug_nvdimm_trace.flush();
+				}
 			}
 		}
 

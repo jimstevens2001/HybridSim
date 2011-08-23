@@ -128,6 +128,7 @@ namespace HybridSim
 		Logger log;
 
 		ofstream debug_victim;
+		ofstream debug_nvdimm_trace;
 
 	};
 
