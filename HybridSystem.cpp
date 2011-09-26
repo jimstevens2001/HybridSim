@@ -279,6 +279,12 @@ namespace HybridSim {
 		trans_queue.push_back(trans);
 		//cout << "pushed\n";
 
+		if ((trans.transactionType == PREFETCH) || (trans.transactionType == FLUSH))
+		{
+			ERROR("PREFETCH/FLUSH not allowed in addTransaction()");
+			abort();
+		}
+
 		// Start the logging for this access.
 		if (ENABLE_LOGGER)
 			log.access_start(trans.address);
@@ -368,7 +374,8 @@ namespace HybridSim {
 
 		// Place access_process here and combine it with access_cache.
 		// Tell the logger when the access is processed (used for timing the time in queue).
-		if (ENABLE_LOGGER)
+		// Only do this for DATA_READ and DATA_WRITE.
+		if ((ENABLE_LOGGER) && ((trans.transactionType == DATA_READ) || (trans.transactionType == DATA_WRITE)))
 			log.access_process(trans.address, trans.transactionType == DATA_READ, hit);
 
 		if (hit)
@@ -381,10 +388,23 @@ namespace HybridSim {
 				CacheRead(trans.address, addr, cache_address);
 			else if(trans.transactionType == DATA_WRITE)
 				CacheWrite(trans.address, addr, cache_address);
+			else if(trans.transactionType == FLUSH)
+				Flush(cache_address);
+			else if(trans.transactionType == PREFETCH)
+			{
+				ERROR("PREFETCH transaction hit the cache. This should be impossible.");
+				abort();
+			}
 		}
 
 		if (!hit)
 		{
+			// Make sure this isn't a FLUSH before proceeding.
+			if(trans.transactionType == FLUSH)
+			{
+				ERROR("FLUSH transaction missed the cache. This should be impossible.");
+				abort();
+			}
 
 			// Select a victim offset within the set (LRU)
 			uint64_t victim = *(set_address_list.begin());
@@ -695,7 +715,7 @@ namespace HybridSim {
 		// the callback to the requesting module, and remove this set from the pending sets to allow future
 		// operations to this set to start.
 		// Note: Only write operations are pending at this point, which will not interfere with future operations.
-		if (p.type == DATA_READ)
+		if ((p.type == DATA_READ) || (p.type == PREFETCH))
 			CacheReadFinish(p.cache_addr, p);
 		else if(p.type == DATA_WRITE)
 			CacheWriteFinish(p.orig_addr, p.flash_addr, p.cache_addr, p.callback_sent);
@@ -769,7 +789,8 @@ namespace HybridSim {
 
 		// Read operation has completed, call the top level callback.
 		// Only do this if it hasn't been sent already by the critical cache line first callback.
-		if (!p.callback_sent)
+		// Also, do not do this for prefetch since it does not have an external caller waiting on it.
+		if ((!p.callback_sent) && (p.type != PREFETCH))
 			ReadDoneCallback(systemID, p.orig_addr, currentClockCycle);
 
 		// Erase the page from the pending set.
@@ -850,6 +871,18 @@ namespace HybridSim {
 		}
 	}
 
+	
+	void HybridSystem::Flush(uint64_t cache_addr)
+	{
+		// The flush transaction simply sets the timestamp of the current cache line to 0.
+		// This forces the next miss in this set to remove this line.
+		// Note: Flush does not actually cause a write to happen.
+
+		// Update the cache state
+		cache_line cur_line = cache[cache_addr];
+		cur_line.ts = 0;
+		cache[cache_addr] = cur_line;
+	}
 
 	void HybridSystem::RegisterCallbacks( TransactionCompleteCB *readDone, TransactionCompleteCB *writeDone
 			/*void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower)*/)
@@ -988,6 +1021,10 @@ namespace HybridSim {
 					ReadDoneCallback(systemID, p.orig_addr, currentClockCycle);
 				else if(p.type == DATA_WRITE)
 					WriteDoneCallback(systemID, p.orig_addr, currentClockCycle);
+				else
+				{
+					// Do nothing if this is a PREFETCH.
+				}
 
 				// Mark the pending item's callback as being sent so it isn't sent again later.
 				p.callback_sent = true;

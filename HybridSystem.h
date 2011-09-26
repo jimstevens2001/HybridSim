@@ -71,6 +71,8 @@ namespace HybridSim
 		void CacheWrite(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr);
 		void CacheWriteFinish(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr, bool callback_sent);
 
+		void Flush(uint64_t cache_addr);
+
 		// Testing function
 		bool is_hit(uint64_t address);
 		uint64_t get_hit();

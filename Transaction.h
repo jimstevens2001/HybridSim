@@ -8,7 +8,8 @@ namespace HybridSim
 	{
 		DATA_READ,
 		DATA_WRITE,
-		RETURN_DATA
+		PREFETCH,
+		FLUSH
 	};
 
 	class Transaction
