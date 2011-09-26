@@ -137,7 +137,7 @@ namespace HybridSim {
 		bool sent_transaction = false;
 
 
-		list<DRAMSim::Transaction>::iterator it = trans_queue.begin();
+		list<Transaction>::iterator it = trans_queue.begin();
 		while((it != trans_queue.end()) && (pending_sets.size() < NUM_SETS) && (check_queue) && (delay_counter == 0))
 		{
 			// Compute the page address.
@@ -195,7 +195,7 @@ namespace HybridSim {
 		bool not_full = true;
 		if (not_full && !dram_queue.empty())
 		{
-			DRAMSim::Transaction tmp = dram_queue.front();
+			Transaction tmp = dram_queue.front();
 			bool isWrite;
 			if (tmp.transactionType == DATA_WRITE)
 				isWrite = true;
@@ -217,7 +217,7 @@ namespace HybridSim {
 		{
 			bool isWrite;
 
-			DRAMSim::Transaction tmp = flash_queue.front();
+			Transaction tmp = flash_queue.front();
 			if (tmp.transactionType == DATA_WRITE)
 				isWrite = true;
 			else
@@ -257,7 +257,7 @@ namespace HybridSim {
 
 	bool HybridSystem::addTransaction(bool isWrite, uint64_t addr)
 	{
-		DRAMSim::TransactionType type;
+		TransactionType type;
 		if (isWrite)
 		{
 			type = DATA_WRITE;
@@ -266,11 +266,11 @@ namespace HybridSim {
 		{
 			type = DATA_READ;
 		}
-		DRAMSim::Transaction t = DRAMSim::Transaction(type, addr, NULL);
+		Transaction t = Transaction(type, addr, NULL);
 		return addTransaction(t);
 	}
 
-	bool HybridSystem::addTransaction(DRAMSim::Transaction &trans)
+	bool HybridSystem::addTransaction(Transaction &trans)
 	{
 
 		pending_count += 1;
@@ -302,7 +302,7 @@ namespace HybridSim {
 		return true;
 	}
 
-	void HybridSystem::ProcessTransaction(DRAMSim::Transaction &trans)
+	void HybridSystem::ProcessTransaction(Transaction &trans)
 	{
 		uint64_t addr = ALIGN(trans.address);
 
@@ -497,7 +497,7 @@ namespace HybridSim {
 
 #if SINGLE_WORD
 		// Schedule a read from DRAM to get the line being evicted.
-		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_READ, p.cache_addr, NULL);
+		Transaction t = Transaction(DATA_READ, p.cache_addr, NULL);
 		dram_queue.push_back(t);
 #else
 		// Schedule reads for the entire page.
@@ -506,7 +506,7 @@ namespace HybridSim {
 		{
 			uint64_t addr = p.cache_addr + i*BURST_SIZE;
 			p.insert_wait(addr);
-			DRAMSim::Transaction t = DRAMSim::Transaction(DATA_READ, addr, NULL);
+			Transaction t = Transaction(DATA_READ, addr, NULL);
 			dram_queue.push_back(t);
 		}
 #endif
@@ -591,13 +591,13 @@ namespace HybridSim {
 
 #if SINGLE_WORD
 		// Schedule a write to Flash to save the evicted line.
-		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, victim_flash_addr, NULL);
+		Transaction t = Transaction(DATA_WRITE, victim_flash_addr, NULL);
 		flash_queue.push_back(t);
 #else
 		// Schedule writes for the entire page.
 		for(uint64_t i=0; i<PAGE_SIZE/FLASH_BURST_SIZE; i++)
 		{
-			DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, victim_flash_addr + i*FLASH_BURST_SIZE, NULL);
+			Transaction t = Transaction(DATA_WRITE, victim_flash_addr + i*FLASH_BURST_SIZE, NULL);
 			flash_queue.push_back(t);
 		}
 #endif
@@ -623,7 +623,7 @@ namespace HybridSim {
 
 #if SINGLE_WORD
 		// Schedule a read from Flash to get the new line 
-		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_READ, page_addr, NULL);
+		Transaction t = Transaction(DATA_READ, page_addr, NULL);
 		flash_queue.push_back(t);
 #else
 		// Schedule reads for the entire page.
@@ -632,7 +632,7 @@ namespace HybridSim {
 		{
 			uint64_t addr = page_addr + i*FLASH_BURST_SIZE;
 			p.insert_wait(addr);
-			DRAMSim::Transaction t = DRAMSim::Transaction(DATA_READ, addr, NULL);
+			Transaction t = Transaction(DATA_READ, addr, NULL);
 			flash_queue.push_back(t);
 		}
 #endif
@@ -711,13 +711,13 @@ namespace HybridSim {
 
 #if SINGLE_WORD
 		// Schedule a write to DRAM to simulate the write of the line that was read from Flash.
-		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, p.cache_addr, NULL);
+		Transaction t = Transaction(DATA_WRITE, p.cache_addr, NULL);
 		dram_queue.push_back(t);
 #else
 		// Schedule writes for the entire page.
 		for(uint64_t i=0; i<PAGE_SIZE/BURST_SIZE; i++)
 		{
-			DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, p.cache_addr + i*BURST_SIZE, NULL);
+			Transaction t = Transaction(DATA_WRITE, p.cache_addr + i*BURST_SIZE, NULL);
 			dram_queue.push_back(t);
 		}
 #endif
@@ -736,7 +736,7 @@ namespace HybridSim {
 
 		assert(cache_addr == PAGE_ADDRESS(data_addr));
 
-		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_READ, data_addr, NULL);
+		Transaction t = Transaction(DATA_READ, data_addr, NULL);
 		dram_queue.push_back(t);
 
 		// Update the cache state
@@ -801,7 +801,7 @@ namespace HybridSim {
 		// Compute the actual DRAM address of the data word we care about.
 		uint64_t data_addr = cache_addr + PAGE_OFFSET(flash_addr);
 
-		DRAMSim::Transaction t = DRAMSim::Transaction(DATA_WRITE, data_addr, NULL);
+		Transaction t = Transaction(DATA_WRITE, data_addr, NULL);
 		dram_queue.push_back(t);
 
 		// Finish the operation by updating cache state, doing the callback, and removing the pending set.

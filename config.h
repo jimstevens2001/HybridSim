@@ -33,15 +33,23 @@
 #include <DRAMSim.h>
 
 // Additional things I reuse from DRAMSim repo (for internal use only).
-#include <Transaction.h>
+//#include <Transaction.h>
 #include <SimulatorObject.h>
 using DRAMSim::SimulatorObject;
-using DRAMSim::TransactionType;
-using DRAMSim::DATA_READ;
-using DRAMSim::DATA_WRITE;
+//using DRAMSim::TransactionType;
+//using DRAMSim::DATA_READ;
+//using DRAMSim::DATA_WRITE;
 
 // Include external interface for NVDIMM.
 #include <NVDIMMSim.h>
+
+
+// Include the Transaction type (which is needed below).
+#include "Transaction.h"
+
+// Declare error printout (used to be brought in from DRAMSim).
+#define ERROR(str) std::cerr<<"[ERROR ("<<__FILE__<<":"<<__LINE__<<")]: "<<str<<std::endl;
+
 
 using namespace std;
 
@@ -136,7 +144,7 @@ class Pending
 	uint64_t cache_addr;
 	uint64_t victim_tag;
 	bool callback_sent;
-	DRAMSim::TransactionType type; // DATA_READ or DATA_WRITE
+	TransactionType type; // DATA_READ or DATA_WRITE
 	unordered_set<uint64_t> *wait;
 
 	Pending() : op(VICTIM_READ), flash_addr(0), cache_addr(0), victim_tag(0), type(DATA_READ), wait(0) {};

@@ -21,7 +21,7 @@ namespace HybridSim
 		~HybridSystem();
 		void update();
 		bool addTransaction(bool isWrite, uint64_t addr);
-		bool addTransaction(DRAMSim::Transaction &trans);
+		bool addTransaction(Transaction &trans);
 		bool WillAcceptTransaction();
 		/*void RegisterCallbacks(
 				TransactionCompleteCB *readDone,
@@ -53,7 +53,7 @@ namespace HybridSim
 
 
 		// Helper functions
-		void ProcessTransaction(DRAMSim::Transaction &trans);
+		void ProcessTransaction(Transaction &trans);
 
 		void VictimRead(Pending p);
 		void VictimReadFinish(uint64_t addr, Pending p);
@@ -99,7 +99,7 @@ namespace HybridSim
 		bool check_queue; // If there is nothing to do, don't check the queue until the next event occurs that will make new work.
 
 		uint64_t delay_counter; // Used to stall the controller while it is "doing work".
-		DRAMSim::Transaction active_transaction; // Used to hold the transaction waiting for SRAM.
+		Transaction active_transaction; // Used to hold the transaction waiting for SRAM.
 		bool active_transaction_flag; // Indicates that a transaction is waiting for SRAM.
 
 		int64_t pending_count;
@@ -110,9 +110,9 @@ namespace HybridSim
 		uint64_t pending_pages_max;
 		uint64_t trans_queue_max;
 
-		list<DRAMSim::Transaction> trans_queue; // Entry queue for the cache controller.
-		list<DRAMSim::Transaction> dram_queue; // Buffer to wait for DRAM
-		list<DRAMSim::Transaction> flash_queue; // Buffer to wait for Flash
+		list<Transaction> trans_queue; // Entry queue for the cache controller.
+		list<Transaction> dram_queue; // Buffer to wait for DRAM
+		list<Transaction> flash_queue; // Buffer to wait for Flash
 
 		// Logger is used to store HybridSim-specific logging events.
 		Logger log;
