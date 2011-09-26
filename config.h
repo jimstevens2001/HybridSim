@@ -6,6 +6,7 @@
 #define DEBUG_LOGGER 0
 #define DEBUG_VICTIM 0
 #define DEBUG_NVDIMM_TRACE 0
+#define DEBUG_FULL_TRACE 0
 
 #define SINGLE_WORD 0
 #define FDSIM 0

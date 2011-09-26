@@ -129,6 +129,7 @@ namespace HybridSim
 
 		ofstream debug_victim;
 		ofstream debug_nvdimm_trace;
+		ofstream debug_full_trace;
 
 	};
 

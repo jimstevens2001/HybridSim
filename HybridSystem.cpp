@@ -71,6 +71,7 @@ namespace HybridSim {
 		pending_count = 0;
 		max_dram_pending = 0;
 
+		// Create file descriptors for debugging output (if needed).
 		if (DEBUG_VICTIM) 
 		{
 			debug_victim.open("debug_victim.log", ios_base::out | ios_base::trunc);
@@ -90,6 +91,16 @@ namespace HybridSim {
 				abort();
 			}
 		}
+
+		if (DEBUG_FULL_TRACE) 
+		{
+			debug_full_trace.open("full_trace.log", ios_base::out | ios_base::trunc);
+			if (!debug_full_trace.is_open())
+			{
+				cout << "ERROR: HybridSim debug_full_trace file failed to open.\n";
+				abort();
+			}
+		}
 	}
 
 	HybridSystem::~HybridSystem()
@@ -99,6 +110,9 @@ namespace HybridSim {
 
 		if (DEBUG_NVDIMM_TRACE)
 			debug_nvdimm_trace.close();
+
+		if (DEBUG_FULL_TRACE)
+			debug_full_trace.close();
 	}
 
 	// static allocator for the library interface
@@ -307,6 +321,12 @@ namespace HybridSim {
 		// Start the logging for this access.
 		if (ENABLE_LOGGER)
 			log.access_start(trans.address);
+
+		if (DEBUG_FULL_TRACE)
+		{
+			debug_full_trace << currentClockCycle << " " << ((trans.transactionType == DATA_WRITE) ? 1 : 0) << " " << trans.address << "\n";
+			debug_full_trace.flush();
+		}
 
 		// Restart queue checking.
 		this->check_queue = true;
