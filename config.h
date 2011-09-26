@@ -2,11 +2,22 @@
 #define HYBRIDSYSTEM_CONFIG_H
 
 // Debug flags.
-#define DEBUG_CACHE 0		// Lots of output during cache operations. Goes to stdout.
-#define DEBUG_LOGGER 0		// Lots of output for debugging logging operations. Goes to debug.log.
-#define DEBUG_VICTIM 0		// Outputs the victim selection process during each eviction. Goes to debug_victim.log.
-#define DEBUG_NVDIMM_TRACE 0	// Outputs the full trace of accesses sent to NVDIMM. Goes to nvdimm_trace.log.
-#define DEBUG_FULL_TRACE 0	// Outputs the full trace of accesses received by HybridSim. Goes to full_trace.log.
+
+// Lots of output during cache operations. Goes to stdout.
+#define DEBUG_CACHE 0
+
+// Lots of output for debugging logging operations. Goes to debug.log.
+#define DEBUG_LOGGER 0		
+
+// Outputs the victim selection process during each eviction. Goes to debug_victim.log.
+#define DEBUG_VICTIM 0		
+
+// Outputs the full trace of accesses sent to NVDIMM. Goes to nvdimm_trace.log.
+#define DEBUG_NVDIMM_TRACE 0
+
+// Outputs the full trace of accesses received by HybridSim. Goes to full_trace.log.
+#define DEBUG_FULL_TRACE 0
+
 
 // SINGLE_WORD only sends one transaction to the memories per page instead of PAGE_SIZE/BURST_SIZE
 // This is an old feature that may not work.
