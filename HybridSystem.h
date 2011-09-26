@@ -51,10 +51,6 @@ namespace HybridSim
 		void restoreCacheTable();
 		void saveCacheTable();
 
-		// Functions that schedule pending operations (second part to these operations is in the callbacks).
-//		void VictimRead(uint64_t flash_addr, uint64_t victim_cache_addr, uint64_t victim_tag, TransactionType type);
-//		void VictimWrite(uint64_t flash_addr, uint64_t victim_cache_addr, uint64_t victim_tag);
-//		void LineRead(uint64_t flash_addr, TransactionType type); 
 
 		// Helper functions
 		void ProcessTransaction(DRAMSim::Transaction &trans);
@@ -89,13 +85,7 @@ namespace HybridSim
 
 		DRAMSim::MemorySystem *dram;
 
-#if FDSIM
-		FDSim::FlashDIMM *flash;
-#elif NVDSIM
 		NVDSim::NVDIMM *flash;
-#else
-		DRAMSim::MemorySystem *flash;
-#endif
 
 		unordered_map<uint64_t, cache_line> cache;
 

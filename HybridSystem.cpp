@@ -17,17 +17,8 @@ namespace HybridSim {
 		cout << "Creating DRAM" << endl;
 		dram = DRAMSim::getMemorySystemInstance(0, dram_ini, sys_ini, "../HybridSim", "resultsfilename", (CACHE_PAGES * PAGE_SIZE) >> 20);
 		cout << "Creating Flash" << endl;
-#if FDSIM
-		// Note: this old code is likely broken and should be removed on the next cleanup pass.
-		flash = new FDSim::FlashDIMM(1,"ini/samsung_K9XXG08UXM.ini","ini/def_system.ini","../HybridSim","");
-#elif NVDSIM
-		//flash = new NVDSim::NVDIMM(1,flash_ini,"ini/def_system.ini","../HybridSim","");
+
 		flash = NVDSim::getNVDIMMInstance(1,flash_ini,"ini/def_system.ini","../HybridSim","");
-		cout << "Did NVDSIM" << endl;
-#else
-		// Note: this old code is likely broken and should be removed on the next cleanup pass.
-		flash = DRAMSim::getMemorySystemInstance(1, dram_ini, sys_ini, "../HybridSim", "resultsfilename2", (TOTAL_PAGES * PAGE_SIZE) >> 20); 
-#endif
 		cout << "Done with creating memories" << endl;
 
 		// Set up the callbacks for DRAM.
@@ -36,22 +27,11 @@ namespace HybridSim {
 		DRAMSim::TransactionCompleteCB *write_cb = new dramsim_callback_t(this, &HybridSystem::DRAMWriteCallback);
 		dram->RegisterCallbacks(read_cb, write_cb, NULL);
 
-		// Set up the callbacks for DRAM.
-#if FDSIM
-		typedef FDSim::Callback <HybridSystem, void, uint, uint64_t, uint64_t> fdsim_callback_t;
-		FDSim::Callback_t *f_read_cb = new fdsim_callback_t(this, &HybridSystem::FlashReadCallback);
-		FDSim::Callback_t *f_write_cb = new fdsim_callback_t(this, &HybridSystem::FlashWriteCallback);
-		flash->RegisterCallbacks(f_read_cb, f_write_cb);
-#elif NVDSIM
+		// Set up the callbacks for NVDIMM.
 		typedef NVDSim::Callback <HybridSystem, void, uint, uint64_t, uint64_t, bool> nvdsim_callback_t;
 		NVDSim::Callback_t *nv_read_cb = new nvdsim_callback_t(this, &HybridSystem::FlashReadCallback);
 		NVDSim::Callback_t *nv_write_cb = new nvdsim_callback_t(this, &HybridSystem::FlashWriteCallback);
 		flash->RegisterCallbacks(nv_read_cb, NULL, nv_write_cb, NULL);
-#else
-		read_cb = new dramsim_callback_t(this, &HybridSystem::FlashReadCallback);
-		write_cb = new dramsim_callback_t(this, &HybridSystem::FlashWriteCallback);
-		flash->RegisterCallbacks(read_cb, write_cb, NULL);
-#endif
 
 		// Need to check the queue when we start.
 		check_queue = true;
@@ -236,33 +216,14 @@ namespace HybridSim {
 		if (not_full && !flash_queue.empty())
 		{
 			bool isWrite;
-#if FDSIM
-			// put some code to deal with FDSim interactions here
-			DRAMSim::Transaction t = flash_queue.front();
-			FDSim::FlashTransaction ft = FDSim::FlashTransaction(static_cast<FDSim::TransactionType>(t.transactionType), t.address, t.data);
-			not_full = flash->add(ft);
-#elif NVDSIM
-			// put some code to deal with NVDSim interactions here
-			//cout << "adding a flash transaction" << endl;
-			//DRAMSim::Transaction t = flash_queue.front();
-			//NVDSim::FlashTransaction ft = NVDSim::FlashTransaction(static_cast<NVDSim::TransactionType>(t.transactionType), t.address, t.data);
-			//cout << "the address sent to flash was " << t.address << endl;
-			//not_full = flash->add(ft);
+
 			DRAMSim::Transaction tmp = flash_queue.front();
 			if (tmp.transactionType == DATA_WRITE)
 				isWrite = true;
 			else
 				isWrite = false;
 			not_full = flash->addTransaction(isWrite, tmp.address);
-#else
-			//not_full = flash->addTransaction(flash_queue.front());
-			DRAMSim::Transaction tmp = flash_queue.front();
-			if (tmp.transactionType == DATA_WRITE)
-				isWrite = true;
-			else
-				isWrite = false;
-			not_full = flash->addTransaction(isWrite, tmp.address);
-#endif
+
 			if (not_full)
 			{
 				flash_queue.pop_front();
@@ -1086,9 +1047,8 @@ namespace HybridSim {
 
 	void HybridSystem::reportPower()
 	{
-#if NVDSIM
+		// Forward this call to NVDIMM to process.
 		flash->saveStats();
-#endif
 	}
 
 
