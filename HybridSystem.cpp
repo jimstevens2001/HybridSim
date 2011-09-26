@@ -272,7 +272,6 @@ namespace HybridSim {
 
 	bool HybridSystem::addTransaction(Transaction &trans)
 	{
-
 		pending_count += 1;
 
 		//cout << "enter HybridSystem::addTransaction\n";
@@ -299,6 +298,14 @@ namespace HybridSim {
 		this->check_queue = true;
 
 		return true; // TODO: Figure out when this could be false.
+	}
+
+	void HybridSystem::addPrefetch(uint64_t flush_addr, uint64_t prefetch_addr)
+	{
+		pending_count += 1;
+
+		// Restart queue checking.
+		this->check_queue = true;
 	}
 
 	bool HybridSystem::WillAcceptTransaction()
@@ -575,7 +582,7 @@ namespace HybridSim {
 
 		// If the pending_set counter is now 0, then we can go ahead and remove it.
 		// This means that LINE_READ finished first and that the pending set was not removed
-		// in the CacheReadFinish or CacheWriteFinish functions.
+		// in the CacheReadFinish or CacheWriteFinish functions (or LineReadFinish for PREFETCH).
 		if (pending_sets[set_index] == 0)
 		{
 			if (DEBUG_CACHE)
@@ -715,10 +722,35 @@ namespace HybridSim {
 		// the callback to the requesting module, and remove this set from the pending sets to allow future
 		// operations to this set to start.
 		// Note: Only write operations are pending at this point, which will not interfere with future operations.
-		if ((p.type == DATA_READ) || (p.type == PREFETCH))
+		if (p.type == DATA_READ)
 			CacheReadFinish(p.cache_addr, p);
 		else if(p.type == DATA_WRITE)
 			CacheWriteFinish(p.orig_addr, p.flash_addr, p.cache_addr, p.callback_sent);
+		else if(p.type == PREFETCH)
+		{
+			// Do not call cache functions because prefetch does not send data back to the caller.
+
+			// Erase the page from the pending set.
+			// Note: the if statement is needed to ensure that the VictimRead operation (if it was invoked as part of a cache miss)
+			// is already complete. If not, the pending_set removal will be done in VictimReadFinish().
+			uint64_t set_index = SET_INDEX(PAGE_ADDRESS(p.flash_addr));
+			if (pending_sets[set_index] == 0)
+			{
+				int num = pending_pages.erase(PAGE_ADDRESS(p.flash_addr));
+				int num2 = pending_sets.erase(set_index);
+				if ((num != 1) || (num2 != 1))
+				{
+					cout << "pending_sets.erase() was called after PREFETCH and num was 0.\n";
+					cout << "orig:" << p.orig_addr << " aligned:" << p.flash_addr << "\n\n";
+					abort();
+				}
+
+				// Restart queue checking.
+				this->check_queue = true;
+				pending_count -= 1;
+			}
+
+		}
 	}
 
 
@@ -790,7 +822,7 @@ namespace HybridSim {
 		// Read operation has completed, call the top level callback.
 		// Only do this if it hasn't been sent already by the critical cache line first callback.
 		// Also, do not do this for prefetch since it does not have an external caller waiting on it.
-		if ((!p.callback_sent) && (p.type != PREFETCH))
+		if (!p.callback_sent)
 			ReadDoneCallback(systemID, p.orig_addr, currentClockCycle);
 
 		// Erase the page from the pending set.
@@ -1023,7 +1055,7 @@ namespace HybridSim {
 					WriteDoneCallback(systemID, p.orig_addr, currentClockCycle);
 				else
 				{
-					// Do nothing if this is a PREFETCH.
+					// Do nothing because this is a PREFETCH.
 				}
 
 				// Mark the pending item's callback as being sent so it isn't sent again later.

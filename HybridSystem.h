@@ -22,6 +22,7 @@ namespace HybridSim
 		void update();
 		bool addTransaction(bool isWrite, uint64_t addr);
 		bool addTransaction(Transaction &trans);
+		void addPrefetch(uint64_t flush_addr, uint64_t prefetch_addr);
 		bool WillAcceptTransaction();
 		/*void RegisterCallbacks(
 				TransactionCompleteCB *readDone,
