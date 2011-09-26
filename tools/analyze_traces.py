@@ -93,9 +93,16 @@ def process_tracefile(filename):
 
 	# Done. Now write this to a file.
 	outFile = open('prefetch_data.txt', 'w')
+	outFile.write('NUM_SETS '+str(NUM_SETS)+'\n\n\n')
 	for i in range(NUM_SETS):
-		outFile.write('set '+str(i)+'\n')
-		outFile.write(str(prefetch[i])+'\n\n')
+		outFile.write('SET '+str(i)+' '+str(len(prefetch[i]))+'\n')
+	#	outFile.write(str(prefetch[i])+'\n\n')
+		for j in range(len(prefetch[i])):
+			access_number = str(prefetch[i][j][0])
+			evicted_page = str(prefetch[i][j][1])
+			prefetch_page = str(prefetch[i][j][2])
+			outFile.write(access_number+' '+evicted_page+' '+prefetch_page+'\n');
+		outFile.write('\n\n')
 
 process_tracefile(sys.argv[1])
 
