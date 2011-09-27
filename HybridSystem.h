@@ -120,6 +120,15 @@ namespace HybridSim
 		// Logger is used to store HybridSim-specific logging events.
 		Logger log;
 
+		// Prefetch data stores the prefetch sets from the prefetch file.
+		// This is stored as a map of lists. It could be stored more compactly as an array of pointers to pointers,
+		// but I chose not to since random access is not needed and this makes the code simpler.
+		// If space becomes a problem, I'm just going to switch this to loading the data from a file per set at runtime.
+		unordered_map<uint64_t, list<uint64_t>> prefetch_access_number;
+		unordered_map<uint64_t, list<uint64_t>> prefetch_flush_addr;
+		unordered_map<uint64_t, list<uint64_t>> prefetch_new_addr;
+		unordered_map<uint64_t, uint64_t> prefetch_counter;
+
 		ofstream debug_victim;
 		ofstream debug_nvdimm_trace;
 		ofstream debug_full_trace;

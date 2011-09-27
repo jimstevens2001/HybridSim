@@ -1,6 +1,10 @@
 #ifndef HYBRIDSYSTEM_CONFIG_H
 #define HYBRIDSYSTEM_CONFIG_H
 
+// Temporary prefetch flags.
+#define ENABLE_PREFETCHING 1
+#define PREFETCH_FILE "traces/prefetch_data.txt"
+
 // Debug flags.
 
 // Lots of output during cache operations. Goes to stdout.

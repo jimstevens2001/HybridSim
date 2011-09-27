@@ -46,6 +46,78 @@ namespace HybridSim {
 		// If ENABLE_RESTORE is set, then this will fill the cache table.
 		restoreCacheTable();
 
+		// Load prefetch data.
+		if (ENABLE_PREFETCHING)
+		{
+			// MOVE THIS TO A FUNCTION.
+
+			// Open prefetch file.
+			ifstream prefetch_file;
+			prefetch_file.open(PREFETCH_FILE, ifstream::in);
+			if (!prefetch_file.is_open())
+			{
+				cout << "ERROR: Failed to load prefetch file: " << PREFETCH_FILE << "\n";
+				abort();
+			}
+
+			// Declare variables for parsing string and uint64_t.
+			string parse_string;
+			uint64_t num_sets, cur_set, set_size, set_counter, tmp_num;
+
+			// Parse prefetch data.
+			prefetch_file >> parse_string;
+			if (parse_string != "NUM_SETS")
+			{
+				cout << "ERROR: Invalid prefetch file format. NUM_SETS does not appear at beginning.\n";
+				abort();
+			}
+			
+			prefetch_file >> num_sets;
+
+			for (cur_set = 0; cur_set < num_sets; cur_set++)
+			{
+				prefetch_file >> parse_string;
+				if (parse_string != "SET")
+				{
+					cout << "ERROR: Invalid prefetch file format. SET does not appear at beginning of set " << cur_set << ".\n";
+					abort();
+				}
+
+				prefetch_file >> tmp_num;
+				if (tmp_num != cur_set)
+				{
+					cout << "ERROR: Invalid prefetch file format. Sets not given in order. (" << cur_set << ")\n";
+					abort();
+				}
+				
+				// Read the size fo this set.
+				prefetch_file >> set_size;
+
+				// Create a new entry in the maps.
+				prefetch_access_number[cur_set] = list<uint64_t>();
+				prefetch_flush_addr[cur_set] = list<uint64_t>();
+				prefetch_new_addr[cur_set] = list<uint64_t>();
+				prefetch_counter[cur_set] = 0;
+
+				// Process each prefetch.
+				for (set_counter = 0; set_counter < set_size; set_counter++)
+				{
+					// Read and store the access counter.
+					prefetch_file >> tmp_num;
+					prefetch_access_number[cur_set].push_back(tmp_num);
+
+					// Read and store the flush address.
+					prefetch_file >> tmp_num;
+					prefetch_flush_addr[cur_set].push_back(tmp_num);
+
+					// Read and store the new address.
+					prefetch_file >> tmp_num;
+					prefetch_new_addr[cur_set].push_back(tmp_num);
+				}
+			}
+
+			prefetch_file.close();
+		}
 
 		// debug stuff to remove later
 		pending_count = 0;
@@ -304,6 +376,15 @@ namespace HybridSim {
 	{
 		pending_count += 1;
 
+		// Create flush and prefetch transactions.
+		Transaction flush_transaction = Transaction(FLUSH, flush_addr, NULL);
+		Transaction prefetch_transaction = Transaction(PREFETCH, prefetch_addr, NULL);
+
+		// Push them onto the front of the transaction queue (so they execute immediately).
+		// Prefetch is pushed first so flush is at the front of the queue when done.
+		trans_queue.push_front(prefetch_transaction);
+		trans_queue.push_front(flush_transaction);
+
 		// Restart queue checking.
 		this->check_queue = true;
 	}
@@ -358,7 +439,8 @@ namespace HybridSim {
 			if (cache.count(cur_address) == 0)
 			{
 				// If i is not allocated yet, allocate it.
-				cache[cur_address] = *(new cache_line());
+				//cache[cur_address] = *(new cache_line());
+				cache[cur_address] = cache_line();
 			}
 
 			cur_line = cache[cur_address];
@@ -385,6 +467,29 @@ namespace HybridSim {
 		if ((ENABLE_LOGGER) && ((trans.transactionType == DATA_READ) || (trans.transactionType == DATA_WRITE)))
 			log.access_process(trans.address, trans.transactionType == DATA_READ, hit);
 
+		// Handle prefetching operations.
+		if (ENABLE_PREFETCHING && ((trans.transactionType == DATA_READ) || (trans.transactionType == DATA_WRITE)))
+		{
+			// Increment prefetch counter for this set.
+			prefetch_counter[set_index]++;
+
+			// If there are any prefetches left in this set prefetch list.
+			if (!prefetch_access_number[set_index].empty())
+			{
+				// If the counter exceeds the front of the access list, 
+				// then issue a prefetch and pop the front of the prefetch lists for this set.
+				// This must be a > because the prefetch must only happen AFTER the access.
+				if (prefetch_counter[set_index] > prefetch_access_number[set_index].front())
+				{
+					addPrefetch(prefetch_flush_addr[set_index].front(), prefetch_new_addr[set_index].front());
+					prefetch_access_number[set_index].pop_front();
+					prefetch_flush_addr[set_index].pop_front();
+					prefetch_new_addr[set_index].pop_front();
+				}
+			}
+		}
+
+
 		if (hit)
 		{
 			// Log the hit. 
@@ -396,10 +501,12 @@ namespace HybridSim {
 			else if(trans.transactionType == DATA_WRITE)
 				CacheWrite(trans.address, addr, cache_address);
 			else if(trans.transactionType == FLUSH)
+			{
 				Flush(cache_address);
+			}
 			else if(trans.transactionType == PREFETCH)
 			{
-				ERROR("PREFETCH transaction hit the cache. This should be impossible.");
+				cout << "Error: PREFETCH transaction hit the cache. This should be impossible. Make sure you are using the right trace.";
 				abort();
 			}
 		}
@@ -409,7 +516,7 @@ namespace HybridSim {
 			// Make sure this isn't a FLUSH before proceeding.
 			if(trans.transactionType == FLUSH)
 			{
-				ERROR("FLUSH transaction missed the cache. This should be impossible.");
+				cout << "Error: Flush transaction missed the cache. This should be impossible. Make sure you are using the right trace.";
 				abort();
 			}
 
@@ -478,7 +585,7 @@ namespace HybridSim {
 			// THIS MUST HAPPEN AFTER THE CUR_LINE IS SET TO THE VICTIM LINE.
 			//uint64_t victim_flash_addr = (cur_line.tag * NUM_SETS + set_index) * PAGE_SIZE; 
 			uint64_t victim_flash_addr = FLASH_ADDRESS(cur_line.tag, set_index);
-			if (ENABLE_LOGGER)
+			if ((ENABLE_LOGGER) && ((trans.transactionType == DATA_READ) || (trans.transactionType == DATA_WRITE)))
 				log.access_miss(PAGE_ADDRESS(addr), victim_flash_addr, set_index, victim, cur_line.dirty, cur_line.valid);
 
 			if (DEBUG_CACHE)
@@ -914,6 +1021,24 @@ namespace HybridSim {
 		cache_line cur_line = cache[cache_addr];
 		cur_line.ts = 0;
 		cache[cache_addr] = cur_line;
+
+		uint64_t flash_address = FLASH_ADDRESS(cur_line.tag, cur_line.data);
+		uint64_t set_index = SET_INDEX(PAGE_ADDRESS(flash_address));
+		if (pending_sets[set_index] == 0)
+		{
+			int num = pending_pages.erase(PAGE_ADDRESS(flash_address));
+			int num2 = pending_sets.erase(set_index);
+			if ((num != 1) || (num2 != 1))
+			{
+				cout << "pending_sets.erase() was called after PREFETCH and num was 0.\n";
+				cout << "orig: unknown" << " aligned:" << flash_address << "\n\n";
+				abort();
+			}
+
+			// Restart queue checking.
+			this->check_queue = true;
+			pending_count -= 1;
+		}
 	}
 
 	void HybridSystem::RegisterCallbacks( TransactionCompleteCB *readDone, TransactionCompleteCB *writeDone
