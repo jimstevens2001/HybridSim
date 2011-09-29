@@ -1,3 +1,9 @@
+# This is the original parser for GreenskySim traces written by Jim Greensky.
+# Note: GreenskySim is our name for a modified version of QEMU that outputs
+# trace data from QEMU. It outputs a raw hex format, which is then preprocessed
+# into a simple ASCII format before being sent to HybridSim.
+# Usage: python mtparser.py <trace>
+
 import sys
 import struct
 

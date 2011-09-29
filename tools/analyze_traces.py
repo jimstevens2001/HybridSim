@@ -1,3 +1,6 @@
+# This tool generates prefetch data from a HybridSim format trace.
+
+
 import sys
 
 SET_SIZE = 64

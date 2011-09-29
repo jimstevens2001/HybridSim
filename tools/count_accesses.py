@@ -1,3 +1,6 @@
+# This tool is used to count accesses in a trace in GreenskySim's format.
+# Usage: python count_accesses.py <tracefile>
+
 import sys
 import struct
 
