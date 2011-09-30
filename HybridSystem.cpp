@@ -374,7 +374,7 @@ namespace HybridSim {
 
 	void HybridSystem::addPrefetch(uint64_t flush_addr, uint64_t prefetch_addr)
 	{
-		pending_count += 1;
+		pending_count += 2;
 
 		// Create flush and prefetch transactions.
 		Transaction flush_transaction = Transaction(FLUSH, flush_addr, NULL);
@@ -1290,6 +1290,7 @@ namespace HybridSim {
 			cout << "PERFORMING RESTORE OF CACHE TABLE!!!\n";
 
 			ifstream inFile;
+			confirm_directory_exists("../HybridSim/state"); // Assumes using state directory, otherwise the user is on their own.
 			inFile.open("../HybridSim/"+HYBRIDSIM_RESTORE_FILE);
 			if (!inFile.is_open())
 			{
@@ -1355,6 +1356,7 @@ namespace HybridSim {
 		if (ENABLE_SAVE)
 		{
 			ofstream savefile;
+			confirm_directory_exists("../HybridSim/state"); // Assumes using state directory, otherwise the user is on their own.
 			savefile.open("../HybridSim/"+HYBRIDSIM_SAVE_FILE, ios_base::out | ios_base::trunc);
 			if (!savefile.is_open())
 			{

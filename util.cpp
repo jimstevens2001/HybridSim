@@ -78,3 +78,14 @@ list<string> split(string input, string chars, size_t maxsplit)
 	return ret;
 }
 
+void confirm_directory_exists(string path)
+{
+	string command_str = "test -e "+path+" || mkdir "+path;
+	const char * command = command_str.c_str();
+	int sys_done = system(command);
+	if (sys_done != 0)
+	{
+		cout << "system command to confirm directory "+path+" exists has failed.";
+		abort();
+	}
+}
