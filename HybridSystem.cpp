@@ -506,8 +506,9 @@ namespace HybridSim {
 			}
 			else if(trans.transactionType == PREFETCH)
 			{
-				cout << "Error: PREFETCH transaction hit the cache. This should be impossible. Make sure you are using the right trace.";
-				abort();
+				//cout << "Error: PREFETCH transaction hit the cache. This should be impossible. Make sure you are using the right trace.";
+				//abort();
+				return;  // for now
 			}
 		}
 
@@ -516,8 +517,9 @@ namespace HybridSim {
 			// Make sure this isn't a FLUSH before proceeding.
 			if(trans.transactionType == FLUSH)
 			{
-				cout << "Error: Flush transaction missed the cache. This should be impossible. Make sure you are using the right trace.";
-				abort();
+				//cout << "Error: Flush transaction missed the cache. This should be impossible. Make sure you are using the right trace.";
+				//abort();
+				return; // for now
 			}
 
 			// Select a victim offset within the set (LRU)
