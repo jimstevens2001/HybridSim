@@ -508,6 +508,23 @@ namespace HybridSim {
 			{
 				//cout << "Error: PREFETCH transaction hit the cache. This should be impossible. Make sure you are using the right trace.";
 				//abort();
+				uint64_t flash_address = addr;
+				//uint64_t set_index = SET_INDEX(PAGE_ADDRESS(flash_address));
+				if (pending_sets[set_index] == 0)
+				{
+					int num = pending_pages.erase(PAGE_ADDRESS(flash_address));
+					int num2 = pending_sets.erase(set_index);
+					if ((num != 1) || (num2 != 1))
+					{
+						cout << "pending_sets.erase() was called after FLUSH and num was 0.\n";
+						cout << "orig: unknown" << " aligned:" << flash_address << "\n\n";
+						abort();
+					}
+
+					// Restart queue checking.
+					this->check_queue = true;
+					pending_count -= 1;
+				}
 				return;  // for now
 			}
 		}
@@ -519,6 +536,23 @@ namespace HybridSim {
 			{
 				//cout << "Error: Flush transaction missed the cache. This should be impossible. Make sure you are using the right trace.";
 				//abort();
+				uint64_t flash_address = addr;
+				//uint64_t set_index = SET_INDEX(PAGE_ADDRESS(flash_address));
+				if (pending_sets[set_index] == 0)
+				{
+					int num = pending_pages.erase(PAGE_ADDRESS(flash_address));
+					int num2 = pending_sets.erase(set_index);
+					if ((num != 1) || (num2 != 1))
+					{
+						cout << "pending_sets.erase() was called after FLUSH and num was 0.\n";
+						cout << "orig: unknown" << " aligned:" << flash_address << "\n\n";
+						abort();
+					}
+
+					// Restart queue checking.
+					this->check_queue = true;
+					pending_count -= 1;
+				}
 				return; // for now
 			}
 
