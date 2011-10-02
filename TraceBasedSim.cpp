@@ -210,9 +210,9 @@ int HybridSimTBS::run_trace(string tracefile)
 	cout << "dram_pending=" << mem->dram_pending.size() << " flash_pending=" << mem->flash_pending.size() << "\n\n";
 	cout << "dram_queue=" << mem->dram_queue.size() << " flash_queue=" << mem->flash_queue.size() << "\n\n";
 	cout << "pending_pages=" << mem->pending_pages.size() << "\n\n";
-	for (set<uint64_t>::iterator it = mem->pending_pages.begin(); it != mem->pending_pages.end(); it++)
+	for (unordered_map<uint64_t, uint64_t>::iterator it = mem->pending_pages.begin(); it != mem->pending_pages.end(); it++)
 	{
-		cout << (*it) << " ";
+		cout << (*it).first << " ";
 	}
 	cout << "\n\n";
 	cout << "pending_count=" << mem->pending_count << "\n\n";
