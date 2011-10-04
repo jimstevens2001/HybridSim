@@ -110,11 +110,6 @@ def process_tracefile(filename):
 		outFile.write('\n\n')
 	outFile.close()
 
-	print 'Initial cache set for set 0'
-	print init[0]
-
-	for i in range(NUM_SETS):
-		print i, len(init[i])
 
 	# Save cache state table.
 	outFile = open('prefetch_cache_state.txt', 'w')
