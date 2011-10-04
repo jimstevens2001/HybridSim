@@ -17,7 +17,7 @@
 #define DEBUG_VICTIM 0		
 
 // Outputs the full trace of accesses sent to NVDIMM. Goes to nvdimm_trace.log.
-#define DEBUG_NVDIMM_TRACE 0
+#define DEBUG_NVDIMM_TRACE 1
 
 // Outputs the full trace of accesses received by HybridSim. Goes to full_trace.log.
 #define DEBUG_FULL_TRACE 0

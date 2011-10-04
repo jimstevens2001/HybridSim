@@ -848,6 +848,7 @@ namespace HybridSim {
 		// and VictimRead (if needed) are completely done.
 		uint64_t set_index = SET_INDEX(PAGE_ADDRESS(p.flash_addr));
 		pending_sets[set_index] -= 1;
+		//pending_pages[PAGE_ADDRESS(p.flash_addr)] -= 1; // TODO: figure out if this is necessary
 
 		if (DEBUG_CACHE)
 		{
@@ -1194,6 +1195,8 @@ namespace HybridSim {
 		else
 		{
 			ERROR("FlashReadCallback received an address not in the pending set.");
+			cout << "flash_pending count was " << flash_pending.count(PAGE_ADDRESS(addr)) << "\n";
+			cout << "address: " << addr << " page: " << PAGE_ADDRESS(addr) << " set: " << SET_INDEX(addr) << "\n";
 			abort();
 		}
 	}
