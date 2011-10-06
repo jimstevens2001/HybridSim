@@ -119,9 +119,14 @@ namespace HybridSim {
 			prefetch_file.close();
 		}
 
-		// debug stuff to remove later
-		pending_count = 0;
+		// Initialize size/max counters.
+		// Note: Some of this is just debug info, but I'm keeping it around because it is useful.
+		pending_count = 0; // This is used by TraceBasedSim for MAX_PENDING.
 		max_dram_pending = 0;
+		pending_sets_max = 0;
+		pending_pages_max = 0;
+		trans_queue_max = 0;
+		trans_queue_size = 0; // This is not debugging info.
 
 		// Create file descriptors for debugging output (if needed).
 		if (DEBUG_VICTIM) 
@@ -185,15 +190,15 @@ namespace HybridSim {
 			pending_sets_max = pending_sets.size();
 		if (pending_pages.size() > pending_pages_max)
 			pending_pages_max = pending_pages.size();
-		if (trans_queue.size() > trans_queue_max)
-			trans_queue_max = trans_queue.size();
+		if (trans_queue_size > trans_queue_max)
+			trans_queue_max = trans_queue_size;
 
 		// Log the queue length.
-		bool idle = (trans_queue.size() == 0) && (pending_sets.size() == 0);
-		bool flash_idle = (flash_queue.size() == 0) && (flash_pending.size() == 0);
-		bool dram_idle = (dram_queue.size() == 0) && (dram_pending.size() == 0);
+		bool idle = (trans_queue.empty()) && (pending_sets.empty());
+		bool flash_idle = (flash_queue.empty()) && (flash_pending.empty());
+		bool dram_idle = (dram_queue.empty()) && (dram_pending.empty());
 		if (ENABLE_LOGGER)
-			log.access_update(trans_queue.size(), idle, flash_idle, dram_idle);
+			log.access_update(trans_queue_size, idle, flash_idle, dram_idle);
 
 
 		// See if there are any transactions ready to be processed.
@@ -236,6 +241,7 @@ namespace HybridSim {
 
 				// Delete this item and skip to the next.
 				it = trans_queue.erase(it);
+				trans_queue_size--;
 
 				break;
 			}
@@ -346,9 +352,8 @@ namespace HybridSim {
 	{
 		pending_count += 1;
 
-		//cout << "enter HybridSystem::addTransaction\n";
 		trans_queue.push_back(trans);
-		//cout << "pushed\n";
+		trans_queue_size++;
 
 		if ((trans.transactionType == PREFETCH) || (trans.transactionType == FLUSH))
 		{
@@ -384,6 +389,7 @@ namespace HybridSim {
 		// Prefetch is pushed first so flush is at the front of the queue when done.
 		trans_queue.push_front(prefetch_transaction);
 		trans_queue.push_front(flush_transaction);
+		trans_queue_size += 2;
 
 		// Restart queue checking.
 		this->check_queue = true;
