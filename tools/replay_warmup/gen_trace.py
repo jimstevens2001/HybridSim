@@ -1,3 +1,7 @@
+# This tool is used in the fast forwarding process to generate HybridSim format 
+# traces from the GreenskySim format.
+# Usage: python gen_trace.py <tracefile>
+
 import sys
 import struct
 

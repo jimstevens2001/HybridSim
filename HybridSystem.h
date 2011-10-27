@@ -112,6 +112,7 @@ namespace HybridSim
 		uint64_t pending_sets_max;
 		uint64_t pending_pages_max;
 		uint64_t trans_queue_max;
+		uint64_t trans_queue_size;
 
 		list<Transaction> trans_queue; // Entry queue for the cache controller.
 		list<Transaction> dram_queue; // Buffer to wait for DRAM

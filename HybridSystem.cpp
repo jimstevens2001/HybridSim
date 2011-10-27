@@ -119,9 +119,14 @@ namespace HybridSim {
 			prefetch_file.close();
 		}
 
-		// debug stuff to remove later
-		pending_count = 0;
+		// Initialize size/max counters.
+		// Note: Some of this is just debug info, but I'm keeping it around because it is useful.
+		pending_count = 0; // This is used by TraceBasedSim for MAX_PENDING.
 		max_dram_pending = 0;
+		pending_sets_max = 0;
+		pending_pages_max = 0;
+		trans_queue_max = 0;
+		trans_queue_size = 0; // This is not debugging info.
 
 		// Create file descriptors for debugging output (if needed).
 		if (DEBUG_VICTIM) 
@@ -185,15 +190,15 @@ namespace HybridSim {
 			pending_sets_max = pending_sets.size();
 		if (pending_pages.size() > pending_pages_max)
 			pending_pages_max = pending_pages.size();
-		if (trans_queue.size() > trans_queue_max)
-			trans_queue_max = trans_queue.size();
+		if (trans_queue_size > trans_queue_max)
+			trans_queue_max = trans_queue_size;
 
 		// Log the queue length.
-		bool idle = (trans_queue.size() == 0) && (pending_sets.size() == 0);
-		bool flash_idle = (flash_queue.size() == 0) && (flash_pending.size() == 0);
-		bool dram_idle = (dram_queue.size() == 0) && (dram_pending.size() == 0);
+		bool idle = (trans_queue.empty()) && (pending_sets.empty());
+		bool flash_idle = (flash_queue.empty()) && (flash_pending.empty());
+		bool dram_idle = (dram_queue.empty()) && (dram_pending.empty());
 		if (ENABLE_LOGGER)
-			log.access_update(trans_queue.size(), idle, flash_idle, dram_idle);
+			log.access_update(trans_queue_size, idle, flash_idle, dram_idle);
 
 
 		// See if there are any transactions ready to be processed.
@@ -236,6 +241,7 @@ namespace HybridSim {
 
 				// Delete this item and skip to the next.
 				it = trans_queue.erase(it);
+				trans_queue_size--;
 
 				break;
 			}
@@ -346,9 +352,8 @@ namespace HybridSim {
 	{
 		pending_count += 1;
 
-		//cout << "enter HybridSystem::addTransaction\n";
 		trans_queue.push_back(trans);
-		//cout << "pushed\n";
+		trans_queue_size++;
 
 		if ((trans.transactionType == PREFETCH) || (trans.transactionType == FLUSH))
 		{
@@ -374,7 +379,7 @@ namespace HybridSim {
 
 	void HybridSystem::addPrefetch(uint64_t flush_addr, uint64_t prefetch_addr)
 	{
-		pending_count += 1;
+		pending_count += 2;
 
 		// Create flush and prefetch transactions.
 		Transaction flush_transaction = Transaction(FLUSH, flush_addr, NULL);
@@ -384,6 +389,7 @@ namespace HybridSim {
 		// Prefetch is pushed first so flush is at the front of the queue when done.
 		trans_queue.push_front(prefetch_transaction);
 		trans_queue.push_front(flush_transaction);
+		trans_queue_size += 2;
 
 		// Restart queue checking.
 		this->check_queue = true;
@@ -506,8 +512,26 @@ namespace HybridSim {
 			}
 			else if(trans.transactionType == PREFETCH)
 			{
-				cout << "Error: PREFETCH transaction hit the cache. This should be impossible. Make sure you are using the right trace.";
-				abort();
+				//cout << "Error: PREFETCH transaction hit the cache. This should be impossible. Make sure you are using the right trace.";
+				//abort();
+				uint64_t flash_address = addr;
+				//uint64_t set_index = SET_INDEX(PAGE_ADDRESS(flash_address));
+				if (pending_sets[set_index] == 0)
+				{
+					int num = pending_pages.erase(PAGE_ADDRESS(flash_address));
+					int num2 = pending_sets.erase(set_index);
+					if ((num != 1) || (num2 != 1))
+					{
+						cout << "pending_sets.erase() was called after FLUSH and num was 0.\n";
+						cout << "orig: unknown" << " aligned:" << flash_address << "\n\n";
+						abort();
+					}
+
+					// Restart queue checking.
+					this->check_queue = true;
+					pending_count -= 1;
+				}
+				return;  // for now
 			}
 		}
 
@@ -516,8 +540,26 @@ namespace HybridSim {
 			// Make sure this isn't a FLUSH before proceeding.
 			if(trans.transactionType == FLUSH)
 			{
-				cout << "Error: Flush transaction missed the cache. This should be impossible. Make sure you are using the right trace.";
-				abort();
+				//cout << "Error: Flush transaction missed the cache. This should be impossible. Make sure you are using the right trace.";
+				//abort();
+				uint64_t flash_address = addr;
+				//uint64_t set_index = SET_INDEX(PAGE_ADDRESS(flash_address));
+				if (pending_sets[set_index] == 0)
+				{
+					int num = pending_pages.erase(PAGE_ADDRESS(flash_address));
+					int num2 = pending_sets.erase(set_index);
+					if ((num != 1) || (num2 != 1))
+					{
+						cout << "pending_sets.erase() was called after FLUSH and num was 0.\n";
+						cout << "orig: unknown" << " aligned:" << flash_address << "\n\n";
+						abort();
+					}
+
+					// Restart queue checking.
+					this->check_queue = true;
+					pending_count -= 1;
+				}
+				return; // for now
 			}
 
 			// Select a victim offset within the set (LRU)
@@ -1243,7 +1285,6 @@ namespace HybridSim {
 	void HybridSystem::reportPower()
 	{
 		// Forward this call to NVDIMM to process.
-		flash->saveStats();
 	}
 
 
@@ -1257,7 +1298,10 @@ namespace HybridSim {
 
 		// Print out the log file.
 		if (ENABLE_LOGGER)
+		{
 			log.print();
+			flash->saveStats();
+		}
 	}
 
 	list<uint64_t> HybridSystem::get_valid_pages()
@@ -1290,6 +1334,7 @@ namespace HybridSim {
 			cout << "PERFORMING RESTORE OF CACHE TABLE!!!\n";
 
 			ifstream inFile;
+			confirm_directory_exists("../HybridSim/state"); // Assumes using state directory, otherwise the user is on their own.
 			inFile.open("../HybridSim/"+HYBRIDSIM_RESTORE_FILE);
 			if (!inFile.is_open())
 			{
@@ -1355,6 +1400,7 @@ namespace HybridSim {
 		if (ENABLE_SAVE)
 		{
 			ofstream savefile;
+			confirm_directory_exists("../HybridSim/state"); // Assumes using state directory, otherwise the user is on their own.
 			savefile.open("../HybridSim/"+HYBRIDSIM_SAVE_FILE, ios_base::out | ios_base::trunc);
 			if (!savefile.is_open())
 			{
