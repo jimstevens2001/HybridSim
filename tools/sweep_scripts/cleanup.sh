@@ -3,20 +3,28 @@ topdir=`pwd`
 
 for mix in mix1 mix2 mix3 mix4;
 do
-	cd "$mix"
+	test -e "$mix" || echo "Bad ditectory structure. Aborting..."
+	test -e "$mix" || exit
+	cd "$mix" 
 
 	for chan in 1 2 4 8 16 32 64 128 256;
 	do
-		cd "$chan"
+		test -e "$chan" || echo "Bad ditectory structure. Aborting..."
+		test -e "$chan" || exit
+		cd "$chan" 
 
-		for config in noprefetch;
+		for config in prefetch noprefetch;
 		do
-			cd "$config"
+			test -e "$config" || echo "Bad ditectory structure. Aborting..."
+			test -e "$config" || exit
+			cd "$config" 
 			
-			#echo In directory for $mix/$chan/$config
+			echo In directory for $mix/$chan/$config
 
 			rm -rf `ls | grep -v HybridSim`
 
+			test -e HybridSim || echo "Bad ditectory structure. Aborting..."
+			test -e HybridSim || exit
 			cd HybridSim
 
 
