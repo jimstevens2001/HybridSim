@@ -20,7 +20,7 @@
 #define DEBUG_NVDIMM_TRACE 0
 
 // Outputs the full trace of accesses received by HybridSim. Goes to full_trace.log.
-#define DEBUG_FULL_TRACE 1
+#define DEBUG_FULL_TRACE 0
 
 
 // SINGLE_WORD only sends one transaction to the memories per page instead of PAGE_SIZE/BURST_SIZE
