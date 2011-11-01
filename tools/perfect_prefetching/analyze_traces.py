@@ -3,6 +3,9 @@
 
 import sys
 
+ADJUSTMENT = 400 	# Set the adjustment to prevent premature evictions in non-deterministic runs (e.g. marss)
+					# If fully deterministic, set this to 0.
+
 SET_SIZE = 64
 PAGE_SIZE = 4096
 CACHE_PAGES = 131072
@@ -103,7 +106,7 @@ def process_tracefile(filename):
 		outFile.write('SET '+str(i)+' '+str(len(prefetch[i]))+'\n')
 	#	outFile.write(str(prefetch[i])+'\n\n')
 		for j in range(len(prefetch[i])):
-			access_number = str(prefetch[i][j][0])
+			access_number = str(prefetch[i][j][0]+ADJUSTMENT)
 			evicted_page = str(prefetch[i][j][1])
 			prefetch_page = str(prefetch[i][j][2])
 			outFile.write(access_number+' '+evicted_page+' '+prefetch_page+'\n');
