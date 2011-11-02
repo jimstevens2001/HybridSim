@@ -633,6 +633,9 @@ namespace HybridSim {
 			if ((ENABLE_LOGGER) && ((trans.transactionType == DATA_READ) || (trans.transactionType == DATA_WRITE)))
 				log.access_miss(PAGE_ADDRESS(addr), victim_flash_addr, set_index, victim, cur_line.dirty, cur_line.valid);
 
+
+			// TODO: Lock the victim page HERE.
+
 			if (DEBUG_CACHE)
 			{
 				cout << currentClockCycle << ": " << "MISS: victim is cache_address " << cache_address <<
@@ -802,7 +805,8 @@ namespace HybridSim {
 		// Increment the pending set counter (this is used to ensure that the pending set entry isn't removed until both LineRead
 		// and VictimRead (if needed) are completely done.
 		pending_sets[SET_INDEX(PAGE_ADDRESS(p.flash_addr))] += 1;
-		
+		pending_pages[PAGE_ADDRESS(p.flash_addr)] += 1;
+
 
 #if SINGLE_WORD
 		// Schedule a read from Flash to get the new line 
@@ -855,7 +859,7 @@ namespace HybridSim {
 		// and VictimRead (if needed) are completely done.
 		uint64_t set_index = SET_INDEX(PAGE_ADDRESS(p.flash_addr));
 		pending_sets[set_index] -= 1;
-		//pending_pages[PAGE_ADDRESS(p.flash_addr)] -= 1; // TODO: figure out if this is necessary
+		pending_pages[PAGE_ADDRESS(p.flash_addr)] -= 1; 
 
 		if (DEBUG_CACHE)
 		{
