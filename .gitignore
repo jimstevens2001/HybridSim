@@ -4,8 +4,6 @@ results/
 *.po
 *.dep
 *.swp
-*.sh
-*.sh~
 *.h~
 *.cpp~
 *.log
@@ -22,5 +20,6 @@ NVHybridSim
 libnvhybridsim.so
 dramsim.log
 hybridsim.log
+run.sh
 tags
 state/

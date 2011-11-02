@@ -3,6 +3,9 @@
 
 import sys
 
+ADJUSTMENT = 400 	# Set the adjustment to prevent premature evictions in non-deterministic runs (e.g. marss)
+					# If fully deterministic, set this to 0.
+
 SET_SIZE = 64
 PAGE_SIZE = 4096
 CACHE_PAGES = 131072
@@ -35,11 +38,13 @@ def process_tracefile(filename):
 	cnt = {}
 	cache = {}
 	prefetch = {}
+	init = {}
 
 	for i in range(NUM_SETS):
 		cnt[i] = 0 # This counts the access number to each set (which is used to trigger prefetches)
 		cache[i] = [] # This holds SET_SIZE pairs of (access number, page) in LRU order (the one at the end gets evicted on misses).
 		prefetch[i] = [] # This holds triples of (access number, old page, new page) to prefetch. These are triggered immediately after a set is no longer needed.
+		init[i] = [] # The initial pages in each cache set.
 
 
 	# The general algorithm here is that whenever a miss occurs, we know when a particular evicted page is no longer needed (by using its access number).
@@ -81,7 +86,7 @@ def process_tracefile(filename):
 
 			else:
 				# The cache set isn't full yet, so just put this at the front of the list and do not evict anything.
-				pass
+				init[set_index].append(page)
 			
 		# Insert the new entry at the beginning of the list (for LRU).
 		cache[set_index].insert(0, (page, cnt[set_index]))
@@ -101,11 +106,32 @@ def process_tracefile(filename):
 		outFile.write('SET '+str(i)+' '+str(len(prefetch[i]))+'\n')
 	#	outFile.write(str(prefetch[i])+'\n\n')
 		for j in range(len(prefetch[i])):
-			access_number = str(prefetch[i][j][0])
+			access_number = str(prefetch[i][j][0]+ADJUSTMENT)
 			evicted_page = str(prefetch[i][j][1])
 			prefetch_page = str(prefetch[i][j][2])
 			outFile.write(access_number+' '+evicted_page+' '+prefetch_page+'\n');
 		outFile.write('\n\n')
+	outFile.close()
+
+
+	# Save cache state table.
+	outFile = open('prefetch_cache_state.txt', 'w')
+	outFile.write(str(PAGE_SIZE)+' '+str(SET_SIZE)+' '+str(CACHE_PAGES)+' '+str(TOTAL_PAGES)+'\n')
+	for i in range(CACHE_PAGES):
+		cache_addr = i*PAGE_SIZE
+		set_index = SET_INDEX(cache_addr)
+
+		# If there is another address to output in this file.
+		if len(init[set_index]) > 0:
+			cur_page = init[set_index].pop(0)
+			tag = TAG(cur_page)
+			ts = i/NUM_SETS
+
+			# order to output is cache_addr 1 1 tag 0 ts
+			outFile.write(str(cache_addr)+' 1 1 '+str(tag)+' 0 '+str(ts)+'\n')
+
+	outFile.close()
+
 
 process_tracefile(sys.argv[1])
 
