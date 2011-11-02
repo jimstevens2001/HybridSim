@@ -222,8 +222,9 @@ namespace HybridSim {
 			uint64_t page_addr = PAGE_ADDRESS(ALIGN((*it).address));
 
 
-			// Check to see if this pending set is open.
-			if (pending_pages.count(page_addr) == 0)
+			// Check to see if this page is open under contention rules.
+			//if (pending_pages.count(page_addr) == 0)
+			if (contention_is_unlocked(page_addr))
 			{
 				// Lock the page.
 				contention_lock(page_addr);
@@ -674,8 +675,9 @@ namespace HybridSim {
 
 		// Increment the pending set/page counter (this is used to ensure that the pending set/page entry isn't removed until both LineRead
 		// and VictimRead (if needed) are completely done.
-		pending_sets[SET_INDEX(p.flash_addr)] += 1;
-		pending_pages[PAGE_ADDRESS(p.flash_addr)] += 1;
+		//pending_sets[SET_INDEX(p.flash_addr)] += 1;
+		//pending_pages[PAGE_ADDRESS(p.flash_addr)] += 1;
+		contention_increment(PAGE_ADDRESS(p.flash_addr));
 
 #if SINGLE_WORD
 		// Schedule a read from DRAM to get the line being evicted.
@@ -724,11 +726,13 @@ namespace HybridSim {
 		p.delete_wait();
 #endif
 
+		uint64_t set_index = SET_INDEX(PAGE_ADDRESS(p.flash_addr));
+
 		// Decrement the pending set counter (this is used to ensure that the pending set entry isn't removed until both LineRead
 		// and VictimRead (if needed) are completely done.
-		uint64_t set_index = SET_INDEX(PAGE_ADDRESS(p.flash_addr));
-		pending_sets[set_index] -= 1;
-		pending_pages[PAGE_ADDRESS(p.flash_addr)] -= 1;
+		//pending_sets[set_index] -= 1;
+		//pending_pages[PAGE_ADDRESS(p.flash_addr)] -= 1;
+		contention_decrement(PAGE_ADDRESS(p.flash_addr));
 
 		if (DEBUG_CACHE)
 		{
@@ -803,8 +807,9 @@ namespace HybridSim {
 
 		// Increment the pending set counter (this is used to ensure that the pending set entry isn't removed until both LineRead
 		// and VictimRead (if needed) are completely done.
-		pending_sets[SET_INDEX(PAGE_ADDRESS(p.flash_addr))] += 1;
-		pending_pages[PAGE_ADDRESS(p.flash_addr)] += 1;
+		//pending_sets[SET_INDEX(PAGE_ADDRESS(p.flash_addr))] += 1;
+		//pending_pages[PAGE_ADDRESS(p.flash_addr)] += 1;
+		contention_increment(PAGE_ADDRESS(p.flash_addr));
 
 
 #if SINGLE_WORD
@@ -854,11 +859,13 @@ namespace HybridSim {
 		p.delete_wait();
 #endif
 
+		uint64_t set_index = SET_INDEX(PAGE_ADDRESS(p.flash_addr));
+
 		// Decrement the pending set counter (this is used to ensure that the pending set entry isn't removed until both LineRead
 		// and VictimRead (if needed) are completely done.
-		uint64_t set_index = SET_INDEX(PAGE_ADDRESS(p.flash_addr));
-		pending_sets[set_index] -= 1;
-		pending_pages[PAGE_ADDRESS(p.flash_addr)] -= 1; 
+		//pending_sets[set_index] -= 1;
+		//pending_pages[PAGE_ADDRESS(p.flash_addr)] -= 1; 
+		contention_decrement(PAGE_ADDRESS(p.flash_addr));
 
 		if (DEBUG_CACHE)
 		{
@@ -1547,10 +1554,62 @@ namespace HybridSim {
 	// Page Contention functions
 	void HybridSystem::contention_lock(uint64_t page_addr)
 	{
-		// Add to the pending 
+		// Add to the pending pages map. And set the count to 0.
 		pending_pages[page_addr] = 0;
 		pending_sets[SET_INDEX(page_addr)] = 0;
 	}
-	
+
+	void HybridSystem::contention_unlock(uint64_t flash_addr, uint64_t orig_addr, string operation)
+	{
+		// Erase the page from the pending set.
+		// Note: the if statement is needed to ensure that the VictimRead operation (if it was invoked as part of a cache miss)
+		// is already complete. If not, the pending_set removal will be done in VictimReadFinish().
+		uint64_t set_index = SET_INDEX(PAGE_ADDRESS(flash_addr));
+		if (pending_pages[PAGE_ADDRESS(flash_addr)] == 0)
+		{
+			int num = pending_pages.erase(PAGE_ADDRESS(flash_addr));
+			int num2 = pending_sets.erase(set_index);
+			//if ((num != 1) || (num2 != 1))
+			if (num != 1)
+			{
+				cout << "pending_pages.erase() was called after " << operation << " and num was 0.\n";
+				cout << "orig:" << orig_addr << " aligned:" << flash_addr << "\n\n";
+				abort();
+			}
+
+			// Restart queue checking.
+			this->check_queue = true;
+			pending_count -= 1;
+		}
+
+	}
+
+	bool HybridSystem::contention_is_unlocked(uint64_t page_addr)
+	{
+		// If the page is not in the penting_pages map, then it is unlocked.
+		if (pending_pages.count(page_addr) == 0)
+			return true;
+		else
+			return false;
+	}
+
+
+	void HybridSystem::contention_increment(uint64_t page_addr)
+	{
+		// TODO: Add somme error checking here (e.g. make sure page is in pending_sets and make sure count is >= 0)
+
+		// This implements a counting semaphore for the page so that it isn't unlocked until the count is 0.
+		pending_sets[SET_INDEX(page_addr)] += 1;
+		pending_pages[page_addr] += 1;
+	}
+
+	void HybridSystem::contention_decrement(uint64_t page_addr)
+	{
+		// TODO: Add somme error checking here (e.g. make sure page is in pending_sets and make sure count is >= 0)
+
+		// This implements a counting semaphore for the page so that it isn't unlocked until the count is 0.
+		pending_sets[SET_INDEX(page_addr)] -= 1;
+		pending_pages[page_addr] -= 1;
+	}
 
 } // Namespace HybridSim

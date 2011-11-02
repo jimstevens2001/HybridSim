@@ -81,6 +81,10 @@ namespace HybridSim
 
 		// Page Contention Functions
 		void contention_lock(uint64_t page_addr);
+		void contention_unlock(uint64_t flash_addr, uint64_t orig_addr, string operation);
+		bool contention_is_unlocked(uint64_t page_addr);
+		void contention_increment(uint64_t page_addr);
+		void contention_decrement(uint64_t page_addr);
 
 		// State
 		IniReader iniReader;
