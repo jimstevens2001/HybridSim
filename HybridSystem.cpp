@@ -225,9 +225,8 @@ namespace HybridSim {
 			// Check to see if this pending set is open.
 			if (pending_pages.count(page_addr) == 0)
 			{
-				// Add to the pending 
-				pending_pages[page_addr] = 0;
-				pending_sets[SET_INDEX(page_addr)] = 0;
+				// Lock the page.
+				contention_lock(page_addr);
 
 				// Log the page access.
 				if (ENABLE_LOGGER)
@@ -1544,5 +1543,14 @@ namespace HybridSim {
 		return hit;
 
 	}
+
+	// Page Contention functions
+	void HybridSystem::contention_lock(uint64_t page_addr)
+	{
+		// Add to the pending 
+		pending_pages[page_addr] = 0;
+		pending_sets[SET_INDEX(page_addr)] = 0;
+	}
+	
 
 } // Namespace HybridSim

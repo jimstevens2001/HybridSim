@@ -79,6 +79,9 @@ namespace HybridSim
 		uint64_t get_hit();
 		list<uint64_t> get_valid_pages();
 
+		// Page Contention Functions
+		void contention_lock(uint64_t page_addr);
+
 		// State
 		IniReader iniReader;
 
