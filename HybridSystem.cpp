@@ -517,22 +517,23 @@ namespace HybridSim {
 				//abort();
 				uint64_t flash_address = addr;
 				//uint64_t set_index = SET_INDEX(PAGE_ADDRESS(flash_address));
-				if (pending_pages[PAGE_ADDRESS(flash_address)] == 0)
-				{
-					int num = pending_pages.erase(PAGE_ADDRESS(flash_address));
-					int num2 = pending_sets.erase(set_index);
-					//if ((num != 1) || (num2 != 1))
-					if (num != 1)
-					{
-						cout << "pending_sets.erase() was called after FLUSH and num was 0.\n";
-						cout << "orig: unknown" << " aligned:" << flash_address << "\n\n";
-						abort();
-					}
-
-					// Restart queue checking.
-					this->check_queue = true;
-					pending_count -= 1;
-				}
+				contention_unlock(flash_address, flash_address, "FLUSH");
+//				if (pending_pages[PAGE_ADDRESS(flash_address)] == 0)
+//				{
+//					int num = pending_pages.erase(PAGE_ADDRESS(flash_address));
+//					int num2 = pending_sets.erase(set_index);
+//					//if ((num != 1) || (num2 != 1))
+//					if (num != 1)
+//					{
+//						cout << "pending_sets.erase() was called after FLUSH and num was 0.\n";
+//						cout << "orig: unknown" << " aligned:" << flash_address << "\n\n";
+//						abort();
+//					}
+//
+//					// Restart queue checking.
+//					this->check_queue = true;
+//					pending_count -= 1;
+//				}
 				return;  // for now
 			}
 		}
@@ -549,7 +550,7 @@ namespace HybridSim {
 				if (pending_pages[PAGE_ADDRESS(flash_address)] == 0)
 				{
 					int num = pending_pages.erase(PAGE_ADDRESS(flash_address));
-					int num2 = pending_sets.erase(set_index);
+					//int num2 = pending_sets.erase(set_index);
 					//if ((num != 1) || (num2 != 1))
 					if (num != 1)
 					{
@@ -750,7 +751,7 @@ namespace HybridSim {
 				cout << "ERASING PENDING SET IN VICTIM READ FINISH\n";
 
 			int num = pending_pages.erase(PAGE_ADDRESS(p.flash_addr));
-			int num2 = pending_sets.erase(set_index);
+			//int num2 = pending_sets.erase(set_index);
 			//if ((num != 1) || (num2 != 1))
 			if (num != 1)
 			{
@@ -904,7 +905,7 @@ namespace HybridSim {
 			if (pending_pages[PAGE_ADDRESS(p.flash_addr)] == 0)
 			{
 				int num = pending_pages.erase(PAGE_ADDRESS(p.flash_addr));
-				int num2 = pending_sets.erase(set_index);
+				//int num2 = pending_sets.erase(set_index);
 				//if ((num != 1) || (num2 != 1))
 				if (num != 1)
 				{
@@ -1000,7 +1001,7 @@ namespace HybridSim {
 		if (pending_pages[PAGE_ADDRESS(p.flash_addr)] == 0)
 		{
 			int num = pending_pages.erase(PAGE_ADDRESS(p.flash_addr));
-			int num2 = pending_sets.erase(set_index);
+			//int num2 = pending_sets.erase(set_index);
 			//if ((num != 1) || (num2 != 1))
 			if (num != 1)
 			{
@@ -1058,7 +1059,7 @@ namespace HybridSim {
 		if (pending_pages[PAGE_ADDRESS(flash_addr)] == 0)
 		{
 			int num = pending_pages.erase(PAGE_ADDRESS(flash_addr));
-			int num2 = pending_sets.erase(set_index);
+			//int num2 = pending_sets.erase(set_index);
 			//if ((num != 1) || (num2 != 1))
 			if (num != 1)
 			{
@@ -1091,7 +1092,7 @@ namespace HybridSim {
 		if (pending_pages[PAGE_ADDRESS(flash_address)] == 0)
 		{
 			int num = pending_pages.erase(PAGE_ADDRESS(flash_address));
-			int num2 = pending_sets.erase(set_index);
+			//int num2 = pending_sets.erase(set_index);
 			//if ((num != 1) || (num2 != 1))
 			if (num != 1)
 			{
@@ -1568,7 +1569,7 @@ namespace HybridSim {
 		if (pending_pages[PAGE_ADDRESS(flash_addr)] == 0)
 		{
 			int num = pending_pages.erase(PAGE_ADDRESS(flash_addr));
-			int num2 = pending_sets.erase(set_index);
+			//int num2 = pending_sets.erase(set_index);
 			//if ((num != 1) || (num2 != 1))
 			if (num != 1)
 			{
