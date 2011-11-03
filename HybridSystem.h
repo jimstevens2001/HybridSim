@@ -110,6 +110,7 @@ namespace HybridSim
 
 		unordered_map<uint64_t, uint64_t> pending_pages; // If a page is in the pending set, then skip subsequent transactions to the page.
 		unordered_map<uint64_t, uint64_t> pending_sets; // If a page is in the pending map, then skip subsequent transactions to the page.
+		unordered_map<uint64_t, uint64_t> set_counter; // Counts the number of outstanding transactions to each set.
 
 		bool check_queue; // If there is nothing to do, don't check the queue until the next event occurs that will make new work.
 

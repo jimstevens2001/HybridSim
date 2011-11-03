@@ -1625,6 +1625,18 @@ namespace HybridSim {
 
 	bool HybridSystem::contention_is_unlocked(uint64_t page_addr)
 	{
+		// First see if the set is locked. This is done by looking at the set_counter.
+		// If the set counter exists and is equal to the set size, then we should NOT be trying to do any more accesses
+		// to the set, because this means that all of the cache lines are locked.
+		uint64_t set_index = SET_INDEX(page_addr);
+		if (set_counter.count(set_index) > 0)
+		{
+			if (set_counter[set_index] == SET_SIZE)
+			{
+				return false;
+			}
+		}
+
 		// If the page is not in the penting_pages map, then it is unlocked.
 		if (pending_pages.count(page_addr) == 0)
 			return true;
@@ -1665,6 +1677,12 @@ namespace HybridSim {
 		cache_line cur_line = cache[cache_addr];
 		cur_line.locked = true;
 		cache[cache_addr] = cur_line;
+
+		uint64_t set_index = SET_INDEX(cache_addr);
+		if (set_counter.count(set_index) == 0)
+			set_counter[set_index] = 1;
+		else
+			set_counter[set_index] += 1;
 	}
 
 	void HybridSystem::contention_cache_line_unlock(uint64_t cache_addr)
@@ -1672,6 +1690,9 @@ namespace HybridSim {
 		cache_line cur_line = cache[cache_addr];
 		cur_line.locked = false;
 		cache[cache_addr] = cur_line;
+
+		uint64_t set_index = SET_INDEX(cache_addr);
+		set_counter[set_index] -= 1;
 	}
 
 } // Namespace HybridSim
