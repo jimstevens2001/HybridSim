@@ -24,10 +24,6 @@ namespace HybridSim
 		bool addTransaction(Transaction &trans);
 		void addPrefetch(uint64_t flush_addr, uint64_t prefetch_addr);
 		bool WillAcceptTransaction();
-		/*void RegisterCallbacks(
-				TransactionCompleteCB *readDone,
-				TransactionCompleteCB *writeDone,
-				void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower));*/
 		void RegisterCallbacks(
 				TransactionCompleteCB *readDone,
 				TransactionCompleteCB *writeDone);
@@ -70,7 +66,6 @@ namespace HybridSim
 		void CacheReadFinish(uint64_t addr, Pending p);
 
 		void CacheWrite(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr);
-		//void CacheWriteFinish(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr, bool callback_sent);
 		void CacheWriteFinish(Pending p);
 
 		void Flush(uint64_t cache_addr);
@@ -87,8 +82,8 @@ namespace HybridSim
 		bool contention_is_unlocked(uint64_t page_addr);
 		void contention_increment(uint64_t page_addr);
 		void contention_decrement(uint64_t page_addr);
-		void contention_miss_lock(uint64_t page_addr);
-		void contention_miss_unlock(uint64_t page_addr);
+		void contention_victim_lock(uint64_t page_addr);
+		void contention_victim_unlock(uint64_t page_addr);
 		void contention_cache_line_lock(uint64_t cache_addr);
 		void contention_cache_line_unlock(uint64_t cache_addr);
 

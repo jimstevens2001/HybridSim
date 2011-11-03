@@ -1,7 +1,5 @@
 #include "HybridSystem.h"
 
-//test
-
 using namespace std;
 
 namespace HybridSim {
@@ -195,7 +193,6 @@ namespace HybridSim {
 
 		// Log the queue length.
 		bool idle = (trans_queue.empty()) && (pending_pages.empty());
-		//bool idle = (trans_queue.empty()) && (pending_sets.empty());
 		bool flash_idle = (flash_queue.empty()) && (flash_pending.empty());
 		bool dram_idle = (dram_queue.empty()) && (dram_pending.empty());
 		if (ENABLE_LOGGER)
@@ -223,7 +220,6 @@ namespace HybridSim {
 
 
 			// Check to see if this page is open under contention rules.
-			//if (pending_pages.count(page_addr) == 0)
 			if (contention_is_unlocked(page_addr))
 			{
 				// Lock the page.
@@ -253,9 +249,7 @@ namespace HybridSim {
 					log.access_set_conflict(SET_INDEX(page_addr));
 
 				// Skip to the next and do nothing else.
-				// cout << "PAGE IN PENDING" << page_addr << "\n";
 				++it;
-				//it = trans_queue.end();
 			}
 		}
 
@@ -306,7 +300,7 @@ namespace HybridSim {
 			if (not_full)
 			{
 				flash_queue.pop_front();
-				//cout << "popping front of flash queue" << endl;
+
 				if (DEBUG_NVDIMM_TRACE)
 				{
 					debug_nvdimm_trace << currentClockCycle << " " << (isWrite ? 1 : 0) << " " << tmp.address << "\n";
@@ -405,15 +399,10 @@ namespace HybridSim {
 
 	void HybridSystem::ProcessTransaction(Transaction &trans)
 	{
+		// trans.address is the original address that we must use to callback.
+		// But for our processing, we must use an aligned address (which is aligned to a page in the NV address space).
 		uint64_t addr = ALIGN(trans.address);
 
-
-		//	if (addr != trans.address)
-		//	{
-		//		cout << "Assertion fail: aligned address and oriignal address are different.\n";
-		//		cout << "aligned=0x" << hex << addr << " orig=0x" << trans.address << "\n";
-		//		abort();
-		//	}
 
 		if (DEBUG_CACHE)
 			cout << "\n" << currentClockCycle << ": " << "Starting transaction for address " << addr << endl;
@@ -421,6 +410,7 @@ namespace HybridSim {
 
 		if (addr >= (TOTAL_PAGES * PAGE_SIZE))
 		{
+			// Note: This should be technically impossible due to the modulo in ALIGN. But this is just a sanity check.
 			cout << "ERROR: Address out of bounds - orig:" << trans.address << " aligned:" << addr << "\n";
 			abort();
 		}
@@ -446,7 +436,6 @@ namespace HybridSim {
 			if (cache.count(cur_address) == 0)
 			{
 				// If i is not allocated yet, allocate it.
-				//cache[cur_address] = *(new cache_line());
 				cache[cur_address] = cache_line();
 			}
 
@@ -499,9 +488,6 @@ namespace HybridSim {
 
 		if (hit)
 		{
-			// Log the hit. 
-			//log.access_cache(trans.address, true);
-
 			// Lock the line that was hit (so it cannot be selected as a victim while being processed).
 			contention_cache_line_lock(cache_address);
 
@@ -516,28 +502,13 @@ namespace HybridSim {
 			}
 			else if(trans.transactionType == PREFETCH)
 			{
-				//cout << "Error: PREFETCH transaction hit the cache. This should be impossible. Make sure you are using the right trace.";
-				//abort();
+				// We allow PREFETCH to hit the cache because of non-determinism from marss.
 				uint64_t flash_address = addr;
-				//uint64_t set_index = SET_INDEX(PAGE_ADDRESS(flash_address));
 				contention_unlock(flash_address, flash_address, "PREFETCH (hit)", false, 0, true, cache_address);
-//				if (pending_pages[PAGE_ADDRESS(flash_address)] == 0)
-//				{
-//					int num = pending_pages.erase(PAGE_ADDRESS(flash_address));
-//					int num2 = pending_sets.erase(set_index);
-//					//if ((num != 1) || (num2 != 1))
-//					if (num != 1)
-//					{
-//						cout << "pending_sets.erase() was called after PREFETCH and num was 0.\n";
-//						cout << "orig: unknown" << " aligned:" << flash_address << "\n\n";
-//						abort();
-//					}
-//
-//					// Restart queue checking.
-//					this->check_queue = true;
-//					pending_count -= 1;
-//				}
-				return;  // for now
+
+				// TODO: Add some logging for this event.
+
+				return; 
 			}
 		}
 
@@ -546,28 +517,13 @@ namespace HybridSim {
 			// Make sure this isn't a FLUSH before proceeding.
 			if(trans.transactionType == FLUSH)
 			{
-				//cout << "Error: Flush transaction missed the cache. This should be impossible. Make sure you are using the right trace.";
-				//abort();
+				// We allow FLUSH to miss the cache because of non-determinism from marss.
 				uint64_t flash_address = addr;
-				//uint64_t set_index = SET_INDEX(PAGE_ADDRESS(flash_address));
 				contention_unlock(flash_address, flash_address, "FLUSH (miss)", false, 0, false, 0);
-//				if (pending_pages[PAGE_ADDRESS(flash_address)] == 0)
-//				{
-//					int num = pending_pages.erase(PAGE_ADDRESS(flash_address));
-//					//int num2 = pending_sets.erase(set_index);
-//					//if ((num != 1) || (num2 != 1))
-//					if (num != 1)
-//					{
-//						cout << "pending_sets.erase() was called after FLUSH and num was 0.\n";
-//						cout << "orig: unknown" << " aligned:" << flash_address << "\n\n";
-//						abort();
-//					}
-//
-//					// Restart queue checking.
-//					this->check_queue = true;
-//					pending_count -= 1;
-//				}
-				return; // for now
+
+				// TODO: Add some logging for this event.
+
+				return;
 			}
 
 			// Select a victim offset within the set (LRU)
@@ -626,16 +582,12 @@ namespace HybridSim {
 				debug_victim << "Victim in set_offset: " << victim_set_offset << "\n\n";
 			}
 
-			// Log the miss 
-			//log.access_cache(trans.address, false);
-
 
 			cache_address = victim;
 			cur_line = cache[cache_address];
 
 			// Log the victim, set, etc.
 			// THIS MUST HAPPEN AFTER THE CUR_LINE IS SET TO THE VICTIM LINE.
-			//uint64_t victim_flash_addr = (cur_line.tag * NUM_SETS + set_index) * PAGE_SIZE; 
 			uint64_t victim_flash_addr = FLASH_ADDRESS(cur_line.tag, set_index);
 			if ((ENABLE_LOGGER) && ((trans.transactionType == DATA_READ) || (trans.transactionType == DATA_WRITE)))
 				log.access_miss(PAGE_ADDRESS(addr), victim_flash_addr, set_index, victim, cur_line.dirty, cur_line.valid);
@@ -645,7 +597,7 @@ namespace HybridSim {
 			// transaction's miss and so further transactions to this page cannot happen.
 			// Only lock it if the cur_line is valid.
 			if (cur_line.valid)
-				contention_miss_lock(victim_flash_addr);
+				contention_victim_lock(victim_flash_addr);
 
 			// Lock the cache line so no one else tries to use it while this miss is being serviced.
 			contention_cache_line_lock(cache_address);
@@ -740,7 +692,6 @@ namespace HybridSim {
 		p.delete_wait();
 #endif
 
-		//uint64_t set_index = SET_INDEX(PAGE_ADDRESS(p.flash_addr));
 
 		// Decrement the pending set counter (this is used to ensure that the pending set entry isn't removed until both LineRead
 		// and VictimRead (if needed) are completely done.
@@ -749,35 +700,14 @@ namespace HybridSim {
 		if (DEBUG_CACHE)
 		{
 			cout << "The victim read to DRAM line " << PAGE_ADDRESS(addr) << " has completed.\n";
-			//cout << "pending_sets[" << set_index << "] = " << pending_sets[set_index] << "\n";
 			cout << "pending_pages[" << PAGE_ADDRESS(p.flash_addr) << "] = " << pending_pages[PAGE_ADDRESS(p.flash_addr)] << "\n";
 		}
 
-		// If the pending_set counter is now 0, then we can go ahead and remove it.
+		// contention_unlock will only unlock if the pending_page counter is 0.
 		// This means that LINE_READ finished first and that the pending set was not removed
 		// in the CacheReadFinish or CacheWriteFinish functions (or LineReadFinish for PREFETCH).
 		uint64_t victim_address = FLASH_ADDRESS(p.victim_tag, SET_INDEX(p.cache_addr));
 		contention_unlock(p.flash_addr, p.orig_addr, "VICTIM_READ", p.victim_valid, victim_address, true, p.cache_addr);
-//		if (pending_pages[PAGE_ADDRESS(p.flash_addr)] == 0)
-//		{
-//			if (DEBUG_CACHE)
-//				cout << "ERASING PENDING SET IN VICTIM READ FINISH\n";
-//
-//			int num = pending_pages.erase(PAGE_ADDRESS(p.flash_addr));
-//			//int num2 = pending_sets.erase(set_index);
-//			//if ((num != 1) || (num2 != 1))
-//			if (num != 1)
-//			{
-//				cout << "pending_sets.erase() was called after VICTIM_READ and num was 0.\n";
-//				cout << "orig:" << p.orig_addr << " aligned:" << p.flash_addr << "\n\n";
-//				abort();
-//			}
-//
-//			// Restart queue checking.
-//			this->check_queue = true;
-//			pending_count -= 1;
-//		}
-			
 
 		// Schedule a write to the flash to simulate the transfer
 		VictimWrite(p);
@@ -871,7 +801,6 @@ namespace HybridSim {
 		p.delete_wait();
 #endif
 
-		//uint64_t set_index = SET_INDEX(PAGE_ADDRESS(p.flash_addr));
 
 		// Decrement the pending set counter (this is used to ensure that the pending set entry isn't removed until both LineRead
 		// and VictimRead (if needed) are completely done.
@@ -880,7 +809,6 @@ namespace HybridSim {
 		if (DEBUG_CACHE)
 		{
 			cout << "The line read to Flash line " << PAGE_ADDRESS(addr) << " has completed.\n";
-			//cout << "pending_sets[" << set_index << "] = " << pending_sets[set_index] << "\n";
 		}
 
 
@@ -902,7 +830,6 @@ namespace HybridSim {
 		if (p.type == DATA_READ)
 			CacheReadFinish(p.cache_addr, p);
 		else if(p.type == DATA_WRITE)
-			//CacheWriteFinish(p.orig_addr, p.flash_addr, p.cache_addr, p.callback_sent);
 			CacheWriteFinish(p);
 		else if(p.type == PREFETCH)
 		{
@@ -911,27 +838,9 @@ namespace HybridSim {
 			// Erase the page from the pending set.
 			// Note: the if statement is needed to ensure that the VictimRead operation (if it was invoked as part of a cache miss)
 			// is already complete. If not, the pending_set removal will be done in VictimReadFinish().
-			//uint64_t set_index = SET_INDEX(PAGE_ADDRESS(p.flash_addr));
 
 			uint64_t victim_address = FLASH_ADDRESS(p.victim_tag, SET_INDEX(p.cache_addr));
 			contention_unlock(p.flash_addr, p.orig_addr, "PREFETCH", p.victim_valid, victim_address, true, p.cache_addr);
-//			if (pending_pages[PAGE_ADDRESS(p.flash_addr)] == 0)
-//			{
-//				int num = pending_pages.erase(PAGE_ADDRESS(p.flash_addr));
-//				//int num2 = pending_sets.erase(set_index);
-//				//if ((num != 1) || (num2 != 1))
-//				if (num != 1)
-//				{
-//					cout << "pending_sets.erase() was called after PREFETCH and num was 0.\n";
-//					cout << "orig:" << p.orig_addr << " aligned:" << p.flash_addr << "\n\n";
-//					abort();
-//				}
-//
-//				// Restart queue checking.
-//				this->check_queue = true;
-//				pending_count -= 1;
-//			}
-
 		}
 	}
 
@@ -1012,25 +921,8 @@ namespace HybridSim {
 		// Erase the page from the pending set.
 		// Note: the if statement is needed to ensure that the VictimRead operation (if it was invoked as part of a cache miss)
 		// is already complete. If not, the pending_set removal will be done in VictimReadFinish().
-		//uint64_t set_index = SET_INDEX(PAGE_ADDRESS(p.flash_addr));
 		uint64_t victim_address = FLASH_ADDRESS(p.victim_tag, SET_INDEX(p.cache_addr));
 		contention_unlock(p.flash_addr, p.orig_addr, "CACHE_READ", p.victim_valid, victim_address, true, p.cache_addr);
-//		if (pending_pages[PAGE_ADDRESS(p.flash_addr)] == 0)
-//		{
-//			int num = pending_pages.erase(PAGE_ADDRESS(p.flash_addr));
-//			//int num2 = pending_sets.erase(set_index);
-//			//if ((num != 1) || (num2 != 1))
-//			if (num != 1)
-//			{
-//				cout << "pending_sets.erase() was called after CACHE_READ and num was 0.\n";
-//				cout << "orig:" << p.orig_addr << " aligned:" << p.flash_addr << "\n\n";
-//				abort();
-//			}
-//
-//			// Restart queue checking.
-//			this->check_queue = true;
-//			pending_count -= 1;
-//		}
 	}
 
 	void HybridSystem::CacheWrite(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr)
@@ -1055,7 +947,7 @@ namespace HybridSim {
 		p.victim_valid = false;
 		p.callback_sent = false;
 		p.type = DATA_WRITE;
-		//CacheWriteFinish(orig_addr, flash_addr, cache_addr, false);
+
 		CacheWriteFinish(p);
 
 	}
@@ -1082,25 +974,8 @@ namespace HybridSim {
 		// Erase the page from the pending set.
 		// Note: the if statement is needed to ensure that the VictimRead operation (if it was invoked as part of a cache miss)
 		// is already complete. If not, the pending_set removal will be done in VictimReadFinish().
-		//uint64_t set_index = SET_INDEX(PAGE_ADDRESS(flash_addr));
 		uint64_t victim_address = FLASH_ADDRESS(p.victim_tag, SET_INDEX(p.cache_addr));
 		contention_unlock(p.flash_addr, p.orig_addr, "CACHE_WRITE", p.victim_valid, victim_address, true, p.cache_addr);
-//		if (pending_pages[PAGE_ADDRESS(flash_addr)] == 0)
-//		{
-//			int num = pending_pages.erase(PAGE_ADDRESS(flash_addr));
-//			//int num2 = pending_sets.erase(set_index);
-//			//if ((num != 1) || (num2 != 1))
-//			if (num != 1)
-//			{
-//				cout << "pending_pages.erase() was called after CACHE_WRITE and num was 0.\n";
-//				cout << "orig:" << orig_addr << " aligned:" << flash_addr << "\n\n";
-//				abort();
-//			}
-//
-//			// Restart queue checking.
-//			this->check_queue = true;
-//			pending_count -= 1;
-//		}
 	}
 
 	
@@ -1118,31 +993,13 @@ namespace HybridSim {
 		uint64_t set_index = SET_INDEX(cache_addr);
 		uint64_t flash_address = FLASH_ADDRESS(cur_line.tag, set_index);
 		contention_unlock(flash_address, flash_address, "FLUSH", false, 0, true, cache_addr);
-//		if (pending_pages[PAGE_ADDRESS(flash_address)] == 0)
-//		{
-//			int num = pending_pages.erase(PAGE_ADDRESS(flash_address));
-//			//int num2 = pending_sets.erase(set_index);
-//			//if ((num != 1) || (num2 != 1))
-//			if (num != 1)
-//			{
-//				cout << "pending_sets.erase() was called after FLUSH and num was 0.\n";
-//				cout << "orig: unknown" << " aligned:" << flash_address << "\n\n";
-//				abort();
-//			}
-//
-//			// Restart queue checking.
-//			this->check_queue = true;
-//			pending_count -= 1;
-//		}
 	}
 
-	void HybridSystem::RegisterCallbacks( TransactionCompleteCB *readDone, TransactionCompleteCB *writeDone
-			/*void (*reportPower)(double bgpower, double burstpower, double refreshpower, double actprepower)*/)
+	void HybridSystem::RegisterCallbacks( TransactionCompleteCB *readDone, TransactionCompleteCB *writeDone)
 	{
 		// Save the external callbacks.
 		ReadDone = readDone;
 		WriteDone = writeDone;
-
 	}
 
 
@@ -1174,32 +1031,6 @@ namespace HybridSim {
 		else
 		{
 			ERROR("DRAMReadCallback received an address not in the pending set.");
-
-			// DEBUG CODE (remove this later)
-			cout << "dram_pending.size() = " << dram_pending.size() << "\n";
-			for (unordered_map<uint64_t, Pending>::iterator it = dram_pending.begin(); it != dram_pending.end(); it++)
-			{
-				cout << (*it).first << " ";
-			}
-
-
-			cout << "\n\ndram_queue.size() = " << dram_queue.size() << "\n";
-
-			cout << "\n\ndram_pending_set.size() = " << dram_pending_set.size() << "\n";
-			for (set<uint64_t>::iterator it = dram_pending_set.begin(); it != dram_pending_set.end(); it++)
-			{
-				cout << (*it) << " ";
-			}
-			cout << "\n\n" << "addr= " << addr << endl;
-			cout << "PAGE_ADDRESS(addr)= " << PAGE_ADDRESS(addr) << "\n";
-			cout << "max_dram_pending= " << max_dram_pending << "\n";
-
-			dram_bad_address.push_back(addr);
-
-			// end debug code
-
-
-
 			abort();
 		}
 
@@ -1220,7 +1051,6 @@ namespace HybridSim {
 
 	void HybridSystem::FlashReadCallback(uint id, uint64_t addr, uint64_t cycle, bool unmapped)
 	{
-		//cout << flash_pending.count(PAGE_ADDRESS(addr)) << endl;
 		if (flash_pending.count(PAGE_ADDRESS(addr)) != 0)
 		{
 			// Get the pending object.
@@ -1338,7 +1168,7 @@ namespace HybridSim {
 
 	void HybridSystem::reportPower()
 	{
-		// Forward this call to NVDIMM to process.
+		// TODO: Remove this funnction from the external API.
 	}
 
 
@@ -1360,7 +1190,6 @@ namespace HybridSim {
 
 	list<uint64_t> HybridSystem::get_valid_pages()
 	{
-		//cout << "IN get_valid_pages()\n";
 		list<uint64_t> valid_pages;
 
 		unordered_map<uint64_t, cache_line>::iterator it;
@@ -1368,8 +1197,6 @@ namespace HybridSim {
 		{
 			uint64_t addr = (*it).first;
 			cache_line line = (*it).second;
-
-			//cout << addr << " : " << line.str() << "\n";
 
 			if (line.valid)
 			{
@@ -1438,11 +1265,16 @@ namespace HybridSim {
 				inFile >> line.data;
 				inFile >> line.ts;
 
+				// The line must not be locked on restore.
+				// This is a point of weirdness with the replay warmup design (since we can't restore the system
+				// exactly as it was), but it is unavoidable. In flight transactions are simply lost. Although, if
+				// replay warmup is done right, the system should run until all transactions are processed.
+				line.locked = false;
+
 				// Put this in the cache.
 				cache[cache_addr] = line;
 			}
 		
-
 			inFile.close();
 
 			flash->loadNVState(NVDIMM_RESTORE_FILE);
@@ -1586,21 +1418,17 @@ namespace HybridSim {
 	{
 		// Add to the pending pages map. And set the count to 0.
 		pending_pages[page_addr] = 0;
-		//pending_sets[SET_INDEX(page_addr)] = 0;
 	}
 
 	void HybridSystem::contention_unlock(uint64_t flash_addr, uint64_t orig_addr, string operation, bool victim_valid, uint64_t victim_page, 
 			bool cache_line_valid, uint64_t cache_addr)
 	{
-		// Erase the page from the pending set.
+		// Erase the page from the pending page map.
 		// Note: the if statement is needed to ensure that the VictimRead operation (if it was invoked as part of a cache miss)
 		// is already complete. If not, the pending_set removal will be done in VictimReadFinish().
-		//uint64_t set_index = SET_INDEX(PAGE_ADDRESS(flash_addr));
 		if (pending_pages[PAGE_ADDRESS(flash_addr)] == 0)
 		{
 			int num = pending_pages.erase(PAGE_ADDRESS(flash_addr));
-			//int num2 = pending_sets.erase(set_index);
-			//if ((num != 1) || (num2 != 1))
 			if (num != 1)
 			{
 				cout << "pending_pages.erase() was called after " << operation << " and num was 0.\n";
@@ -1610,7 +1438,7 @@ namespace HybridSim {
 
 			// If the victim page is valid, then unlock it too.
 			if (victim_valid)
-				contention_miss_unlock(victim_page);
+				contention_victim_unlock(victim_page);
 
 			// If the cache line is valid, unlock it.
 			if (cache_line_valid)
@@ -1661,12 +1489,12 @@ namespace HybridSim {
 		pending_pages[page_addr] -= 1;
 	}
 
-	void HybridSystem::contention_miss_lock(uint64_t page_addr)
+	void HybridSystem::contention_victim_lock(uint64_t page_addr)
 	{
 		pending_pages[page_addr] = 0;
 	}
 
-	void HybridSystem::contention_miss_unlock(uint64_t page_addr)
+	void HybridSystem::contention_victim_unlock(uint64_t page_addr)
 	{
 		int num = pending_pages.erase(page_addr);
 		assert(num == 1);

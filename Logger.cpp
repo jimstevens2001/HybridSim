@@ -239,20 +239,6 @@ namespace HybridSim
 	}
 
 
-//	void Logger::access_cache(uint64_t addr, bool hit)
-//	{
-//		if (access_map.count(addr) == 0)
-//		{
-//			cerr << "ERROR: Logger.access_cache() called with address not in access_map. address=" << hex << addr << "\n" << dec;
-//			abort();
-//		}
-//
-//		AccessMapEntry a = access_map[addr];
-//		a.hit = hit;
-//		access_map[addr] = a;
-//
-//	}
-
 	void Logger::access_page(uint64_t page_addr)
 	{
 		if (pages_used.count(page_addr) == 0)
@@ -394,7 +380,6 @@ namespace HybridSim
 	void Logger::read_latency(uint64_t cycles)
 	{
 		this->latency(cycles);
-		//average_read_latency = compute_running_average(average_read_latency, num_reads, cycles);
 		sum_read_latency += cycles;
 
 		cur_sum_read_latency += cycles;
