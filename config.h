@@ -131,12 +131,14 @@ class cache_line
         public:
         bool valid;
         bool dirty;
+		bool locked;
         uint64_t tag;
         uint64_t data;
         uint64_t ts;
 
-        cache_line() : valid(false), dirty(false), tag(0), data(0), ts(0) {}
-        string str() { stringstream out; out << "tag=" << tag << " data=" << data << " valid=" << valid << " dirty=" << dirty << " ts=" << ts; return out.str(); }
+        cache_line() : valid(false), dirty(false), locked(false), tag(0), data(0), ts(0) {}
+        string str() { stringstream out; out << "tag=" << tag << " data=" << data << " valid=" << valid << " dirty=" << dirty << " locked=" << locked 
+				<< " ts=" << ts; return out.str(); }
 
 };
 
@@ -158,6 +160,7 @@ class Pending
 	uint64_t flash_addr;
 	uint64_t cache_addr;
 	uint64_t victim_tag;
+	bool victim_valid;
 	bool callback_sent;
 	TransactionType type; // DATA_READ or DATA_WRITE
 	unordered_set<uint64_t> *wait;

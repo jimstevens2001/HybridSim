@@ -70,7 +70,8 @@ namespace HybridSim
 		void CacheReadFinish(uint64_t addr, Pending p);
 
 		void CacheWrite(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr);
-		void CacheWriteFinish(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr, bool callback_sent);
+		//void CacheWriteFinish(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr, bool callback_sent);
+		void CacheWriteFinish(Pending p);
 
 		void Flush(uint64_t cache_addr);
 
@@ -81,10 +82,15 @@ namespace HybridSim
 
 		// Page Contention Functions
 		void contention_lock(uint64_t page_addr);
-		void contention_unlock(uint64_t flash_addr, uint64_t orig_addr, string operation);
+		void contention_unlock(uint64_t flash_addr, uint64_t orig_addr, string operation, bool victim_valid, uint64_t victim_page, 
+				bool cache_line_valid, uint64_t cache_addr);
 		bool contention_is_unlocked(uint64_t page_addr);
 		void contention_increment(uint64_t page_addr);
 		void contention_decrement(uint64_t page_addr);
+		void contention_miss_lock(uint64_t page_addr);
+		void contention_miss_unlock(uint64_t page_addr);
+		void contention_cache_line_lock(uint64_t cache_addr);
+		void contention_cache_line_unlock(uint64_t cache_addr);
 
 		// State
 		IniReader iniReader;
