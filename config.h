@@ -2,8 +2,11 @@
 #define HYBRIDSYSTEM_CONFIG_H
 
 // Temporary prefetch flags.
-#define ENABLE_PREFETCHING 0
+#define ENABLE_PERFECT_PREFETCHING 0
 #define PREFETCH_FILE "traces/prefetch_data.txt"
+
+#define ENABLE_SEQUENTIAL_PREFETCHING 0
+#define SEQUENTIAL_PREFETCHING_WINDOW 2
 
 // Debug flags.
 

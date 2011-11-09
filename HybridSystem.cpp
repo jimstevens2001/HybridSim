@@ -45,7 +45,7 @@ namespace HybridSim {
 		restoreCacheTable();
 
 		// Load prefetch data.
-		if (ENABLE_PREFETCHING)
+		if (ENABLE_PERFECT_PREFETCHING)
 		{
 			// MOVE THIS TO A FUNCTION.
 
@@ -372,19 +372,31 @@ namespace HybridSim {
 		return true; // TODO: Figure out when this could be false.
 	}
 
-	void HybridSystem::addPrefetch(uint64_t flush_addr, uint64_t prefetch_addr)
+	void HybridSystem::addPrefetch(uint64_t prefetch_addr)
 	{
-		pending_count += 2;
-
-		// Create flush and prefetch transactions.
-		Transaction flush_transaction = Transaction(FLUSH, flush_addr, NULL);
+		// Create prefetch transaction.
 		Transaction prefetch_transaction = Transaction(PREFETCH, prefetch_addr, NULL);
 
-		// Push them onto the front of the transaction queue (so they execute immediately).
-		// Prefetch is pushed first so flush is at the front of the queue when done.
+		// Push the operation onto the front of the transaction queue (so it executes immediately).
 		trans_queue.push_front(prefetch_transaction);
+		trans_queue_size += 1;
+
+		pending_count += 1;
+
+		// Restart queue checking.
+		this->check_queue = true;
+	}
+
+	void HybridSystem::addFlush(uint64_t flush_addr)
+	{
+		// Create flush transaction.
+		Transaction flush_transaction = Transaction(FLUSH, flush_addr, NULL);
+
+		// Push the operation onto the front of the transaction queue (so it executes immediately).
 		trans_queue.push_front(flush_transaction);
-		trans_queue_size += 2;
+		trans_queue_size += 1;
+
+		pending_count += 1;
 
 		// Restart queue checking.
 		this->check_queue = true;
@@ -464,7 +476,7 @@ namespace HybridSim {
 			log.access_process(trans.address, trans.transactionType == DATA_READ, hit);
 
 		// Handle prefetching operations.
-		if (ENABLE_PREFETCHING && ((trans.transactionType == DATA_READ) || (trans.transactionType == DATA_WRITE)))
+		if (ENABLE_PERFECT_PREFETCHING && ((trans.transactionType == DATA_READ) || (trans.transactionType == DATA_WRITE)))
 		{
 			// Increment prefetch counter for this set.
 			prefetch_counter[set_index]++;
@@ -477,7 +489,12 @@ namespace HybridSim {
 				// This must be a > because the prefetch must only happen AFTER the access.
 				if (prefetch_counter[set_index] > prefetch_access_number[set_index].front())
 				{
-					addPrefetch(prefetch_flush_addr[set_index].front(), prefetch_new_addr[set_index].front());
+
+					// Add prefetch, then add flush (this makes flush run first).
+					addPrefetch(prefetch_new_addr[set_index].front());
+					addFlush(prefetch_flush_addr[set_index].front());
+
+					// Go to the next prefetch in this set.
 					prefetch_access_number[set_index].pop_front();
 					prefetch_flush_addr[set_index].pop_front();
 					prefetch_new_addr[set_index].pop_front();
@@ -524,6 +541,11 @@ namespace HybridSim {
 				// TODO: Add some logging for this event.
 
 				return;
+			}
+
+			if ((ENABLE_SEQUENTIAL_PREFETCHING) && (trans.transactionType != PREFETCH))
+			{
+				issue_sequential_prefetches(addr);
 			}
 
 			// Select a victim offset within the set (LRU)
@@ -1521,6 +1543,26 @@ namespace HybridSim {
 
 		uint64_t set_index = SET_INDEX(cache_addr);
 		set_counter[set_index] -= 1;
+	}
+
+	// PREFETCHING FUNCTIONS
+	void HybridSystem::issue_sequential_prefetches(uint64_t page_addr)
+	{
+		// Count down from the top address. This must be done because addPrefetch puts transactions at the front
+		// of the queue and we want page_addr+PAGE_SIZE to be the first prefetch issued.
+		for (int i=SEQUENTIAL_PREFETCHING_WINDOW; i > 0; i--)
+		{
+			// Compute the next prefetch address.
+			uint64_t prefetch_address = page_addr + (i * PAGE_SIZE);
+
+			// If address is above the legal address space for the main memory, then do not issue this prefetch.
+			if (prefetch_address >= (TOTAL_PAGES * PAGE_SIZE))
+				continue;
+
+			// Add the prefetch.
+			addPrefetch(prefetch_address);
+			//cout << currentClockCycle << ": Prefetcher adding " << prefetch_address << " to transaction queue.\n";
+		}
 	}
 
 } // Namespace HybridSim

@@ -22,7 +22,8 @@ namespace HybridSim
 		void update();
 		bool addTransaction(bool isWrite, uint64_t addr);
 		bool addTransaction(Transaction &trans);
-		void addPrefetch(uint64_t flush_addr, uint64_t prefetch_addr);
+		void addPrefetch(uint64_t prefetch_addr);
+		void addFlush(uint64_t flush_addr);
 		bool WillAcceptTransaction();
 		void RegisterCallbacks(
 				TransactionCompleteCB *readDone,
@@ -86,6 +87,10 @@ namespace HybridSim
 		void contention_victim_unlock(uint64_t page_addr);
 		void contention_cache_line_lock(uint64_t cache_addr);
 		void contention_cache_line_unlock(uint64_t cache_addr);
+
+
+		// Prefetch Functions
+		void issue_sequential_prefetches(uint64_t page_addr);
 
 		// State
 		IniReader iniReader;
