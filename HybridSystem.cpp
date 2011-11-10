@@ -29,7 +29,8 @@ namespace HybridSim {
 		typedef NVDSim::Callback <HybridSystem, void, uint, uint64_t, uint64_t, bool> nvdsim_callback_t;
 		NVDSim::Callback_t *nv_read_cb = new nvdsim_callback_t(this, &HybridSystem::FlashReadCallback);
 		NVDSim::Callback_t *nv_write_cb = new nvdsim_callback_t(this, &HybridSystem::FlashWriteCallback);
-		flash->RegisterCallbacks(nv_read_cb, NULL, nv_write_cb, NULL);
+		NVDSim::Callback_t *nv_crit_cb = new nvdsim_callback_t(this, &HybridSystem::FlashCriticalLineCallback);
+		flash->RegisterCallbacks(nv_read_cb, nv_crit_cb, nv_write_cb, NULL);
 
 		// Need to check the queue when we start.
 		check_queue = true;
@@ -1105,6 +1106,8 @@ namespace HybridSim {
 		// This function is called to implement critical line first for reads.
 		// This allows HybridSim to tell the external user it can make progress as soon as the data
 		// it is waiting for is back in the memory controller.
+
+		//cout << cycle << ": Critical Line Callback Received for address " << addr << "\n";
 
 		if (flash_pending.count(PAGE_ADDRESS(addr)) != 0)
 		{
