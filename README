@@ -1,5 +1,54 @@
 HybridSim
 
-Simulation of hybrid memory system utilizing a DRAM and a FlashDIMM
+University of Maryland, College Park
+Memory Systems Research Lab
+Lead Developer: Jim Stevens
 
-To use, the headers and .so files for DRAMSim and FlashDIMMSim must be available.
+Description:
+
+HybridSim is a timing simulation for a memory system design that
+utilizes a DRAM memory subsystem to cache a non-volatile memory. The DRAM
+subsystem is simulated by DRAMSim2 and the NVRAM subsystem is simulated
+by NVDIMMSim. HybridSim can run as a standalone trace-based simulator or
+as part of a full system simulator.
+
+HybridSim assumes the cache controller exists on the CPU and can be
+accessed with no overhead. The cache tag lookup delay in HybridSim is
+configurable.  HybridSim simulates accesses at a granularity of 64 bytes
+(the last level cache line size that is typically used as the memory
+system access granularity). Each of these lines is then part of a larger
+NVDIMM page (typically 4K, but configurable).  When a page is mapped
+into the DRAM, HybridSim simply passes accesses along to DRAMSim2 to
+simulate the timing. When a page is not mapped into the DRAM, HybridSim
+evicts a page from the cache set and then requests the missed page from
+the NVDIMM. HybridSim is lockup free, so while one DRAM cache miss is
+being serviced, other accessed can continue without delay.
+
+HybridSim also has support for sequential prefetching and perfect
+prefetching (prefetching based on a prefetch script computed ahead
+of time).
+
+
+Build instructions:
+
+To build HybridSim, the external headers and .so files for DRAMSim and
+NVDIMMSim must be available. NVDIMMSim must be placed in the ../NVDIMMSim
+directory and DRAMSim2 must be placed in the ../DRAMSim2 directory
+relative to this directory. Follow the instructions for those systems to
+build the .so files. Then, to build the standalone trace-based simulator,
+simply type "make".
+
+To build HybridSim as a shared library, type "make lib". The marss.hybridsim repo
+can then be built with libhybridsim.so.
+
+All code mentioned above can be found at:
+https://github.com/jimstevens2001
+
+
+Trace-Based Simulator Usage:
+
+./HybridSim <trace-file>
+
+The trace file format is an ASCII file with each access in the trace as a separate
+line. Each access consists of a cycle number, an operation type (0 for read, 1 for write),
+and an byte address for the memory access (addresses should be aligned to 64 bytes).
