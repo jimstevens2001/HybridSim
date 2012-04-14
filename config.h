@@ -56,6 +56,13 @@
 #define DEBUG_FULL_TRACE 0
 
 
+// Map the first CACHE_PAGES of the NVDIMM address space.
+// This is the initial state of the hybrid memory on boot.
+// This will be overridden if ENABLE_RESTORE is on in the ini file, so leaving this
+// on all of the time is harmless.
+#define PREFILL_CACHE 1
+
+
 // SINGLE_WORD only sends one transaction to the memories per page instead of PAGE_SIZE/BURST_SIZE
 // This is an old feature that may not work.
 #define SINGLE_WORD 0

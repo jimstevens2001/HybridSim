@@ -1265,6 +1265,26 @@ namespace HybridSim {
 
 	void HybridSystem::restoreCacheTable()
 	{
+		if (PREFILL_CACHE)
+		{
+			// Fill the cache table.
+			for (uint64_t i=0; i<CACHE_PAGES; i++)
+			{
+				uint64_t cache_addr = i*PAGE_SIZE;
+				cache_line line;
+
+				line.valid = true;
+				line.dirty = false;
+				line.locked = false;
+				line.tag = TAG(cache_addr);
+				line.data = 0;
+				line.ts = 0;
+
+				// Put this in the cache.
+				cache[cache_addr] = line;
+			}
+		}
+
 		if (ENABLE_RESTORE)
 		{
 			cout << "PERFORMING RESTORE OF CACHE TABLE!!!\n";
