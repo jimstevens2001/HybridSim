@@ -79,6 +79,9 @@ namespace HybridSim
 		flash_idle_counter = 0;
 		dram_idle_counter = 0;
 
+		num_mmio_dropped = 0;
+		num_mmio_remapped = 0;
+
 
 		// Init the latency histogram.
 		for (uint64_t i = 0; i <= HISTOGRAM_MAX; i += HISTOGRAM_BIN)
@@ -314,6 +317,18 @@ namespace HybridSim
 		MissedPageEntry m(currentClockCycle, missed_page, victim_page, cache_set, cache_page, dirty, valid);
 		
 		missed_page_list.push_back(m);
+	}
+
+	void Logger::mmio_dropped()
+	{
+		num_mmio_dropped++;
+		cur_num_mmio_dropped++;
+	}
+
+	void Logger::mmio_remapped()
+	{
+		num_mmio_remapped++;
+		cur_num_mmio_remapped++;
 	}
 
 
@@ -584,6 +599,8 @@ namespace HybridSim
 			savefile << "flash idle percentage: " << this->divide(cur_flash_idle_counter, EPOCH_LENGTH) << "\n";
 			savefile << "dram idle counter: " << cur_dram_idle_counter << "\n";
 			savefile << "dram idle percentage: " << this->divide(cur_dram_idle_counter, EPOCH_LENGTH) << "\n";
+			savefile << "MMIO Accesses Dropped: " << cur_num_mmio_dropped << "\n";
+			savefile << "MMIO Accesses Remapped: " << cur_num_mmio_remapped << "\n";
 			savefile << "\n";
 
 			savefile << "reads: " << cur_num_reads << "\n";
@@ -678,6 +695,9 @@ namespace HybridSim
 		cur_flash_idle_counter = 0;
 		cur_dram_idle_counter = 0;
 
+		cur_num_mmio_dropped = 0;
+		cur_num_mmio_remapped = 0;
+
 		// Clear cur_pages_used
 		cur_pages_used.clear();
 	}
@@ -719,6 +739,8 @@ namespace HybridSim
 		savefile << "flash idle percentage: " << this->divide(flash_idle_counter, currentClockCycle) << "\n";
 		savefile << "dram idle counter: " << dram_idle_counter << "\n";
 		savefile << "dram idle percentage: " << this->divide(dram_idle_counter, currentClockCycle) << "\n";
+		savefile << "MMIO Accesses Dropped: " << num_mmio_dropped << "\n";
+		savefile << "MMIO Accesses Remapped: " << num_mmio_remapped << "\n";
 		savefile << "\n";
 
 		savefile << "reads: " << num_reads << "\n";
