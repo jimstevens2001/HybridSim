@@ -52,3 +52,7 @@ Trace-Based Simulator Usage:
 The trace file format is an ASCII file with each access in the trace as a separate
 line. Each access consists of a cycle number, an operation type (0 for read, 1 for write),
 and an byte address for the memory access (addresses should be aligned to 64 bytes).
+
+Software License:
+This software is open-source and is released under the BSD license. Please
+see the file LICENSE for a copy of the license.

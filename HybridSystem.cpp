@@ -376,6 +376,24 @@ namespace HybridSim {
 
 	bool HybridSystem::addTransaction(Transaction &trans)
 	{
+		const uint64_t HALFGB = 536870912; // 1024^3 / 2
+		const uint64_t THREEPOINTFIVEGB = 3758096384; // 1024^3 * 3.5
+		const uint64_t FOURGB = 4294967296; // 1024^3 * 4
+
+		if (REMAP_MMIO)
+		{
+			if ((trans.address >= THREEPOINTFIVEGB) && (trans.address < FOURGB))
+			{
+				// Do not add this transaction to the queue because it is in the MMIO range.
+				return true;
+			}
+			else if (trans.address >= FOURGB)
+			{
+				// Subtract 0.5 GB from the address to adjust for MMIO.
+				trans.address -= HALFGB;
+			}
+		}
+
 		pending_count += 1;
 
 		trans_queue.push_back(trans);

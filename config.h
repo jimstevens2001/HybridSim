@@ -63,6 +63,14 @@
 #define PREFILL_CACHE 1
 
 
+// In Intel processors, the 3.5-4.0 GB range of addresses is reserved for MMIO. If the
+// input stream is not filtered and remapped, then memory accesses that should not be
+// simulated will come into HybridSim. This option drops all accesses in that range
+// and subtracts 0.5 GB from all addresses above 4.0 GB.
+// With MARSSx86 or traces generated from MARSSx86, this option should be on.
+#define REMAP_MMIO 1
+
+
 // SINGLE_WORD only sends one transaction to the memories per page instead of PAGE_SIZE/BURST_SIZE
 // This is an old feature that may not work.
 #define SINGLE_WORD 0
