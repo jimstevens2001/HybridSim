@@ -384,9 +384,15 @@ namespace HybridSim {
 				// Do not add this transaction to the queue because it is in the MMIO range.
 				// Just issue the callback and return.
 				if (trans.transactionType == DATA_READ)
-					(*ReadDone)(systemID, trans.address, currentClockCycle);
+				{
+					if (ReadDone != NULL)
+						(*ReadDone)(systemID, trans.address, currentClockCycle);
+				}
 				else if (trans.transactionType == DATA_WRITE)
-					(*WriteDone)(systemID, trans.address, currentClockCycle);
+				{
+					if (WriteDone != NULL)
+						(*WriteDone)(systemID, trans.address, currentClockCycle);
+				}
 				else
 					assert(0);
 
