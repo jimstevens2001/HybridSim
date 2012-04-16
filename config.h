@@ -70,6 +70,11 @@
 // With MARSSx86 or traces generated from MARSSx86, this option should be on.
 #define REMAP_MMIO 1
 
+// Constants for REMAP_MMIO
+const uint64_t HALFGB = 536870912; // 1024^3 / 2
+const uint64_t THREEPOINTFIVEGB = 3758096384; // 1024^3 * 3.5
+const uint64_t FOURGB = 4294967296; // 1024^3 * 4
+
 
 // SINGLE_WORD only sends one transaction to the memories per page instead of PAGE_SIZE/BURST_SIZE
 // This is an old feature that may not work.

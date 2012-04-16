@@ -379,10 +379,6 @@ namespace HybridSim {
 
 		if (REMAP_MMIO)
 		{
-			const uint64_t HALFGB = 536870912; // 1024^3 / 2
-			const uint64_t THREEPOINTFIVEGB = 3758096384; // 1024^3 * 3.5
-			const uint64_t FOURGB = 4294967296; // 1024^3 * 4
-
 			if ((trans.address >= THREEPOINTFIVEGB) && (trans.address < FOURGB))
 			{
 				// Do not add this transaction to the queue because it is in the MMIO range.
@@ -1229,8 +1225,18 @@ namespace HybridSim {
 	{
 		if (ReadDone != NULL)
 		{
+			uint64_t callback_addr = orig_addr;
+			if (REMAP_MMIO)
+			{
+				if (orig_addr >= THREEPOINTFIVEGB)
+				{
+					// Give the same address in the callback that we originally received.
+					callback_addr += HALFGB;
+				}
+			}
+
 			// Call the callback.
-			(*ReadDone)(sysID, orig_addr, cycle);
+			(*ReadDone)(sysID, callback_addr, cycle);
 		}
 
 		// Finish the logging for this access.
@@ -1243,8 +1249,18 @@ namespace HybridSim {
 	{
 		if (WriteDone != NULL)
 		{
+			uint64_t callback_addr = orig_addr;
+			if (REMAP_MMIO)
+			{
+				if (orig_addr >= THREEPOINTFIVEGB)
+				{
+					// Give the same address in the callback that we originally received.
+					callback_addr += HALFGB;
+				}
+			}
+
 			// Call the callback.
-			(*WriteDone)(sysID, orig_addr, cycle);
+			(*WriteDone)(sysID, callback_addr, cycle);
 		}
 
 		// Finish the logging for this access.
