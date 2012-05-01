@@ -43,7 +43,7 @@ namespace HybridSim {
 
 		systemID = id;
 		cout << "Creating DRAM" << endl;
-		dram = DRAMSim::getMemorySystemInstance(0, dram_ini, sys_ini, "../HybridSim", "resultsfilename", (CACHE_PAGES * PAGE_SIZE) >> 20);
+		dram = DRAMSim::getMemorySystemInstance(dram_ini, sys_ini, "../HybridSim", "resultsfilename", (CACHE_PAGES * PAGE_SIZE) >> 20);
 		cout << "Creating Flash" << endl;
 
 		flash = NVDSim::getNVDIMMInstance(1,flash_ini,"ini/def_system.ini","../HybridSim","");

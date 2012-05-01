@@ -127,7 +127,7 @@ namespace HybridSim
 		TransactionCompleteCB *WriteDone;
 		uint systemID;
 
-		DRAMSim::MemorySystem *dram;
+		DRAMSim::MultiChannelMemorySystem *dram;
 
 		NVDSim::NVDIMM *flash;
 
