@@ -101,7 +101,7 @@ void HybridSimTBS::write_complete(uint id, uint64_t address, uint64_t clock_cycl
 
 int HybridSimTBS::run_trace(string tracefile)
 {
-	HybridSystem *mem = new HybridSystem(1);
+	HybridSystem *mem = new HybridSystem(1, "");
 
 
 	/* create and register our callback functions */

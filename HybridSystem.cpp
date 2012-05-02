@@ -34,10 +34,14 @@ using namespace std;
 
 namespace HybridSim {
 
-	HybridSystem::HybridSystem(uint id)
+	HybridSystem::HybridSystem(uint id, string ini)
 	{
+		if (ini == "")
+			hybridsim_ini = "../HybridSim/ini/hybridsim.ini";
+		else
+			hybridsim_ini = ini;
 
-		iniReader.read("../HybridSim/ini/hybridsim.ini");
+		iniReader.read(hybridsim_ini);
 		if (ENABLE_LOGGER)
 			log.init();
 
@@ -202,9 +206,9 @@ namespace HybridSim {
 	}
 
 	// static allocator for the library interface
-	HybridSystem *getMemorySystemInstance(uint id)
+	HybridSystem *getMemorySystemInstance(uint id, string ini)
 	{
-		return new HybridSystem(id);
+		return new HybridSystem(id, ini);
 	}
 
 

@@ -33,6 +33,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <string>
 
 #include "config.h"
 #include "util.h"
@@ -40,12 +41,14 @@
 #include "Logger.h"
 #include "IniReader.h"
 
+using std::string;
+
 namespace HybridSim
 {
 	class HybridSystem: public SimulatorObject
 	{
 		public:
-		HybridSystem(uint id);
+		HybridSystem(uint id, string ini);
 		~HybridSystem();
 		void update();
 		bool addTransaction(bool isWrite, uint64_t addr);
@@ -121,6 +124,7 @@ namespace HybridSim
 		void issue_sequential_prefetches(uint64_t page_addr);
 
 		// State
+		string hybridsim_ini;
 		IniReader iniReader;
 
 		TransactionCompleteCB *ReadDone;
@@ -177,7 +181,7 @@ namespace HybridSim
 
 	};
 
-	HybridSystem *getMemorySystemInstance(uint id);
+	HybridSystem *getMemorySystemInstance(uint id, string ini);
 
 }
 

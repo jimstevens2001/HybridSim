@@ -37,17 +37,19 @@
  */
 
 #include <stdint.h>
-//#include <string>
+#include <string>
 //#include <iostream>
 //#include <fstream>
 #include "CallbackHybrid.h"
+
+using std::string;
 
 namespace HybridSim 
 {
 	class HybridSystem
 	{
 		public:
-			HybridSystem(uint id);
+			HybridSystem(uint id, string ini);
 			bool addTransaction(bool isWrite, uint64_t addr);
 			bool WillAcceptTransaction();
 			void update();
@@ -61,7 +63,7 @@ namespace HybridSim
 			void reportPower();
 		void printLogfile();
 	};
-	HybridSystem *getMemorySystemInstance(uint id);
+	HybridSystem *getMemorySystemInstance(uint id, string ini);
 
 }
 
