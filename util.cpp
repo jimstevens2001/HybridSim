@@ -37,7 +37,7 @@ void convert_uint64_t(uint64_t &var, string value, string infostring)
 	{
 		if(!isdigit(value[i]))
 		{
-			cout << "ERROR: Non-digit character found: " << infostring << " : " << value << "\n";
+			cerr << "ERROR: Non-digit character found: " << infostring << " : " << value << "\n";
 			abort();
 		}
 	}
@@ -115,7 +115,7 @@ void confirm_directory_exists(string path)
 	int sys_done = system(command);
 	if (sys_done != 0)
 	{
-		cout << "system command to confirm directory "+path+" exists has failed.";
+		cerr << "system command to confirm directory "+path+" exists has failed.";
 		abort();
 	}
 }

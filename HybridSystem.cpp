@@ -46,12 +46,12 @@ namespace HybridSim {
 			log.init();
 
 		systemID = id;
-		cout << "Creating DRAM" << endl;
+		cerr << "Creating DRAM" << endl;
 		dram = DRAMSim::getMemorySystemInstance(dram_ini, sys_ini, "../HybridSim", "resultsfilename", (CACHE_PAGES * PAGE_SIZE) >> 20);
-		cout << "Creating Flash" << endl;
+		cerr << "Creating Flash" << endl;
 
 		flash = NVDSim::getNVDIMMInstance(1,flash_ini,"ini/def_system.ini","../HybridSim","");
-		cout << "Done with creating memories" << endl;
+		cerr << "Done with creating memories" << endl;
 
 		// Set up the callbacks for DRAM.
 		typedef DRAMSim::Callback <HybridSystem, void, uint, uint64_t, uint64_t> dramsim_callback_t;
@@ -89,7 +89,7 @@ namespace HybridSim {
 			prefetch_file.open(PREFETCH_FILE, ifstream::in);
 			if (!prefetch_file.is_open())
 			{
-				cout << "ERROR: Failed to load prefetch file: " << PREFETCH_FILE << "\n";
+				cerr << "ERROR: Failed to load prefetch file: " << PREFETCH_FILE << "\n";
 				abort();
 			}
 
@@ -101,7 +101,7 @@ namespace HybridSim {
 			prefetch_file >> parse_string;
 			if (parse_string != "NUM_SETS")
 			{
-				cout << "ERROR: Invalid prefetch file format. NUM_SETS does not appear at beginning.\n";
+				cerr << "ERROR: Invalid prefetch file format. NUM_SETS does not appear at beginning.\n";
 				abort();
 			}
 			
@@ -112,14 +112,14 @@ namespace HybridSim {
 				prefetch_file >> parse_string;
 				if (parse_string != "SET")
 				{
-					cout << "ERROR: Invalid prefetch file format. SET does not appear at beginning of set " << cur_set << ".\n";
+					cerr << "ERROR: Invalid prefetch file format. SET does not appear at beginning of set " << cur_set << ".\n";
 					abort();
 				}
 
 				prefetch_file >> tmp_num;
 				if (tmp_num != cur_set)
 				{
-					cout << "ERROR: Invalid prefetch file format. Sets not given in order. (" << cur_set << ")\n";
+					cerr << "ERROR: Invalid prefetch file format. Sets not given in order. (" << cur_set << ")\n";
 					abort();
 				}
 				
@@ -167,7 +167,7 @@ namespace HybridSim {
 			debug_victim.open("debug_victim.log", ios_base::out | ios_base::trunc);
 			if (!debug_victim.is_open())
 			{
-				cout << "ERROR: HybridSim debug_victim file failed to open.\n";
+				cerr << "ERROR: HybridSim debug_victim file failed to open.\n";
 				abort();
 			}
 		}
@@ -177,7 +177,7 @@ namespace HybridSim {
 			debug_nvdimm_trace.open("nvdimm_trace.log", ios_base::out | ios_base::trunc);
 			if (!debug_nvdimm_trace.is_open())
 			{
-				cout << "ERROR: HybridSim debug_nvdimm_trace file failed to open.\n";
+				cerr << "ERROR: HybridSim debug_nvdimm_trace file failed to open.\n";
 				abort();
 			}
 		}
@@ -187,7 +187,7 @@ namespace HybridSim {
 			debug_full_trace.open("full_trace.log", ios_base::out | ios_base::trunc);
 			if (!debug_full_trace.is_open())
 			{
-				cout << "ERROR: HybridSim debug_full_trace file failed to open.\n";
+				cerr << "ERROR: HybridSim debug_full_trace file failed to open.\n";
 				abort();
 			}
 		}
@@ -485,13 +485,13 @@ namespace HybridSim {
 
 
 		if (DEBUG_CACHE)
-			cout << "\n" << currentClockCycle << ": " << "Starting transaction for address " << addr << endl;
+			cerr << "\n" << currentClockCycle << ": " << "Starting transaction for address " << addr << endl;
 
 
 		if (addr >= (TOTAL_PAGES * PAGE_SIZE))
 		{
 			// Note: This should be technically impossible due to the modulo in ALIGN. But this is just a sanity check.
-			cout << "ERROR: Address out of bounds - orig:" << trans.address << " aligned:" << addr << "\n";
+			cerr << "ERROR: Address out of bounds - orig:" << trans.address << " aligned:" << addr << "\n";
 			abort();
 		}
 
@@ -528,7 +528,7 @@ namespace HybridSim {
 
 				if (DEBUG_CACHE)
 				{
-					cout << currentClockCycle << ": " << "HIT: " << cur_address << " " << " " << cur_line.str() << 
+					cerr << currentClockCycle << ": " << "HIT: " << cur_address << " " << " " << cur_line.str() << 
 						" (set: " << set_index << ")" << endl;
 				}
 
@@ -695,10 +695,10 @@ namespace HybridSim {
 
 			if (DEBUG_CACHE)
 			{
-				cout << currentClockCycle << ": " << "MISS: victim is cache_address " << cache_address <<
+				cerr << currentClockCycle << ": " << "MISS: victim is cache_address " << cache_address <<
 						" (set: " << set_index << ")" << endl;
-				cout << cur_line.str() << endl;
-				cout << currentClockCycle << ": " << "The victim is dirty? " << cur_line.dirty << endl;
+				cerr << cur_line.str() << endl;
+				cerr << currentClockCycle << ": " << "The victim is dirty? " << cur_line.dirty << endl;
 			}
 
 			Pending p;
@@ -725,7 +725,7 @@ namespace HybridSim {
 	void HybridSystem::VictimRead(Pending p)
 	{
 		if (DEBUG_CACHE)
-			cout << currentClockCycle << ": " << "Performing VICTIM_READ for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
+			cerr << currentClockCycle << ": " << "Performing VICTIM_READ for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
 
 		// flash_addr is the original Flash address requested from the top level Transaction.
 		// victim is the base address of the DRAM page to read.
@@ -761,7 +761,7 @@ namespace HybridSim {
 	{
 		if (DEBUG_CACHE)
 		{
-			cout << currentClockCycle << ": " << "VICTIM_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ") offset="
+			cerr << currentClockCycle << ": " << "VICTIM_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ") offset="
 				<< PAGE_OFFSET(addr) << " num_left=" << p.wait->size() << "\n";
 		}
 
@@ -789,8 +789,8 @@ namespace HybridSim {
 
 		if (DEBUG_CACHE)
 		{
-			cout << "The victim read to DRAM line " << PAGE_ADDRESS(addr) << " has completed.\n";
-			cout << "pending_pages[" << PAGE_ADDRESS(p.flash_addr) << "] = " << pending_pages[PAGE_ADDRESS(p.flash_addr)] << "\n";
+			cerr << "The victim read to DRAM line " << PAGE_ADDRESS(addr) << " has completed.\n";
+			cerr << "pending_pages[" << PAGE_ADDRESS(p.flash_addr) << "] = " << pending_pages[PAGE_ADDRESS(p.flash_addr)] << "\n";
 		}
 
 		// contention_unlock will only unlock if the pending_page counter is 0.
@@ -806,7 +806,7 @@ namespace HybridSim {
 	void HybridSystem::VictimWrite(Pending p)
 	{
 		if (DEBUG_CACHE)
-			cout << currentClockCycle << ": " << "Performing VICTIM_WRITE for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
+			cerr << currentClockCycle << ": " << "Performing VICTIM_WRITE for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
 
 		// Compute victim flash address.
 		// This is where the victim line is stored in the Flash address space.
@@ -832,8 +832,8 @@ namespace HybridSim {
 	{
 		if (DEBUG_CACHE)
 		{
-			cout << currentClockCycle << ": " << "Performing LINE_READ for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
-			cout << "the page address was " << PAGE_ADDRESS(p.flash_addr) << endl;
+			cerr << currentClockCycle << ": " << "Performing LINE_READ for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
+			cerr << "the page address was " << PAGE_ADDRESS(p.flash_addr) << endl;
 		}
 
 		uint64_t page_addr = PAGE_ADDRESS(p.flash_addr);
@@ -871,7 +871,7 @@ namespace HybridSim {
 
 		if (DEBUG_CACHE)
 		{
-			cout << currentClockCycle << ": " << "LINE_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ") offset="
+			cerr << currentClockCycle << ": " << "LINE_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ") offset="
 				<< PAGE_OFFSET(addr) << " num_left=" << p.wait->size() << "\n";
 		}
 
@@ -898,7 +898,7 @@ namespace HybridSim {
 
 		if (DEBUG_CACHE)
 		{
-			cout << "The line read to Flash line " << PAGE_ADDRESS(addr) << " has completed.\n";
+			cerr << "The line read to Flash line " << PAGE_ADDRESS(addr) << " has completed.\n";
 		}
 
 
@@ -940,7 +940,7 @@ namespace HybridSim {
 		// After a LineRead from flash completes, the LineWrite stores the read line into the DRAM.
 
 		if (DEBUG_CACHE)
-			cout << currentClockCycle << ": " << "Performing LINE_WRITE for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
+			cerr << currentClockCycle << ": " << "Performing LINE_WRITE for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
 
 #if SINGLE_WORD
 		// Schedule a write to DRAM to simulate the write of the line that was read from Flash.
@@ -962,7 +962,7 @@ namespace HybridSim {
 	void HybridSystem::CacheRead(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr)
 	{
 		if (DEBUG_CACHE)
-			cout << currentClockCycle << ": " << "Performing CACHE_READ for (" << flash_addr << ", " << cache_addr << ")\n";
+			cerr << currentClockCycle << ": " << "Performing CACHE_READ for (" << flash_addr << ", " << cache_addr << ")\n";
 
 		// Compute the actual DRAM address of the data word we care about.
 		uint64_t data_addr = cache_addr + PAGE_OFFSET(flash_addr);
@@ -1000,7 +1000,7 @@ namespace HybridSim {
 	void HybridSystem::CacheReadFinish(uint64_t addr, Pending p)
 	{
 		if (DEBUG_CACHE)
-			cout << currentClockCycle << ": " << "CACHE_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
+			cerr << currentClockCycle << ": " << "CACHE_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ")\n";
 
 		// Read operation has completed, call the top level callback.
 		// Only do this if it hasn't been sent already by the critical cache line first callback.
@@ -1018,7 +1018,7 @@ namespace HybridSim {
 	void HybridSystem::CacheWrite(uint64_t orig_addr, uint64_t flash_addr, uint64_t cache_addr)
 	{
 		if (DEBUG_CACHE)
-			cout << currentClockCycle << ": " << "Performing CACHE_WRITE for (" << flash_addr << ", " << cache_addr << ")\n";
+			cerr << currentClockCycle << ": " << "Performing CACHE_WRITE for (" << flash_addr << ", " << cache_addr << ")\n";
 
 		// Compute the actual DRAM address of the data word we care about.
 		uint64_t data_addr = cache_addr + PAGE_OFFSET(flash_addr);
@@ -1053,7 +1053,7 @@ namespace HybridSim {
 		cache[p.cache_addr] = cur_line;
 
 		if (DEBUG_CACHE)
-			cout << cur_line.str() << endl;
+			cerr << cur_line.str() << endl;
 
 		// Call the top level callback.
 		// This is done immediately rather than waiting for callback.
@@ -1162,8 +1162,8 @@ namespace HybridSim {
 		else
 		{
 			ERROR("FlashReadCallback received an address not in the pending set.");
-			cout << "flash_pending count was " << flash_pending.count(PAGE_ADDRESS(addr)) << "\n";
-			cout << "address: " << addr << " page: " << PAGE_ADDRESS(addr) << " set: " << SET_INDEX(addr) << "\n";
+			cerr << "flash_pending count was " << flash_pending.count(PAGE_ADDRESS(addr)) << "\n";
+			cerr << "address: " << addr << " page: " << PAGE_ADDRESS(addr) << " set: " << SET_INDEX(addr) << "\n";
 			abort();
 		}
 	}
@@ -1174,7 +1174,7 @@ namespace HybridSim {
 		// This allows HybridSim to tell the external user it can make progress as soon as the data
 		// it is waiting for is back in the memory controller.
 
-		//cout << cycle << ": Critical Line Callback Received for address " << addr << "\n";
+		//cerr << cycle << ": Critical Line Callback Received for address " << addr << "\n";
 
 		if (flash_pending.count(PAGE_ADDRESS(addr)) != 0)
 		{
@@ -1226,7 +1226,7 @@ namespace HybridSim {
 		// Nothing to do (it doesn't matter when the flash write finishes for the cache controller, as long as it happens).
 
 		if (DEBUG_CACHE)
-			cout << "The write to Flash line " << PAGE_ADDRESS(addr) << " has completed.\n";
+			cerr << "The write to Flash line " << PAGE_ADDRESS(addr) << " has completed.\n";
 	}
 
 
@@ -1344,14 +1344,14 @@ namespace HybridSim {
 
 		if (ENABLE_RESTORE)
 		{
-			cout << "PERFORMING RESTORE OF CACHE TABLE!!!\n";
+			cerr << "PERFORMING RESTORE OF CACHE TABLE!!!\n";
 
 			ifstream inFile;
 			confirm_directory_exists("../HybridSim/state"); // Assumes using state directory, otherwise the user is on their own.
 			inFile.open("../HybridSim/"+HYBRIDSIM_RESTORE_FILE);
 			if (!inFile.is_open())
 			{
-				cout << "ERROR: Failed to load HybridSim's state restore file: " << HYBRIDSIM_RESTORE_FILE << "\n";
+				cerr << "ERROR: Failed to load HybridSim's state restore file: " << HYBRIDSIM_RESTORE_FILE << "\n";
 				abort();
 			}
 
@@ -1361,25 +1361,25 @@ namespace HybridSim {
 			inFile >> tmp;
 			if (tmp != PAGE_SIZE)
 			{
-				cout << "ERROR: Attempted to restore state and PAGE_SIZE does not match in restore file and ini file."  << "\n";
+				cerr << "ERROR: Attempted to restore state and PAGE_SIZE does not match in restore file and ini file."  << "\n";
 				abort();
 			}
 			inFile >> tmp;
 			if (tmp != SET_SIZE)
 			{
-				cout << "ERROR: Attempted to restore state and SET_SIZE does not match in restore file and ini file."  << "\n";
+				cerr << "ERROR: Attempted to restore state and SET_SIZE does not match in restore file and ini file."  << "\n";
 				abort();
 			}
 			inFile >> tmp;
 			if (tmp != CACHE_PAGES)
 			{
-				cout << "ERROR: Attempted to restore state and CACHE_PAGES does not match in restore file and ini file."  << "\n";
+				cerr << "ERROR: Attempted to restore state and CACHE_PAGES does not match in restore file and ini file."  << "\n";
 				abort();
 			}
 			inFile >> tmp;
 			if (tmp != TOTAL_PAGES)
 			{
-				cout << "ERROR: Attempted to restore state and TOTAL_PAGES does not match in restore file and ini file."  << "\n";
+				cerr << "ERROR: Attempted to restore state and TOTAL_PAGES does not match in restore file and ini file."  << "\n";
 				abort();
 			}
 				
@@ -1422,10 +1422,10 @@ namespace HybridSim {
 			savefile.open(HYBRIDSIM_SAVE_FILE, ios_base::out | ios_base::trunc);
 			if (!savefile.is_open())
 			{
-				cout << "ERROR: Failed to load HybridSim's state save file: " << HYBRIDSIM_SAVE_FILE << "\n";
+				cerr << "ERROR: Failed to load HybridSim's state save file: " << HYBRIDSIM_SAVE_FILE << "\n";
 				abort();
 			}
-			cout << "PERFORMING SAVE OF CACHE TABLE!!!\n";
+			cerr << "PERFORMING SAVE OF CACHE TABLE!!!\n";
 
 			savefile << PAGE_SIZE << " " << SET_SIZE << " " << CACHE_PAGES << " " << TOTAL_PAGES << "\n";
 
@@ -1460,7 +1460,7 @@ namespace HybridSim {
 
 		if (valid_pages.size() == 0)
 		{
-			cout << "valid pages list is empty.\n";
+			cerr << "valid pages list is empty.\n";
 			abort();
 		}
 
@@ -1485,7 +1485,7 @@ namespace HybridSim {
 		// Check assertion.
 		if (!is_hit(ret_addr))
 		{
-			cout << "get_hit generated a non-hit!!\n";
+			cerr << "get_hit generated a non-hit!!\n";
 			abort();
 		}
 
@@ -1499,7 +1499,7 @@ namespace HybridSim {
 
 		if (addr >= (TOTAL_PAGES * PAGE_SIZE))
 		{
-			cout << "ERROR: Address out of bounds" << endl;
+			cerr << "ERROR: Address out of bounds" << endl;
 			abort();
 		}
 
@@ -1507,15 +1507,15 @@ namespace HybridSim {
 		uint64_t set_index = SET_INDEX(addr);
 		uint64_t tag = TAG(addr);
 
-		//cout << "set address list: ";
+		//cerr << "set address list: ";
 		list<uint64_t> set_address_list;
 		for (uint64_t i=0; i<SET_SIZE; i++)
 		{
 			uint64_t next_address = (i * NUM_SETS + set_index) * PAGE_SIZE;
 			set_address_list.push_back(next_address);
-			//cout << next_address << " ";
+			//cerr << next_address << " ";
 		}
-		//cout << "\n";
+		//cerr << "\n";
 
 		bool hit = false;
 		uint64_t cache_address;
@@ -1534,7 +1534,7 @@ namespace HybridSim {
 
 			if (cur_line.valid && (cur_line.tag == tag))
 			{
-				//		cout << "HIT!!!\n";
+				//		cerr << "HIT!!!\n";
 				hit = true;
 				cache_address = cur_address;
 				break;
@@ -1563,8 +1563,8 @@ namespace HybridSim {
 			int num = pending_pages.erase(PAGE_ADDRESS(flash_addr));
 			if (num != 1)
 			{
-				cout << "pending_pages.erase() was called after " << operation << " and num was 0.\n";
-				cout << "orig:" << orig_addr << " aligned:" << flash_addr << "\n\n";
+				cerr << "pending_pages.erase() was called after " << operation << " and num was 0.\n";
+				cerr << "orig:" << orig_addr << " aligned:" << flash_addr << "\n\n";
 				abort();
 			}
 
@@ -1671,7 +1671,7 @@ namespace HybridSim {
 
 			// Add the prefetch.
 			addPrefetch(prefetch_address);
-			//cout << currentClockCycle << ": Prefetcher adding " << prefetch_address << " to transaction queue.\n";
+			//cerr << currentClockCycle << ": Prefetcher adding " << prefetch_address << " to transaction queue.\n";
 		}
 	}
 

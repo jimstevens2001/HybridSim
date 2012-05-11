@@ -87,7 +87,7 @@ string NVDIMM_SAVE_FILE = "none";
 		inFile.open(inifile);
 		if (!inFile.is_open())
 		{
-			cout << "ERROR: Failed to load HybridSim's Ini file: " << inifile << "\n";
+			cerr << "ERROR: Failed to load HybridSim's Ini file: " << inifile << "\n";
 			abort();
 		}
 
@@ -119,8 +119,8 @@ string NVDIMM_SAVE_FILE = "none";
 
 			if (split_line.size() != 2)
 			{
-				cout << "ERROR: Parsing ini failed on line: " << (*it) << "\n";
-				cout << "There should be exactly one '=' per line\n";
+				cerr << "ERROR: Parsing ini failed on line: " << (*it) << "\n";
+				cerr << "There should be exactly one '=' per line\n";
 				abort();
 			}
 
@@ -172,8 +172,8 @@ string NVDIMM_SAVE_FILE = "none";
 				NVDIMM_SAVE_FILE = value;
 			else
 			{
-				cout << "ERROR: Illegal key/value pair in HybridSim ini file: " << key << "=" << value << "\n";
-				cout << "This could either be due to an illegal key or the incorrect value type for a key\n";
+				cerr << "ERROR: Illegal key/value pair in HybridSim ini file: " << key << "=" << value << "\n";
+				cerr << "This could either be due to an illegal key or the incorrect value type for a key\n";
 				abort();
 			}
 		}

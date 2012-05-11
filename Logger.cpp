@@ -104,7 +104,7 @@ namespace HybridSim
 			debug.open("debug.log", ios_base::out | ios_base::trunc);
 			if (!debug.is_open())
 			{
-				cout << "ERROR: HybridSim Logger debug file failed to open.\n";
+				cerr << "ERROR: HybridSim Logger debug file failed to open.\n";
 				abort();
 			}
 		}
@@ -249,7 +249,7 @@ namespace HybridSim
 			cur_max_queue_length = queue_length;
 		cur_sum_queue_length += queue_length;
 
-		//cout << "access_queue length = " << access_queue.size() << "; queue_length = " << queue_length << ";\n";
+		//cerr << "access_queue length = " << access_queue.size() << "; queue_length = " << queue_length << ";\n";
 
 		// Update idle counters.
 		if (idle)
@@ -547,7 +547,7 @@ namespace HybridSim
 			savefile.open("hybridsim_epoch.log", ios_base::out | ios_base::trunc);
 			if (!savefile.is_open())
 			{
-				cout << "ERROR: HybridSim Logger epoch output file failed to open.\n";
+				cerr << "ERROR: HybridSim Logger epoch output file failed to open.\n";
 				abort();
 			}
 
@@ -564,7 +564,7 @@ namespace HybridSim
 			savefile.open("hybridsim_epoch.log", ios_base::out | ios_base::app);
 			if (!savefile.is_open())
 			{
-				cout << "ERROR: HybridSim Logger epoch output file failed to open.\n";
+				cerr << "ERROR: HybridSim Logger epoch output file failed to open.\n";
 				abort();
 			}
 
@@ -708,7 +708,7 @@ namespace HybridSim
 		savefile.open("hybridsim.log", ios_base::out | ios_base::trunc);
 		if (!savefile.is_open())
 		{
-			cout << "ERROR: HybridSim Logger output file failed to open.\n";
+			cerr << "ERROR: HybridSim Logger output file failed to open.\n";
 			abort();
 		}
 
