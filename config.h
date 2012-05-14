@@ -59,8 +59,12 @@
 // Map the first CACHE_PAGES of the NVDIMM address space.
 // This is the initial state of the hybrid memory on boot.
 // This will be overridden if ENABLE_RESTORE is on in the ini file, so leaving this
-// on all of the time is harmless.
+// on all of the time is harmless. Valid options are 0 or 1.
 #define PREFILL_CACHE 1
+
+// If PREFILL_CACHE is on, specify whether the initialized pages should be
+// clean or dirty. Valid options are 0 or 1.
+#define PREFILL_CACHE_DIRTY 1
 
 
 // In Intel processors, the 3.5-4.0 GB range of addresses is reserved for MMIO. If the

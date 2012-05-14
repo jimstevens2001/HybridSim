@@ -1331,7 +1331,7 @@ namespace HybridSim {
 				cache_line line;
 
 				line.valid = true;
-				line.dirty = false;
+				line.dirty = PREFILL_CACHE_DIRTY;
 				line.locked = false;
 				line.tag = TAG(cache_addr);
 				line.data = 0;
