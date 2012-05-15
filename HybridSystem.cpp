@@ -45,6 +45,9 @@ namespace HybridSim {
 		if (ENABLE_LOGGER)
 			log.init();
 
+		// Make sure that there are more cache pages than pages per set. 
+		assert(CACHE_PAGES >= SET_SIZE);
+
 		systemID = id;
 		cerr << "Creating DRAM" << endl;
 		uint64_t dram_size = (CACHE_PAGES * PAGE_SIZE) >> 20;
