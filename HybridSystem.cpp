@@ -47,9 +47,12 @@ namespace HybridSim {
 
 		systemID = id;
 		cerr << "Creating DRAM" << endl;
-		dram = DRAMSim::getMemorySystemInstance(dram_ini, sys_ini, "../HybridSim", "resultsfilename", (CACHE_PAGES * PAGE_SIZE) >> 20);
-		cerr << "Creating Flash" << endl;
+		uint64_t dram_size = (CACHE_PAGES * PAGE_SIZE) >> 20;
+		dram_size = (dram_size == 0) ? 1 : dram_size; // DRAMSim requires a minimum of 1 MB, even if HybridSim isn't going to use it.
+		dram_size = (OVERRIDE_DRAM_SIZE == 0) ? dram_size : OVERRIDE_DRAM_SIZE; // If OVERRIDE_DRAM_SIZE is non-zero, then use it.
+		dram = DRAMSim::getMemorySystemInstance(dram_ini, sys_ini, "../HybridSim", "resultsfilename", dram_size);
 
+		cerr << "Creating Flash" << endl;
 		flash = NVDSim::getNVDIMMInstance(1,flash_ini,"ini/def_system.ini","../HybridSim","");
 		cerr << "Done with creating memories" << endl;
 
