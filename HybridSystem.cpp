@@ -1353,8 +1353,8 @@ namespace HybridSim {
 			cerr << "PERFORMING RESTORE OF CACHE TABLE!!!\n";
 
 			ifstream inFile;
-			confirm_directory_exists("../HybridSim/state"); // Assumes using state directory, otherwise the user is on their own.
-			inFile.open("../HybridSim/"+HYBRIDSIM_RESTORE_FILE);
+			confirm_directory_exists("state"); // Assumes using state directory, otherwise the user is on their own.
+			inFile.open(HYBRIDSIM_RESTORE_FILE);
 			if (!inFile.is_open())
 			{
 				cerr << "ERROR: Failed to load HybridSim's state restore file: " << HYBRIDSIM_RESTORE_FILE << "\n";
