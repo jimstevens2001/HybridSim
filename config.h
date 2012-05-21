@@ -64,7 +64,7 @@
 
 // If PREFILL_CACHE is on, specify whether the initialized pages should be
 // clean or dirty. Valid options are 0 or 1.
-#define PREFILL_CACHE_DIRTY 1
+#define PREFILL_CACHE_DIRTY 0
 
 
 // In Intel processors, the 3.5-4.0 GB range of addresses is reserved for MMIO. If the
