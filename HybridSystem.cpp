@@ -643,9 +643,8 @@ namespace HybridSim {
 			}
 			else if(trans.transactionType == SYNC)
 			{
-				// TODO: Implement this for real.
-				contention_unlock(addr, addr, "SYNC (hit)", false, 0, true, cache_address);
-
+				sync(addr, cache_address, trans);
+				//contention_unlock(addr, addr, "SYNC (hit)", false, 0, true, cache_address);
 			}
 			else
 			{
@@ -1736,6 +1735,36 @@ namespace HybridSim {
 			addPrefetch(prefetch_address);
 			//cerr << currentClockCycle << ": Prefetcher adding " << prefetch_address << " to transaction queue.\n";
 		}
+	}
+
+
+	void HybridSystem::sync(uint64_t addr, uint64_t cache_address, Transaction trans)
+	{
+		// TODO: Abtract this code into a common function with the miss path (if possible).
+
+		cache_line cur_line = cache[cache_address];
+
+		uint64_t victim_flash_addr = FLASH_ADDRESS(cur_line.tag, SET_INDEX(cache_address));
+
+		// The address in the cache line should be the SAME as the address we are syncing on.
+		assert(victim_flash_addr == addr);
+
+		// Lock the cache line so no one else tries to use it while this miss is being serviced.
+		contention_cache_line_lock(cache_address);
+	
+		Pending p;
+		p.orig_addr = trans.address;
+		p.flash_addr = addr;
+		p.cache_addr = cache_address;
+		p.victim_tag = cur_line.tag;
+		p.victim_valid = false; // MUST SET THIS TO FALSE SINCE SYNC PAGE AND VICTIM PAGE MATCH.
+		p.callback_sent = false;
+		p.type = trans.transactionType;
+
+		// The line MUST be dirty for a sync operation to be valid.
+		assert(cur_line.dirty);
+
+		VictimRead(p);
 	}
 
 
