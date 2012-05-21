@@ -56,6 +56,7 @@ namespace HybridSim
 			void RegisterCallbacks(
 					TransactionCompleteCB *readDone,
 					TransactionCompleteCB *writeDone);
+			void syncAll();
 			void reportPower();
 			void printLogfile();
 	};

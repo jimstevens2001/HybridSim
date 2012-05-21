@@ -490,6 +490,35 @@ namespace HybridSim {
 		uint64_t addr = ALIGN(trans.address);
 
 
+		if (trans.transactionType == SYNC_ALL_COUNTER)
+		{
+			//cout << "Processing SYNC_ALL_COUNTER " << addr << "\n";
+			// Look up cache line.
+			cache_line cur_line = cache[addr];
+
+			if (cur_line.valid && cur_line.dirty)
+			{
+				// Compute flash address.
+				uint64_t flash_addr = FLASH_ADDRESS(cur_line.tag, SET_INDEX(addr));
+
+				// Issue sync command for flash address.
+			}
+
+			uint64_t next_addr = addr + PAGE_SIZE;
+			//cout << "next_addr = " << next_addr << endl;
+			if (next_addr < (CACHE_PAGES * PAGE_SIZE))
+			{
+				// Issue SYNC_ALL_COUNTER transaction to next_addr.
+				// This is what iterates through all lines.
+				addSyncCounter(next_addr, false);
+			}
+
+			// Unlock the page and return.
+			contention_unlock(addr, trans.address, "SYNC_ALL_COUNTER", false, 0, false, 0);
+			return;
+		}
+
+
 		if (DEBUG_CACHE)
 			cerr << "\n" << currentClockCycle << ": " << "Starting transaction for address " << addr << endl;
 
@@ -601,6 +630,16 @@ namespace HybridSim {
 
 				return; 
 			}
+			else if(trans.transactionType == SYNC)
+			{
+				// TODO: Implement this for real.
+				contention_unlock(addr, addr, "SYNC (hit)", false, 0, true, cache_address);
+
+			}
+			else
+			{
+				assert(0);
+			}
 		}
 
 		if (!hit)
@@ -616,6 +655,8 @@ namespace HybridSim {
 
 				return;
 			}
+
+			assert(trans.transactionType != SYNC);
 
 			if ((ENABLE_SEQUENTIAL_PREFETCHING) && (trans.transactionType != PREFETCH))
 			{
@@ -1684,6 +1725,35 @@ namespace HybridSim {
 			addPrefetch(prefetch_address);
 			//cerr << currentClockCycle << ": Prefetcher adding " << prefetch_address << " to transaction queue.\n";
 		}
+	}
+
+	void HybridSystem::addSyncCounter(uint64_t addr, bool initial)
+	{
+		// Create flush transaction.
+		Transaction t = Transaction(SYNC_ALL_COUNTER, addr, NULL);
+
+		if (initial)
+		{
+			// The initial SYNC_ALL_COUNTER operation must wait to get to the front of the queue.
+			trans_queue.push_back(t);
+		}
+		else
+		{
+			// Push the operation onto the front of the transaction queue so it stays at the front.
+			trans_queue.push_front(t);
+		}
+
+		trans_queue_size += 1;
+
+		pending_count += 1;
+
+		// Restart queue checking.
+		this->check_queue = true;
+	}
+
+	void HybridSystem::syncAll()
+	{
+		addSyncCounter(0, true);
 	}
 
 } // Namespace HybridSim

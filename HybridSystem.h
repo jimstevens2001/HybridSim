@@ -59,6 +59,7 @@ namespace HybridSim
 		void RegisterCallbacks(
 				TransactionCompleteCB *readDone,
 				TransactionCompleteCB *writeDone);
+		void syncAll();
 		void DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle);
 		void DRAMWriteCallback(uint id, uint64_t addr, uint64_t cycle);
 		void DRAMPowerCallback(double a, double b, double c, double d);
@@ -122,6 +123,10 @@ namespace HybridSim
 
 		// Prefetch Functions
 		void issue_sequential_prefetches(uint64_t page_addr);
+
+		// Sync functions
+		void addSyncCounter(uint64_t addr);
+		
 
 		// State
 		string hybridsim_ini;
