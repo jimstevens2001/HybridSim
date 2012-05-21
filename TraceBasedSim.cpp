@@ -198,7 +198,7 @@ int HybridSimTBS::run_trace(string tracefile)
 	inFile.close();
 
 
-	mem->syncAll();
+	//mem->syncAll();
 
 
 	// Run update until all transactions come back.

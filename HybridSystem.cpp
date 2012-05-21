@@ -1765,6 +1765,10 @@ namespace HybridSim {
 		assert(cur_line.dirty);
 
 		VictimRead(p);
+
+		// Mark the line clean (since this is the whole point of SYNC).
+		cur_line.dirty = false;
+		cache[cache_address] = cur_line;
 	}
 
 
