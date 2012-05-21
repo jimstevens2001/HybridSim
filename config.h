@@ -92,7 +92,7 @@ const uint64_t FOURGB = 4294967296; // 1024^3 * 4
 
 // RESTORE_CLEAN is used to simulate a checkpoint of the memory system upon restoring the state.
 // Essentially, all pages in the DRAM cache are reverted to clean.
-#define RESTORE_CLEAN 1
+#define RESTORE_CLEAN 0
 
 
 // C standard library and C++ STL includes.
