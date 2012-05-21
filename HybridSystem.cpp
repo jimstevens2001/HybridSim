@@ -493,7 +493,24 @@ namespace HybridSim {
 		if (trans.transactionType == SYNC_ALL_COUNTER)
 		{
 			//cout << "Processing SYNC_ALL_COUNTER " << addr << "\n";
+			uint64_t next_addr = addr + PAGE_SIZE;
+
+			//cout << "next_addr = " << next_addr << endl;
+			if (next_addr < (CACHE_PAGES * PAGE_SIZE))
+			{
+				// Issue SYNC_ALL_COUNTER transaction to next_addr.
+				// This is what iterates through all lines.
+				// Note: This must be done BEFORE the SYNC is added for the current line so 
+				// it is placed after the SYNC in the queue with add_front().
+				addSyncCounter(next_addr, false);
+			}
+
 			// Look up cache line.
+			if (cache.count(addr) == 0)
+			{
+				// If i is not allocated yet, allocate it.
+				cache[addr] = cache_line();
+			}
 			cache_line cur_line = cache[addr];
 
 			if (cur_line.valid && cur_line.dirty)
@@ -502,16 +519,10 @@ namespace HybridSim {
 				uint64_t flash_addr = FLASH_ADDRESS(cur_line.tag, SET_INDEX(addr));
 
 				// Issue sync command for flash address.
+				addSync(flash_addr);
+				cout << "Added sync for address " << flash_addr << endl;
 			}
 
-			uint64_t next_addr = addr + PAGE_SIZE;
-			//cout << "next_addr = " << next_addr << endl;
-			if (next_addr < (CACHE_PAGES * PAGE_SIZE))
-			{
-				// Issue SYNC_ALL_COUNTER transaction to next_addr.
-				// This is what iterates through all lines.
-				addSyncCounter(next_addr, false);
-			}
 
 			// Unlock the page and return.
 			contention_unlock(addr, trans.address, "SYNC_ALL_COUNTER", false, 0, false, 0);
@@ -1726,6 +1737,25 @@ namespace HybridSim {
 			//cerr << currentClockCycle << ": Prefetcher adding " << prefetch_address << " to transaction queue.\n";
 		}
 	}
+
+
+	void HybridSystem::addSync(uint64_t addr)
+	{
+		// Create flush transaction.
+		Transaction t = Transaction(SYNC, addr, NULL);
+
+		// Push the operation onto the front of the transaction queue so it stays at the front.
+		trans_queue.push_front(t);
+
+		trans_queue_size += 1;
+
+		pending_count += 1;
+
+		// Restart queue checking.
+		this->check_queue = true;
+
+	}
+
 
 	void HybridSystem::addSyncCounter(uint64_t addr, bool initial)
 	{
