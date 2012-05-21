@@ -1403,6 +1403,11 @@ namespace HybridSim {
 				inFile >> line.data;
 				inFile >> line.ts;
 
+				if (RESTORE_CLEAN)
+				{
+					line.dirty = 0;
+				}
+
 				// The line must not be locked on restore.
 				// This is a point of weirdness with the replay warmup design (since we can't restore the system
 				// exactly as it was), but it is unavoidable. In flight transactions are simply lost. Although, if

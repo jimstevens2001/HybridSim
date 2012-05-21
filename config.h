@@ -89,6 +89,12 @@ const uint64_t FOURGB = 4294967296; // 1024^3 * 4
 // If it is 0, it is ignored.
 #define OVERRIDE_DRAM_SIZE 0
 
+
+// RESTORE_CLEAN is used to simulate a checkpoint of the memory system upon restoring the state.
+// Essentially, all pages in the DRAM cache are reverted to clean.
+#define RESTORE_CLEAN 1
+
+
 // C standard library and C++ STL includes.
 #include <iostream>
 #include <fstream>
