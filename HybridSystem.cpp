@@ -1740,6 +1740,10 @@ namespace HybridSim {
 
 	void HybridSystem::sync(uint64_t addr, uint64_t cache_address, Transaction trans)
 	{
+		// The SYNC command works by reusing the VictimRead infrastructure. This works pretty well
+		// except we have to be careful because that code was originaly designed to work when a miss 
+		// had occurred. SYNC only happens when there is a hit.
+
 		// TODO: Abtract this code into a common function with the miss path (if possible).
 
 		cache_line cur_line = cache[cache_address];
