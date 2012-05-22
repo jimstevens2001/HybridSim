@@ -1837,6 +1837,7 @@ namespace HybridSim {
 		{
 			// SYNC_ALL
 			cerr << "HybridSim received MMIO SYNC_ALL.\n";
+			syncAll();
 		}
 		else
 		{
