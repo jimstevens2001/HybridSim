@@ -59,6 +59,7 @@ namespace HybridSim
 		void RegisterCallbacks(
 				TransactionCompleteCB *readDone,
 				TransactionCompleteCB *writeDone);
+		void mmio(uint64_t operation, uint64_t address);
 		void syncAll();
 		void DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle);
 		void DRAMWriteCallback(uint id, uint64_t addr, uint64_t cycle);

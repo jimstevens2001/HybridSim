@@ -1824,6 +1824,28 @@ namespace HybridSim {
 		this->check_queue = true;
 	}
 
+
+	void HybridSystem::mmio(uint64_t operation, uint64_t address)
+	{
+		if (operation == 0)
+		{
+			// NOP
+			cerr << "HybridSim received MMIO NOP.\n";
+			return;
+		}
+		else if (operation == 1)
+		{
+			// SYNC_ALL
+			cerr << "HybridSim received MMIO SYNC_ALL.\n";
+		}
+		else
+		{
+			cerr << "HybridSim received invalid MMIO operation: " << operation << "\n";
+			abort();
+		}
+	}
+
+
 	void HybridSystem::syncAll()
 	{
 		addSyncCounter(0, true);
