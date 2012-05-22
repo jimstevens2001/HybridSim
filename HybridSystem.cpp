@@ -1830,18 +1830,17 @@ namespace HybridSim {
 		if (operation == 0)
 		{
 			// NOP
-			cerr << "HybridSim received MMIO NOP.\n";
-			return;
+			cerr << "\n" << currentClockCycle << " : HybridSim received MMIO NOP.\n";
 		}
 		else if (operation == 1)
 		{
 			// SYNC_ALL
-			cerr << "HybridSim received MMIO SYNC_ALL.\n";
+			cerr << "\n" << currentClockCycle << " : HybridSim received MMIO SYNC_ALL.\n";
 			syncAll();
 		}
 		else
 		{
-			cerr << "HybridSim received invalid MMIO operation: " << operation << "\n";
+			cerr << "\n" << currentClockCycle << " : HybridSim received invalid MMIO operation.\n";
 			abort();
 		}
 	}
