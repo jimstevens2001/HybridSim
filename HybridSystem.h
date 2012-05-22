@@ -126,6 +126,7 @@ namespace HybridSim
 
 		// Sync functions
 		void sync(uint64_t addr, uint64_t cache_address, Transaction trans);
+		void syncAllCounter(uint64_t addr, Transaction trans);
 		void addSync(uint64_t addr);
 		void addSyncCounter(uint64_t addr, bool initial);
 		

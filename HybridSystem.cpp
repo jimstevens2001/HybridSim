@@ -492,40 +492,8 @@ namespace HybridSim {
 
 		if (trans.transactionType == SYNC_ALL_COUNTER)
 		{
-			//cout << "Processing SYNC_ALL_COUNTER " << addr << "\n";
-			uint64_t next_addr = addr + PAGE_SIZE;
-
-			//cout << "next_addr = " << next_addr << endl;
-			if (next_addr < (CACHE_PAGES * PAGE_SIZE))
-			{
-				// Issue SYNC_ALL_COUNTER transaction to next_addr.
-				// This is what iterates through all lines.
-				// Note: This must be done BEFORE the SYNC is added for the current line so 
-				// it is placed after the SYNC in the queue with add_front().
-				addSyncCounter(next_addr, false);
-			}
-
-			// Look up cache line.
-			if (cache.count(addr) == 0)
-			{
-				// If i is not allocated yet, allocate it.
-				cache[addr] = cache_line();
-			}
-			cache_line cur_line = cache[addr];
-
-			if (cur_line.valid && cur_line.dirty)
-			{
-				// Compute flash address.
-				uint64_t flash_addr = FLASH_ADDRESS(cur_line.tag, SET_INDEX(addr));
-
-				// Issue sync command for flash address.
-				addSync(flash_addr);
-				cout << "Added sync for address " << flash_addr << endl;
-			}
-
-
-			// Unlock the page and return.
-			contention_unlock(addr, trans.address, "SYNC_ALL_COUNTER", false, 0, false, 0);
+			// SYNC_ALL_COUNTER transactions are handled elsewhere.
+			syncAllCounter(addr, trans);
 			return;
 		}
 
@@ -1773,6 +1741,44 @@ namespace HybridSim {
 		// Mark the line clean (since this is the whole point of SYNC).
 		cur_line.dirty = false;
 		cache[cache_address] = cur_line;
+	}
+
+
+	void HybridSystem::syncAllCounter(uint64_t addr, Transaction trans)
+	{
+		//cout << "Processing SYNC_ALL_COUNTER " << addr << "\n";
+		uint64_t next_addr = addr + PAGE_SIZE;
+
+		//cout << "next_addr = " << next_addr << endl;
+		if (next_addr < (CACHE_PAGES * PAGE_SIZE))
+		{
+			// Issue SYNC_ALL_COUNTER transaction to next_addr.
+			// This is what iterates through all lines.
+			// Note: This must be done BEFORE the SYNC is added for the current line so 
+			// it is placed after the SYNC in the queue with add_front().
+			addSyncCounter(next_addr, false);
+		}
+
+		// Look up cache line.
+		if (cache.count(addr) == 0)
+		{
+			// If i is not allocated yet, allocate it.
+			cache[addr] = cache_line();
+		}
+		cache_line cur_line = cache[addr];
+
+		if (cur_line.valid && cur_line.dirty)
+		{
+			// Compute flash address.
+			uint64_t flash_addr = FLASH_ADDRESS(cur_line.tag, SET_INDEX(addr));
+
+			// Issue sync command for flash address.
+			addSync(flash_addr);
+			cout << "Added sync for address " << flash_addr << endl;
+		}
+
+		// Unlock the page and return.
+		contention_unlock(addr, trans.address, "SYNC_ALL_COUNTER", false, 0, false, 0);
 	}
 
 
