@@ -36,6 +36,8 @@
 #include <fstream>
 #include <list>
 #include <sstream>
+#include <stdint.h>
+#include <cstdlib>
 
 using namespace std;
 
