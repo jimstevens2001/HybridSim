@@ -1325,25 +1325,6 @@ namespace HybridSim {
 		}
 	}
 
-	list<uint64_t> HybridSystem::get_valid_pages()
-	{
-		list<uint64_t> valid_pages;
-
-		unordered_map<uint64_t, cache_line>::iterator it;
-		for (it = cache.begin(); it != cache.end(); ++it)
-		{
-			uint64_t addr = (*it).first;
-			cache_line line = (*it).second;
-
-			if (line.valid)
-			{
-				valid_pages.push_back(addr);
-			}
-		}
-
-		return valid_pages;
-	}
-
 
 	void HybridSystem::restoreCacheTable()
 	{
@@ -1483,97 +1464,7 @@ namespace HybridSim {
 		}
 	}
 
-	// TODO: probably need to change these computations to work on a finer granularity than pages
-	uint64_t HybridSystem::get_hit()
-	{
-		list<uint64_t> valid_pages = get_valid_pages();
 
-		if (valid_pages.size() == 0)
-		{
-			cerr << "valid pages list is empty.\n";
-			abort();
-		}
-
-		// Pick an element number to grab.
-		int size = valid_pages.size();
-		int x = rand() % size;
-
-		int i = 0;
-		list<uint64_t>::iterator it2 = valid_pages.begin();
-		while((i != x) && (it2 != valid_pages.end()))
-		{
-			i++;
-			it2++;
-		}
-
-		uint64_t cache_addr = (*it2);
-
-		// Compute flash address
-		cache_line c = cache[cache_addr];
-		uint64_t ret_addr = (c.tag * NUM_SETS + SET_INDEX(cache_addr)) * PAGE_SIZE;
-
-		// Check assertion.
-		if (!is_hit(ret_addr))
-		{
-			cerr << "get_hit generated a non-hit!!\n";
-			abort();
-		}
-
-		return ret_addr;
-	}
-
-	// TODO: probably need to change these computations to work on a finer granularity than pages
-	bool HybridSystem::is_hit(uint64_t address)
-	{
-		uint64_t addr = ALIGN(address);
-
-		if (addr >= (TOTAL_PAGES * PAGE_SIZE))
-		{
-			cerr << "ERROR: Address out of bounds" << endl;
-			abort();
-		}
-
-		// Compute the set number and tag
-		uint64_t set_index = SET_INDEX(addr);
-		uint64_t tag = TAG(addr);
-
-		//cerr << "set address list: ";
-		list<uint64_t> set_address_list;
-		for (uint64_t i=0; i<SET_SIZE; i++)
-		{
-			uint64_t next_address = (i * NUM_SETS + set_index) * PAGE_SIZE;
-			set_address_list.push_back(next_address);
-			//cerr << next_address << " ";
-		}
-		//cerr << "\n";
-
-		bool hit = false;
-		uint64_t cache_address;
-		uint64_t cur_address;
-		cache_line cur_line;
-		for (list<uint64_t>::iterator it = set_address_list.begin(); it != set_address_list.end(); ++it)
-		{
-			cur_address = *it;
-			if (cache.count(cur_address) == 0)
-			{
-				// If i is not allocated yet, allocate it.
-				cache[cur_address] = *(new cache_line());
-			}
-
-			cur_line = cache[cur_address];
-
-			if (cur_line.valid && (cur_line.tag == tag))
-			{
-				//		cerr << "HIT!!!\n";
-				hit = true;
-				cache_address = cur_address;
-				break;
-			}
-		}
-
-		return hit;
-
-	}
 
 	// Page Contention functions
 	void HybridSystem::contention_lock(uint64_t page_addr)
