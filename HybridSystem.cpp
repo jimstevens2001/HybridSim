@@ -636,7 +636,7 @@ namespace HybridSim {
 
 			assert(trans.transactionType != SYNC);
 
-			if ((ENABLE_SEQUENTIAL_PREFETCHING) && (trans.transactionType != PREFETCH))
+			if ((SEQUENTIAL_PREFETCHING_WINDOW > 0) && (trans.transactionType != PREFETCH))
 			{
 				issue_sequential_prefetches(addr);
 			}
