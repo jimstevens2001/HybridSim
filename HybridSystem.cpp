@@ -1665,7 +1665,7 @@ namespace HybridSim {
 
 			// Issue sync command for flash address.
 			addSync(flash_addr);
-			cout << "Added sync for address " << flash_addr << endl;
+			//cout << "Added sync for address " << flash_addr << endl;
 		}
 
 		// Unlock the page and return.
