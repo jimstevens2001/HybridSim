@@ -59,6 +59,8 @@ namespace HybridSim
 		void RegisterCallbacks(
 				TransactionCompleteCB *readDone,
 				TransactionCompleteCB *writeDone);
+		void mmio(uint64_t operation, uint64_t address);
+		void syncAll();
 		void DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle);
 		void DRAMWriteCallback(uint id, uint64_t addr, uint64_t cycle);
 		void DRAMPowerCallback(double a, double b, double c, double d);
@@ -102,10 +104,6 @@ namespace HybridSim
 
 		void Flush(uint64_t cache_addr);
 
-		// Testing function
-		bool is_hit(uint64_t address);
-		uint64_t get_hit();
-		list<uint64_t> get_valid_pages();
 
 		// Page Contention Functions
 		void contention_lock(uint64_t page_addr);
@@ -122,6 +120,13 @@ namespace HybridSim
 
 		// Prefetch Functions
 		void issue_sequential_prefetches(uint64_t page_addr);
+
+		// Sync functions
+		void sync(uint64_t addr, uint64_t cache_address, Transaction trans);
+		void syncAllCounter(uint64_t addr, Transaction trans);
+		void addSync(uint64_t addr);
+		void addSyncCounter(uint64_t addr, bool initial);
+		
 
 		// State
 		string hybridsim_ini;

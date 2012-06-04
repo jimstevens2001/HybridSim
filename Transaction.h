@@ -39,7 +39,9 @@ namespace HybridSim
 		DATA_READ,
 		DATA_WRITE,
 		PREFETCH,
-		FLUSH
+		FLUSH,
+		SYNC_ALL_COUNTER,
+		SYNC
 	};
 
 	class Transaction

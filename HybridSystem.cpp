@@ -490,6 +490,14 @@ namespace HybridSim {
 		uint64_t addr = ALIGN(trans.address);
 
 
+		if (trans.transactionType == SYNC_ALL_COUNTER)
+		{
+			// SYNC_ALL_COUNTER transactions are handled elsewhere.
+			syncAllCounter(addr, trans);
+			return;
+		}
+
+
 		if (DEBUG_CACHE)
 			cerr << "\n" << currentClockCycle << ": " << "Starting transaction for address " << addr << endl;
 
@@ -601,6 +609,15 @@ namespace HybridSim {
 
 				return; 
 			}
+			else if(trans.transactionType == SYNC)
+			{
+				sync(addr, cache_address, trans);
+				//contention_unlock(addr, addr, "SYNC (hit)", false, 0, true, cache_address);
+			}
+			else
+			{
+				assert(0);
+			}
 		}
 
 		if (!hit)
@@ -617,7 +634,9 @@ namespace HybridSim {
 				return;
 			}
 
-			if ((ENABLE_SEQUENTIAL_PREFETCHING) && (trans.transactionType != PREFETCH))
+			assert(trans.transactionType != SYNC);
+
+			if ((SEQUENTIAL_PREFETCHING_WINDOW > 0) && (trans.transactionType != PREFETCH))
 			{
 				issue_sequential_prefetches(addr);
 			}
@@ -1306,25 +1325,6 @@ namespace HybridSim {
 		}
 	}
 
-	list<uint64_t> HybridSystem::get_valid_pages()
-	{
-		list<uint64_t> valid_pages;
-
-		unordered_map<uint64_t, cache_line>::iterator it;
-		for (it = cache.begin(); it != cache.end(); ++it)
-		{
-			uint64_t addr = (*it).first;
-			cache_line line = (*it).second;
-
-			if (line.valid)
-			{
-				valid_pages.push_back(addr);
-			}
-		}
-
-		return valid_pages;
-	}
-
 
 	void HybridSystem::restoreCacheTable()
 	{
@@ -1464,97 +1464,7 @@ namespace HybridSim {
 		}
 	}
 
-	// TODO: probably need to change these computations to work on a finer granularity than pages
-	uint64_t HybridSystem::get_hit()
-	{
-		list<uint64_t> valid_pages = get_valid_pages();
 
-		if (valid_pages.size() == 0)
-		{
-			cerr << "valid pages list is empty.\n";
-			abort();
-		}
-
-		// Pick an element number to grab.
-		int size = valid_pages.size();
-		int x = rand() % size;
-
-		int i = 0;
-		list<uint64_t>::iterator it2 = valid_pages.begin();
-		while((i != x) && (it2 != valid_pages.end()))
-		{
-			i++;
-			it2++;
-		}
-
-		uint64_t cache_addr = (*it2);
-
-		// Compute flash address
-		cache_line c = cache[cache_addr];
-		uint64_t ret_addr = (c.tag * NUM_SETS + SET_INDEX(cache_addr)) * PAGE_SIZE;
-
-		// Check assertion.
-		if (!is_hit(ret_addr))
-		{
-			cerr << "get_hit generated a non-hit!!\n";
-			abort();
-		}
-
-		return ret_addr;
-	}
-
-	// TODO: probably need to change these computations to work on a finer granularity than pages
-	bool HybridSystem::is_hit(uint64_t address)
-	{
-		uint64_t addr = ALIGN(address);
-
-		if (addr >= (TOTAL_PAGES * PAGE_SIZE))
-		{
-			cerr << "ERROR: Address out of bounds" << endl;
-			abort();
-		}
-
-		// Compute the set number and tag
-		uint64_t set_index = SET_INDEX(addr);
-		uint64_t tag = TAG(addr);
-
-		//cerr << "set address list: ";
-		list<uint64_t> set_address_list;
-		for (uint64_t i=0; i<SET_SIZE; i++)
-		{
-			uint64_t next_address = (i * NUM_SETS + set_index) * PAGE_SIZE;
-			set_address_list.push_back(next_address);
-			//cerr << next_address << " ";
-		}
-		//cerr << "\n";
-
-		bool hit = false;
-		uint64_t cache_address;
-		uint64_t cur_address;
-		cache_line cur_line;
-		for (list<uint64_t>::iterator it = set_address_list.begin(); it != set_address_list.end(); ++it)
-		{
-			cur_address = *it;
-			if (cache.count(cur_address) == 0)
-			{
-				// If i is not allocated yet, allocate it.
-				cache[cur_address] = *(new cache_line());
-			}
-
-			cur_line = cache[cur_address];
-
-			if (cur_line.valid && (cur_line.tag == tag))
-			{
-				//		cerr << "HIT!!!\n";
-				hit = true;
-				cache_address = cur_address;
-				break;
-			}
-		}
-
-		return hit;
-
-	}
 
 	// Page Contention functions
 	void HybridSystem::contention_lock(uint64_t page_addr)
@@ -1684,6 +1594,152 @@ namespace HybridSim {
 			addPrefetch(prefetch_address);
 			//cerr << currentClockCycle << ": Prefetcher adding " << prefetch_address << " to transaction queue.\n";
 		}
+	}
+
+
+	void HybridSystem::sync(uint64_t addr, uint64_t cache_address, Transaction trans)
+	{
+		// The SYNC command works by reusing the VictimRead infrastructure. This works pretty well
+		// except we have to be careful because that code was originaly designed to work when a miss 
+		// had occurred. SYNC only happens when there is a hit.
+
+		// TODO: Abtract this code into a common function with the miss path (if possible).
+
+		cache_line cur_line = cache[cache_address];
+
+		uint64_t victim_flash_addr = FLASH_ADDRESS(cur_line.tag, SET_INDEX(cache_address));
+
+		// The address in the cache line should be the SAME as the address we are syncing on.
+		assert(victim_flash_addr == addr);
+
+		// Lock the cache line so no one else tries to use it while this miss is being serviced.
+		contention_cache_line_lock(cache_address);
+	
+		Pending p;
+		p.orig_addr = trans.address;
+		p.flash_addr = addr;
+		p.cache_addr = cache_address;
+		p.victim_tag = cur_line.tag;
+		p.victim_valid = false; // MUST SET THIS TO FALSE SINCE SYNC PAGE AND VICTIM PAGE MATCH.
+		p.callback_sent = false;
+		p.type = trans.transactionType;
+
+		// The line MUST be dirty for a sync operation to be valid.
+		assert(cur_line.dirty);
+
+		VictimRead(p);
+
+		// Mark the line clean (since this is the whole point of SYNC).
+		cur_line.dirty = false;
+		cache[cache_address] = cur_line;
+	}
+
+
+	void HybridSystem::syncAllCounter(uint64_t addr, Transaction trans)
+	{
+		//cout << "Processing SYNC_ALL_COUNTER " << addr << "\n";
+		uint64_t next_addr = addr + PAGE_SIZE;
+
+		//cout << "next_addr = " << next_addr << endl;
+		if (next_addr < (CACHE_PAGES * PAGE_SIZE))
+		{
+			// Issue SYNC_ALL_COUNTER transaction to next_addr.
+			// This is what iterates through all lines.
+			// Note: This must be done BEFORE the SYNC is added for the current line so 
+			// it is placed after the SYNC in the queue with add_front().
+			addSyncCounter(next_addr, false);
+		}
+
+		// Look up cache line.
+		if (cache.count(addr) == 0)
+		{
+			// If i is not allocated yet, allocate it.
+			cache[addr] = cache_line();
+		}
+		cache_line cur_line = cache[addr];
+
+		if (cur_line.valid && cur_line.dirty)
+		{
+			// Compute flash address.
+			uint64_t flash_addr = FLASH_ADDRESS(cur_line.tag, SET_INDEX(addr));
+
+			// Issue sync command for flash address.
+			addSync(flash_addr);
+			//cout << "Added sync for address " << flash_addr << endl;
+		}
+
+		// Unlock the page and return.
+		contention_unlock(addr, trans.address, "SYNC_ALL_COUNTER", false, 0, false, 0);
+	}
+
+
+	void HybridSystem::addSync(uint64_t addr)
+	{
+		// Create flush transaction.
+		Transaction t = Transaction(SYNC, addr, NULL);
+
+		// Push the operation onto the front of the transaction queue so it stays at the front.
+		trans_queue.push_front(t);
+
+		trans_queue_size += 1;
+
+		pending_count += 1;
+
+		// Restart queue checking.
+		this->check_queue = true;
+
+	}
+
+
+	void HybridSystem::addSyncCounter(uint64_t addr, bool initial)
+	{
+		// Create flush transaction.
+		Transaction t = Transaction(SYNC_ALL_COUNTER, addr, NULL);
+
+		if (initial)
+		{
+			// The initial SYNC_ALL_COUNTER operation must wait to get to the front of the queue.
+			trans_queue.push_back(t);
+		}
+		else
+		{
+			// Push the operation onto the front of the transaction queue so it stays at the front.
+			trans_queue.push_front(t);
+		}
+
+		trans_queue_size += 1;
+
+		pending_count += 1;
+
+		// Restart queue checking.
+		this->check_queue = true;
+	}
+
+
+	void HybridSystem::mmio(uint64_t operation, uint64_t address)
+	{
+		if (operation == 0)
+		{
+			// NOP
+			cerr << "\n" << currentClockCycle << " : HybridSim received MMIO NOP.\n";
+		}
+		else if (operation == 1)
+		{
+			// SYNC_ALL
+			cerr << "\n" << currentClockCycle << " : HybridSim received MMIO SYNC_ALL.\n";
+			syncAll();
+		}
+		else
+		{
+			cerr << "\n" << currentClockCycle << " : HybridSim received invalid MMIO operation.\n";
+			abort();
+		}
+	}
+
+
+	void HybridSystem::syncAll()
+	{
+		addSyncCounter(0, true);
 	}
 
 } // Namespace HybridSim
