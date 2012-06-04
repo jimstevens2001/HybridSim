@@ -277,6 +277,9 @@ namespace HybridSim {
 				delay_counter = CONTROLLER_DELAY;
 				sent_transaction = true;
 
+				// Check that this page is in the TLB.
+				// Do not do this for SYNC_ALL_COUNTER transactions because the page address refers
+				// to the cache line, not the flash page address, so the TLB isn't needed.
 				if ((*it).transactionType != SYNC_ALL_COUNTER)
 					check_tlb(page_addr);
 
