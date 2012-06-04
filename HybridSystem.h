@@ -190,6 +190,7 @@ namespace HybridSim
 		// TLB state
 		unordered_map<uint64_t, uint64_t> tlb_base_set; 
 		uint64_t tlb_misses;
+		uint64_t tlb_hits;
 
 	};
 

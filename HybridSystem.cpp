@@ -167,6 +167,9 @@ namespace HybridSim {
 		trans_queue_max = 0;
 		trans_queue_size = 0; // This is not debugging info.
 
+		tlb_misses = 0;
+		tlb_hits = 0;
+
 		// Create file descriptors for debugging output (if needed).
 		if (DEBUG_VICTIM) 
 		{
@@ -1323,6 +1326,9 @@ namespace HybridSim {
 		// Save the cache table if necessary.
 		saveCacheTable();
 
+		cerr << "TLB Misses: " << tlb_misses << "\n";
+		cerr << "TLB Hits: " << tlb_hits << "\n";
+
 		// Print out the log file.
 		if (ENABLE_LOGGER)
 		{
@@ -1754,7 +1760,8 @@ namespace HybridSim {
 		uint64_t tlb_base_addr = TLB_BASE_ADDRESS(page_addr);
 		if (tlb_base_set.count(tlb_base_addr) == 0)
 		{
-			cerr << "TLB miss with address " << page_addr << ".\n";
+			//cerr << "TLB miss with address " << page_addr << ".\n";
+			tlb_misses++;
 			// TLB miss.
 			if (tlb_base_set.size() == TLB_MAX_ENTRIES)
 			{
@@ -1774,7 +1781,7 @@ namespace HybridSim {
 				}
 
 				// Remove the victim entry.
-				cerr << "Evicting " << tlb_victim << " from TLB.\n";
+				//cerr << "Evicting " << tlb_victim << " from TLB.\n";
 				tlb_base_set.erase(tlb_victim);
 			}
 
@@ -1790,7 +1797,8 @@ namespace HybridSim {
 		else
 		{
 			// TLB hit. Just update the timestamp for the LRU algorithm.
-			cerr << "TLB hit with address " << page_addr << ".\n";
+			//cerr << "TLB hit with address " << page_addr << ".\n";
+			tlb_hits++;
 			tlb_base_set[tlb_base_addr] = currentClockCycle;
 		}
 	}
