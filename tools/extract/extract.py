@@ -109,10 +109,6 @@ def process_path(path):
 
 	os.system('cd '+path+'; pwd;')
 
-	# Get the log file base.
-	os.system('cd '+path+'; ls *.yml > ymlname;')
-	benchmark = getfile(path+'/ymlname')[0].strip()[:-4]
-	os.system('cd '+path+'; rm ymlname;')
 
 	try:
 		# Get the user instructions
@@ -121,6 +117,11 @@ def process_path(path):
 			user_ipc = 0.0
 			didnt_finish.append(path)
 		else:
+			# Get the log file base.
+			os.system('cd '+path+'; ls *.yml > ymlname;')
+			benchmark = getfile(path+'/ymlname')[0].strip()[:-4]
+			os.system('cd '+path+'; rm ymlname;')
+
 			# Get the instruction count
 			os.system('cd '+path+'; '+(instr_cmd%benchmark)+' > instrout;')
 			user_str = getfile(path+'/instrout')
