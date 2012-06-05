@@ -56,11 +56,13 @@ buffering_list = [buffering_base,buffering_runs,channel_count,[Hybrid]]
 
 
 if cleanup:
-	mstats_cmd =  'python '+mstats+' -y --flatten -n base_machine::ooo_.\*::thread0::commit::insns -t user --sum %s.yml'
+	instr_cmd = 'python '+mstats+' -y --flatten -n base_machine::ooo_.\*::thread0::commit::insns -t user --sum %s.yml'
+	cycle_cmd = 'python '+mstats+' -y --flatten -n base_machine::ooo_.\*::cycles -t total --sum %s.log'
 else:
-	mstats_cmd =  'python util/mstats.py -y --flatten -n base_machine::ooo_.\*::thread0::commit::insns -t user --sum %s.yml'
+	instr_cmd = 'python util/mstats.py -y --flatten -n base_machine::ooo_.\*::thread0::commit::insns -t user --sum %s.yml'
+	cycle_cmd = 'python util/mstats.py -y --flatten -n base_machine::ooo_.\*::cycles -t total --sum %s.log'
 	
-grep_cmd = 'grep "Stopped after" %s.log'
+#grep_cmd = 'grep "Stopped after" %s.log'
 
 def process_dir(curpath, inputlist):
 	if inputlist == []:
@@ -120,18 +122,18 @@ def process_path(path):
 			didnt_finish.append(path)
 		else:
 			# Get the instruction count
-			os.system('cd '+path+'; '+(mstats_cmd%benchmark)+' > mstatsout;')
-			user_str = getfile(path+'/mstatsout')
+			os.system('cd '+path+'; '+(instr_cmd%benchmark)+' > instrout;')
+			user_str = getfile(path+'/instrout')
 			user_instr = user_str[0].strip().split(None, 3)[2]
-
-			os.system('cd '+path+'; rm mstatsout;')
+			os.system('cd '+path+'; rm instrout;')
 			#print user_instr
 			
 			# Get the cycle count
-			os.system('cd '+path+'; '+(grep_cmd%benchmark)+' > grepout;')
-			cycle_str = getfile(path+'/grepout')
+			os.system('cd '+path+'; '+(cycle_cmd%benchmark)+' > cycleout;')
+			cycle_str = getfile(path+'/cycleout')
 			cycle_cnt = cycle_str[0].strip().split(None, 3)[2]
-			os.system('cd '+path+'; rm grepout;')
+			cycle_cnt = cycle_cnt / 4.0
+			os.system('cd '+path+'; rm cycleout;')
 			#print cycle_cnt
 
 			# Compute the user IPC
