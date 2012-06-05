@@ -132,7 +132,7 @@ def process_path(path):
 			os.system('cd '+path+'; '+(cycle_cmd%benchmark)+' > cycleout;')
 			cycle_str = getfile(path+'/cycleout')
 			cycle_cnt = cycle_str[0].strip().split(None, 3)[2]
-			cycle_cnt = cycle_cnt / 4.0
+			cycle_cnt = float(cycle_cnt) / 4.0
 			os.system('cd '+path+'; rm cycleout;')
 			#print cycle_cnt
 
