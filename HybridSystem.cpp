@@ -1756,6 +1756,11 @@ namespace HybridSim {
 
 	void HybridSystem::check_tlb(uint64_t page_addr)
 	{
+		// A TLB_SIZE of 0 disables the TLB.
+		// This means we always have the tags in SRAM on the CPU.
+		if (TLB_SIZE == 0)
+			return;
+
 		// TLB processing code.
 		uint64_t tlb_base_addr = TLB_BASE_ADDRESS(page_addr);
 		if (tlb_base_set.count(tlb_base_addr) == 0)
