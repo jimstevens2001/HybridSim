@@ -109,7 +109,7 @@ def process_path(path):
 
 	# Get the log file base.
 	os.system('cd '+path+'; ls *.yml > ymlname;')
-	benchmark = getfile(path+'/ymlname')[0].strip().strip('.yml')
+	benchmark = getfile(path+'/ymlname')[0].strip()[:-4]
 	os.system('cd '+path+'; rm ymlname;')
 
 	try:
