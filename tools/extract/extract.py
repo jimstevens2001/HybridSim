@@ -57,10 +57,10 @@ buffering_list = [buffering_base,buffering_runs,channel_count,[Hybrid]]
 
 if cleanup:
 	instr_cmd = 'python '+mstats+' -y --flatten -n base_machine::ooo_.\*::thread0::commit::insns -t user --sum %s.yml'
-	cycle_cmd = 'python '+mstats+' -y --flatten -n base_machine::ooo_.\*::cycles -t total --sum %s.log'
+	cycle_cmd = 'python '+mstats+' -y --flatten -n base_machine::ooo_.\*::cycles -t total --sum %s.yml'
 else:
 	instr_cmd = 'python util/mstats.py -y --flatten -n base_machine::ooo_.\*::thread0::commit::insns -t user --sum %s.yml'
-	cycle_cmd = 'python util/mstats.py -y --flatten -n base_machine::ooo_.\*::cycles -t total --sum %s.log'
+	cycle_cmd = 'python util/mstats.py -y --flatten -n base_machine::ooo_.\*::cycles -t total --sum %s.yml'
 	
 #grep_cmd = 'grep "Stopped after" %s.log'
 
