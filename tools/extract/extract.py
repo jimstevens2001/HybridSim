@@ -53,7 +53,7 @@ else:
 channel_list = [channel_base,channel_runs,channels,dies,[SSD,Hybrid]]
 buffering_list = [buffering_base,buffering_runs,channel_count,[Hybrid]]
 
-	
+
 
 if cleanup:
 	mstats_cmd =  'python '+mstats+' -y --flatten -n base_machine::ooo_.\*::thread0::commit::insns -t user --sum %s.yml'
@@ -112,29 +112,35 @@ def process_path(path):
 	benchmark = getfile(path+'/ymlname')[0].strip().strip('.yml')
 	os.system('cd '+path+'; rm ymlname;')
 
-	# Get the user instructions
-	if not os.path.exists(path+'/hybridsim.log'):
-		print 'Path '+path+' did not finish!'
+	try:
+		# Get the user instructions
+		if not os.path.exists(path+'/hybridsim.log'):
+			print 'Path '+path+' did not finish!'
+			user_ipc = 0.0
+			didnt_finish.append(path)
+		else:
+			# Get the instruction count
+			os.system('cd '+path+'; '+(mstats_cmd%benchmark)+' > mstatsout;')
+			user_str = getfile(path+'/mstatsout')
+			user_instr = user_str[0].strip().split(None, 3)[2]
+
+			os.system('cd '+path+'; rm mstatsout;')
+			#print user_instr
+			
+			# Get the cycle count
+			os.system('cd '+path+'; '+(grep_cmd%benchmark)+' > grepout;')
+			cycle_str = getfile(path+'/grepout')
+			cycle_cnt = cycle_str[0].strip().split(None, 3)[2]
+			os.system('cd '+path+'; rm grepout;')
+			#print cycle_cnt
+
+			# Compute the user IPC
+			user_ipc = float(user_instr) / float(cycle_cnt)
+			#print user_ipc
+	except IndexError:
+		print 'Path '+path+' caused an IndexError.'
 		user_ipc = 0.0
 		didnt_finish.append(path)
-	else:
-		# Get the instruction count
-		os.system('cd '+path+'; '+(mstats_cmd%benchmark)+' > mstatsout;')
-		user_str = getfile(path+'/mstatsout')
-		user_instr = user_str[0].strip().split(None, 3)[2]
-		os.system('cd '+path+'; rm mstatsout;')
-		#print user_instr
-		
-		# Get the cycle count
-		os.system('cd '+path+'; '+(grep_cmd%benchmark)+' > grepout;')
-		cycle_str = getfile(path+'/grepout')
-		cycle_cnt = cycle_str[0].strip().split(None, 3)[2]
-		os.system('cd '+path+'; rm grepout;')
-		#print cycle_cnt
-
-		# Compute the user IPC
-		user_ipc = float(user_instr) / float(cycle_cnt)
-		#print user_ipc
 
 	# Determine what type of experiment this is
 	if path in latency_paths:
