@@ -167,6 +167,9 @@ namespace HybridSim {
 		trans_queue_max = 0;
 		trans_queue_size = 0; // This is not debugging info.
 
+		tlb_misses = 0;
+		tlb_hits = 0;
+
 		// Create file descriptors for debugging output (if needed).
 		if (DEBUG_VICTIM) 
 		{
@@ -276,6 +279,12 @@ namespace HybridSim {
 				active_transaction_flag = true;
 				delay_counter = CONTROLLER_DELAY;
 				sent_transaction = true;
+
+				// Check that this page is in the TLB.
+				// Do not do this for SYNC_ALL_COUNTER transactions because the page address refers
+				// to the cache line, not the flash page address, so the TLB isn't needed.
+				if ((*it).transactionType != SYNC_ALL_COUNTER)
+					check_tlb(page_addr);
 
 				// Delete this item and skip to the next.
 				it = trans_queue.erase(it);
@@ -1317,6 +1326,9 @@ namespace HybridSim {
 		// Save the cache table if necessary.
 		saveCacheTable();
 
+		cerr << "TLB Misses: " << tlb_misses << "\n";
+		cerr << "TLB Hits: " << tlb_hits << "\n";
+
 		// Print out the log file.
 		if (ENABLE_LOGGER)
 		{
@@ -1746,6 +1758,60 @@ namespace HybridSim {
 	void HybridSystem::syncAll()
 	{
 		addSyncCounter(0, true);
+	}
+
+	void HybridSystem::check_tlb(uint64_t page_addr)
+	{
+		// A TLB_SIZE of 0 disables the TLB.
+		// This means we always have the tags in SRAM on the CPU.
+		if (TLB_SIZE == 0)
+			return;
+
+		// TLB processing code.
+		uint64_t tlb_base_addr = TLB_BASE_ADDRESS(page_addr);
+		if (tlb_base_set.count(tlb_base_addr) == 0)
+		{
+			//cerr << "TLB miss with address " << page_addr << ".\n";
+			tlb_misses++;
+			// TLB miss.
+			if (tlb_base_set.size() == TLB_MAX_ENTRIES)
+			{
+				// TLB is full, so must pick a victim.
+				uint64_t tlb_victim = (*(tlb_base_set.begin())).first;
+				uint64_t tlb_victim_ts = (*(tlb_base_set.begin())).second;
+				unordered_map<uint64_t, uint64_t>:: iterator tlb_it;
+				for (tlb_it = tlb_base_set.begin(); tlb_it != tlb_base_set.end(); tlb_it++)
+				{
+					uint64_t cur_ts = (*tlb_it).second;
+					if (cur_ts < tlb_victim_ts)
+					{
+						// Found an older entry than the current victim.
+						tlb_victim = (*tlb_it).first;
+						tlb_victim_ts = cur_ts;
+					}
+				}
+
+				// Remove the victim entry.
+				//cerr << "Evicting " << tlb_victim << " from TLB.\n";
+				tlb_base_set.erase(tlb_victim);
+			}
+
+			// At this point, there is at least one empty spot in the TLB.
+			assert(tlb_base_set.size() < TLB_MAX_ENTRIES);
+			
+			// Insert the new page with the current clock cycle.
+			tlb_base_set[tlb_base_addr] = currentClockCycle;
+
+			// Add TLB_MISS_DELAY to the controller delay.
+			delay_counter += TLB_MISS_DELAY;
+		}
+		else
+		{
+			// TLB hit. Just update the timestamp for the LRU algorithm.
+			//cerr << "TLB hit with address " << page_addr << ".\n";
+			tlb_hits++;
+			tlb_base_set[tlb_base_addr] = currentClockCycle;
+		}
 	}
 
 } // Namespace HybridSim

@@ -94,6 +94,16 @@ const uint64_t FOURGB = 4294967296; // 1024^3 * 4
 #define RESTORE_CLEAN 0
 
 
+// TLB parameters
+
+// All size parameters in bytes (keep to powers of 2)
+#define TAG_SIZE 2
+#define TLB_SIZE 16384
+
+// TLB miss delay is in memory clock cycles
+#define TLB_MISS_DELAY 30
+
+
 // C standard library and C++ STL includes.
 #include <iostream>
 #include <fstream>
@@ -190,6 +200,12 @@ extern string NVDIMM_SAVE_FILE;
 #define FLASH_ADDRESS(tag, set) ((tag * NUM_SETS + set) * PAGE_SIZE)
 #define ALIGN(addr) (((addr / BURST_SIZE) * BURST_SIZE) % (TOTAL_PAGES * PAGE_SIZE))
 
+// TLB derived parameters
+#define BYTES_PER_READ 64
+#define TLB_MAX_ENTRIES (TLB_SIZE / BYTES_PER_READ)
+#define TAGS_PER_ENTRY (BYTES_PER_READ / TAG_SIZE)
+#define TLB_ENTRY_SPAN (PAGE_SIZE * TAGS_PER_ENTRY)
+#define TLB_BASE_ADDRESS(addr) ((addr * TLB_ENTRY_SPAN) / TLB_ENTRY_SPAN)
 
 // Declare the cache_line class, which is the table entry used for each line in the cache tag store.
 class cache_line

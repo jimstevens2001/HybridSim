@@ -126,6 +126,9 @@ namespace HybridSim
 		void syncAllCounter(uint64_t addr, Transaction trans);
 		void addSync(uint64_t addr);
 		void addSyncCounter(uint64_t addr, bool initial);
+
+		// TLB functions
+		void check_tlb(uint64_t page_addr);
 		
 
 		// State
@@ -183,6 +186,11 @@ namespace HybridSim
 		ofstream debug_victim;
 		ofstream debug_nvdimm_trace;
 		ofstream debug_full_trace;
+
+		// TLB state
+		unordered_map<uint64_t, uint64_t> tlb_base_set; 
+		uint64_t tlb_misses;
+		uint64_t tlb_hits;
 
 	};
 
