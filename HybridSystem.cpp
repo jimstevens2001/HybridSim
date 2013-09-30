@@ -1729,6 +1729,12 @@ namespace HybridSim {
 			cerr << "\n" << currentClockCycle << " : HybridSim received MMIO SYNC_ALL.\n";
 			syncAll();
 		}
+		else if (operation == 2)
+		{
+			// TASK_SWITCH
+			cerr << "\n" << currentClockCycle << " : HybridSim received MMIO TASK_SWITCH.\n";
+			cerr << "\n" << "Address=" << address << " Accesses=" << log.num_accesses << " Reads=" << log.num_reads << " Writes=" << log.num_writes << "\n";
+		}
 		else
 		{
 			cerr << "\n" << currentClockCycle << " : HybridSim received invalid MMIO operation.\n";
