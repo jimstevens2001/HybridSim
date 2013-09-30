@@ -149,7 +149,6 @@ namespace HybridSim
 		unordered_map<uint64_t, Pending> flash_pending;
 
 		unordered_map<uint64_t, uint64_t> pending_pages; // If a page is in the pending set, then skip subsequent transactions to the page.
-		unordered_map<uint64_t, uint64_t> pending_sets; // If a page is in the pending map, then skip subsequent transactions to the page.
 		unordered_map<uint64_t, uint64_t> set_counter; // Counts the number of outstanding transactions to each set.
 
 		bool check_queue; // If there is nothing to do, don't check the queue until the next event occurs that will make new work.
@@ -162,7 +161,6 @@ namespace HybridSim
 		set<uint64_t> dram_pending_set;
 		list<uint64_t> dram_bad_address;
 		uint64_t max_dram_pending;
-		uint64_t pending_sets_max;
 		uint64_t pending_pages_max;
 		uint64_t trans_queue_max;
 		uint64_t trans_queue_size;

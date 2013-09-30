@@ -162,7 +162,6 @@ namespace HybridSim {
 		// Note: Some of this is just debug info, but I'm keeping it around because it is useful.
 		pending_count = 0; // This is used by TraceBasedSim for MAX_PENDING.
 		max_dram_pending = 0;
-		pending_sets_max = 0;
 		pending_pages_max = 0;
 		trans_queue_max = 0;
 		trans_queue_size = 0; // This is not debugging info.
@@ -228,8 +227,6 @@ namespace HybridSim {
 
 		if (dram_pending.size() > max_dram_pending)
 			max_dram_pending = dram_pending.size();
-		if (pending_sets.size() > pending_sets_max)
-			pending_sets_max = pending_sets.size();
 		if (pending_pages.size() > pending_pages_max)
 			pending_pages_max = pending_pages.size();
 		if (trans_queue_size > trans_queue_max)

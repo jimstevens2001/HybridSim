@@ -231,8 +231,6 @@ int HybridSimTBS::run_trace(string tracefile)
 		cout << (*it) << " ";
 	}
 	cout << "\n\n";
-	cout << "pending_sets.size() = " << mem->pending_sets.size() << "\n\n";
-	cout << "pending_sets_max = " << mem->pending_sets_max << "\n\n";
 	cout << "pending_pages_max = " << mem->pending_pages_max << "\n\n";
 	cout << "trans_queue_max = " << mem->trans_queue_max << "\n\n";
 	

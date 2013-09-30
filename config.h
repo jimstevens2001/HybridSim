@@ -97,8 +97,10 @@ const uint64_t FOURGB = 4294967296; // 1024^3 * 4
 // TLB parameters
 
 // All size parameters in bytes (keep to powers of 2)
+// Setting TLB_SIZE to 0 disables TLB simulation.
 #define TAG_SIZE 2
-#define TLB_SIZE 16384
+//#define TLB_SIZE 16384
+#define TLB_SIZE 0 
 
 // TLB miss delay is in memory clock cycles
 #define TLB_MISS_DELAY 30
