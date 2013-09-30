@@ -1,0 +1,12 @@
+This repo follows a standard git branching scheme.
+
+* master - stable branch
+* dev - unstable development branch
+
+All other branches are feature branches. Some may be orphans and some
+may eventually be merged into dev. The master branch will only merge
+changes from dev after we are satisfied they are stable.
+
+Tags with format vX.Y.Z are considered releases of stable versions.
+All other tags are considered experimental.
+
