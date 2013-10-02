@@ -257,14 +257,15 @@ namespace HybridSim {
 		while((it != trans_queue.end()) && (pending_pages.size() < NUM_SETS) && (check_queue) && (delay_counter == 0))
 		{
 			// Compute the page address.
-			uint64_t page_addr = PAGE_ADDRESS(ALIGN((*it).address));
+			uint64_t flash_addr = ALIGN((*it).address);
+			uint64_t page_addr = PAGE_ADDRESS(flash_addr);
 
 
 			// Check to see if this page is open under contention rules.
-			if (contention_is_unlocked(page_addr))
+			if (contention_is_unlocked(flash_addr))
 			{
 				// Lock the page.
-				contention_lock(page_addr);
+				contention_lock(flash_addr);
 
 				// Log the page access.
 				if (ENABLE_LOGGER)
@@ -628,6 +629,9 @@ namespace HybridSim {
 
 		if (!hit)
 		{
+			// Lock the whole page.
+			contention_page_lock(addr);
+
 			// Make sure this isn't a FLUSH before proceeding.
 			if(trans.transactionType == FLUSH)
 			{
@@ -764,7 +768,7 @@ namespace HybridSim {
 
 		// Increment the pending set/page counter (this is used to ensure that the pending set/page entry isn't removed until both LineRead
 		// and VictimRead (if needed) are completely done.
-		contention_increment(PAGE_ADDRESS(p.flash_addr));
+		contention_increment(p.flash_addr);
 
 #if SINGLE_WORD
 		// Schedule a read from DRAM to get the line being evicted.
@@ -816,7 +820,7 @@ namespace HybridSim {
 
 		// Decrement the pending set counter (this is used to ensure that the pending set entry isn't removed until both LineRead
 		// and VictimRead (if needed) are completely done.
-		contention_decrement(PAGE_ADDRESS(p.flash_addr));
+		contention_decrement(p.flash_addr);
 
 		if (DEBUG_CACHE)
 		{
@@ -872,7 +876,7 @@ namespace HybridSim {
 
 		// Increment the pending set counter (this is used to ensure that the pending set entry isn't removed until both LineRead
 		// and VictimRead (if needed) are completely done.
-		contention_increment(PAGE_ADDRESS(p.flash_addr));
+		contention_increment(p.flash_addr);
 
 
 #if SINGLE_WORD
@@ -925,7 +929,7 @@ namespace HybridSim {
 
 		// Decrement the pending set counter (this is used to ensure that the pending set entry isn't removed until both LineRead
 		// and VictimRead (if needed) are completely done.
-		contention_decrement(PAGE_ADDRESS(p.flash_addr));
+		contention_decrement(p.flash_addr);
 
 		if (DEBUG_CACHE)
 		{
@@ -1476,19 +1480,48 @@ namespace HybridSim {
 
 
 	// Page Contention functions
-	void HybridSystem::contention_lock(uint64_t page_addr)
+	void HybridSystem::contention_lock(uint64_t flash_addr)
+	{
+		pending_flash_addr[flash_addr] = 0;
+	}
+
+	void HybridSystem::contention_page_lock(uint64_t flash_addr)
 	{
 		// Add to the pending pages map. And set the count to 0.
-		pending_pages[page_addr] = 0;
+		pending_pages[PAGE_ADDRESS(flash_addr)] = 0;
 	}
 
 	void HybridSystem::contention_unlock(uint64_t flash_addr, uint64_t orig_addr, string operation, bool victim_valid, uint64_t victim_page, 
 			bool cache_line_valid, uint64_t cache_addr)
 	{
+		int page_addr = PAGE_ADDRESS(flash_addr);
+
+		// If there is no page entry, then this means only the flash address was locked (i.e. it is a DRAM hit).
+		if (pending_pages.count(page_addr) == 0)
+		{
+			int num = pending_flash_addr.erase(flash_addr);
+			assert(num == 1);
+
+			// If the cache line is valid, unlock it.
+			if (cache_line_valid)
+				contention_cache_line_unlock(cache_addr);
+
+			// Restart queue checking.
+			this->check_queue = true;
+			pending_count -= 1;
+
+			return;
+		}
+
+		// At this point, we know that the page_addr is in the pending_pages list.
+		// This implies we also know that there was a cache miss for this access.
+		// If the count for the pending_pages entry is > 0, then we DO NOT unlock
+		// the page yet.
+
 		// Erase the page from the pending page map.
 		// Note: the if statement is needed to ensure that the VictimRead operation (if it was invoked as part of a cache miss)
 		// is already complete. If not, the pending_set removal will be done in VictimReadFinish().
-		if (pending_pages[PAGE_ADDRESS(flash_addr)] == 0)
+		else if (pending_pages[PAGE_ADDRESS(flash_addr)] == 0)
 		{
 			int num = pending_pages.erase(PAGE_ADDRESS(flash_addr));
 			if (num != 1)
@@ -1497,6 +1530,10 @@ namespace HybridSim {
 				cerr << "orig:" << orig_addr << " aligned:" << flash_addr << "\n\n";
 				abort();
 			}
+
+			// Also remove the pending_flash_addr entry.
+			num = pending_flash_addr.erase(flash_addr);
+			assert(num == 1);
 
 			// If the victim page is valid, then unlock it too.
 			if (victim_valid)
@@ -1510,11 +1547,12 @@ namespace HybridSim {
 			this->check_queue = true;
 			pending_count -= 1;
 		}
-
 	}
 
-	bool HybridSystem::contention_is_unlocked(uint64_t page_addr)
+	bool HybridSystem::contention_is_unlocked(uint64_t flash_addr)
 	{
+		uint64_t page_addr = PAGE_ADDRESS(flash_addr);
+
 		// First see if the set is locked. This is done by looking at the set_counter.
 		// If the set counter exists and is equal to the set size, then we should NOT be trying to do any more accesses
 		// to the set, because this means that all of the cache lines are locked.
@@ -1535,16 +1573,18 @@ namespace HybridSim {
 	}
 
 
-	void HybridSystem::contention_increment(uint64_t page_addr)
+	void HybridSystem::contention_increment(uint64_t flash_addr)
 	{
+		uint64_t page_addr = PAGE_ADDRESS(flash_addr);
 		// TODO: Add somme error checking here (e.g. make sure page is in pending_pages and make sure count is >= 0)
 
 		// This implements a counting semaphore for the page so that it isn't unlocked until the count is 0.
 		pending_pages[page_addr] += 1;
 	}
 
-	void HybridSystem::contention_decrement(uint64_t page_addr)
+	void HybridSystem::contention_decrement(uint64_t flash_addr)
 	{
+		uint64_t page_addr = PAGE_ADDRESS(flash_addr);
 		// TODO: Add somme error checking here (e.g. make sure page is in pending_pages and make sure count is >= 0)
 
 		// This implements a counting semaphore for the page so that it isn't unlocked until the count is 0.

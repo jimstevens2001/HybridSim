@@ -106,12 +106,13 @@ namespace HybridSim
 
 
 		// Page Contention Functions
-		void contention_lock(uint64_t page_addr);
+		void contention_lock(uint64_t flash_addr);
+		void contention_page_lock(uint64_t flash_addr);
 		void contention_unlock(uint64_t flash_addr, uint64_t orig_addr, string operation, bool victim_valid, uint64_t victim_page, 
 				bool cache_line_valid, uint64_t cache_addr);
-		bool contention_is_unlocked(uint64_t page_addr);
-		void contention_increment(uint64_t page_addr);
-		void contention_decrement(uint64_t page_addr);
+		bool contention_is_unlocked(uint64_t flash_addr);
+		void contention_increment(uint64_t flash_addr);
+		void contention_decrement(uint64_t flash_addr);
 		void contention_victim_lock(uint64_t page_addr);
 		void contention_victim_unlock(uint64_t page_addr);
 		void contention_cache_line_lock(uint64_t cache_addr);
@@ -148,7 +149,9 @@ namespace HybridSim
 		unordered_map<uint64_t, Pending> dram_pending;
 		unordered_map<uint64_t, Pending> flash_pending;
 
-		unordered_map<uint64_t, uint64_t> pending_pages; // If a page is in the pending set, then skip subsequent transactions to the page.
+		
+		unordered_map<uint64_t, uint64_t> pending_flash_addr; // If a page is in the pending_flash_addr , then skip subsequent transactions to the flash address.
+		unordered_map<uint64_t, uint64_t> pending_pages; // If a page is in the pending_pages, then skip subsequent transactions to the page.
 		unordered_map<uint64_t, uint64_t> set_counter; // Counts the number of outstanding transactions to each set.
 
 		bool check_queue; // If there is nothing to do, don't check the queue until the next event occurs that will make new work.
