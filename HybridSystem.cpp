@@ -1494,13 +1494,16 @@ namespace HybridSim {
 	void HybridSystem::contention_unlock(uint64_t flash_addr, uint64_t orig_addr, string operation, bool victim_valid, uint64_t victim_page, 
 			bool cache_line_valid, uint64_t cache_addr)
 	{
-		int page_addr = PAGE_ADDRESS(flash_addr);
+		uint64_t page_addr = PAGE_ADDRESS(flash_addr);
 
 		// If there is no page entry, then this means only the flash address was locked (i.e. it is a DRAM hit).
 		if (pending_pages.count(page_addr) == 0)
 		{
 			int num = pending_flash_addr.erase(flash_addr);
 			assert(num == 1);
+
+			// Victim should never be valid if we were only servicing a cache hit.
+			assert(victim_valid == false);
 
 			// If the cache line is valid, unlock it.
 			if (cache_line_valid)
@@ -1565,8 +1568,8 @@ namespace HybridSim {
 			}
 		}
 
-		// If the page is not in the penting_pages map, then it is unlocked.
-		if (pending_pages.count(page_addr) == 0)
+		// If the page is not in the penting_pages and pending_flash_addr map, then it is unlocked.
+		if ((pending_pages.count(page_addr) == 0) && (pending_flash_addr.count(flash_addr) == 0))
 			return true;
 		else
 			return false;
