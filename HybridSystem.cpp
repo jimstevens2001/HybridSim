@@ -1855,3 +1855,13 @@ namespace HybridSim {
 	}
 
 } // Namespace HybridSim
+
+// Extra function needed for Sandia SST.
+extern "C"
+{
+    void libhybridsim_is_present(void)
+    {
+	;
+    }
+}
+
