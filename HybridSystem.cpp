@@ -776,11 +776,11 @@ namespace HybridSim {
 		dram_queue.push_back(t);
 #else
 		// Schedule reads for the entire page.
-		p.init_wait();
+		dram_pending_wait[p.cache_addr] = unordered_set<uint64_t>();
 		for(uint64_t i=0; i<PAGE_SIZE/BURST_SIZE; i++)
 		{
 			uint64_t addr = p.cache_addr + i*BURST_SIZE;
-			p.insert_wait(addr);
+			dram_pending_wait[p.cache_addr].insert(addr);
 			Transaction t = Transaction(DATA_READ, addr, NULL);
 			dram_queue.push_back(t);
 		}
@@ -797,24 +797,28 @@ namespace HybridSim {
 		if (DEBUG_CACHE)
 		{
 			cerr << currentClockCycle << ": " << "VICTIM_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ") offset="
-				<< PAGE_OFFSET(addr) << " num_left=" << p.wait->size() << "\n";
+				<< PAGE_OFFSET(addr);
 		}
 
 #if SINGLE_WORD
+		cerr << " num_left=0 (SINGLE_WORD)\n";
 #else
-		// Remove the read that just finished from the wait set.
-		p.wait->erase(addr);
+		uint64_t cache_page_addr = p.cache_addr;
+		cerr << " num_left=" << dram_pending_wait[cache_page_addr].size() << "\n"; 
 
-		if (!p.wait->empty())
+		// Remove the read that just finished from the wait set.
+		dram_pending_wait[cache_page_addr].erase(addr);
+
+		if (!dram_pending_wait[cache_page_addr].empty())
 		{
 			// If not done with this line, then re-enter pending map.
-			dram_pending[PAGE_ADDRESS(addr)] = p;
+			dram_pending[cache_page_addr] = p;
 			dram_pending_set.erase(addr);
 			return;
 		}
 
 		// The line has completed. Delete the wait set object and move on.
-		p.delete_wait();
+		dram_pending_wait.erase(cache_page_addr);
 #endif
 
 
@@ -885,11 +889,11 @@ namespace HybridSim {
 		flash_queue.push_back(t);
 #else
 		// Schedule reads for the entire page.
-		p.init_wait();
+		flash_pending_wait[page_addr] = unordered_set<uint64_t>();
 		for(uint64_t i=0; i<PAGE_SIZE/FLASH_BURST_SIZE; i++)
 		{
 			uint64_t addr = page_addr + i*FLASH_BURST_SIZE;
-			p.insert_wait(addr);
+			flash_pending_wait[page_addr].insert(addr);
 			Transaction t = Transaction(DATA_READ, addr, NULL);
 			flash_queue.push_back(t);
 		}
@@ -907,15 +911,19 @@ namespace HybridSim {
 		if (DEBUG_CACHE)
 		{
 			cerr << currentClockCycle << ": " << "LINE_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ") offset="
-				<< PAGE_OFFSET(addr) << " num_left=" << p.wait->size() << "\n";
+				<< PAGE_OFFSET(addr);
 		}
 
 #if SINGLE_WORD
+		cerr << " num_left=0 (SINGLE_WORD)\n";
 #else
-		// Remove the read that just finished from the wait set.
-		p.wait->erase(addr);
+		uint64_t page_addr = PAGE_ADDRESS(p.flash_addr);
+		cerr << " num_left=" << dram_pending_wait[page_addr].size() << "\n"; 
 
-		if (!p.wait->empty())
+		// Remove the read that just finished from the wait set.
+		flash_pending_wait[page_addr].erase(addr);
+
+		if (!flash_pending_wait[page_addr].empty())
 		{
 			// If not done with this line, then re-enter pending map.
 			flash_pending[PAGE_ADDRESS(addr)] = p;
@@ -923,7 +931,7 @@ namespace HybridSim {
 		}
 
 		// The line has completed. Delete the wait set object and move on.
-		p.delete_wait();
+		flash_pending_wait.erase(page_addr);
 #endif
 
 

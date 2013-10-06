@@ -149,6 +149,10 @@ namespace HybridSim
 		unordered_map<uint64_t, Pending> dram_pending;
 		unordered_map<uint64_t, Pending> flash_pending;
 
+		// Per page wait sets for the VICTIM_READ and LINE_READ operations.
+		unordered_map<uint64_t, unordered_set<uint64_t>> dram_pending_wait;
+		unordered_map<uint64_t, unordered_set<uint64_t>> flash_pending_wait;
+
 		
 		unordered_map<uint64_t, uint64_t> pending_flash_addr; // If a page is in the pending_flash_addr , then skip subsequent transactions to the flash address.
 		unordered_map<uint64_t, uint64_t> pending_pages; // If a page is in the pending_pages, then skip subsequent transactions to the page.

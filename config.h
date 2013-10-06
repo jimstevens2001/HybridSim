@@ -247,28 +247,10 @@ class Pending
 	bool victim_valid;
 	bool callback_sent;
 	TransactionType type; // DATA_READ or DATA_WRITE
-	unordered_set<uint64_t> *wait;
 
-	Pending() : op(VICTIM_READ), flash_addr(0), cache_addr(0), victim_tag(0), type(DATA_READ), wait(0) {};
+	Pending() : op(VICTIM_READ), flash_addr(0), cache_addr(0), victim_tag(0), type(DATA_READ) {};
         string str() { stringstream out; out << "O=" << op << " F=" << flash_addr << " C=" << cache_addr << " V=" << victim_tag 
 		<< " T=" << type; return out.str(); }
-
-	void init_wait()
-	{
-		wait = new unordered_set<uint64_t>;
-
-	}
-
-	void insert_wait(uint64_t n)
-	{
-		wait->insert(n);
-	}
-
-	void delete_wait()
-	{
-		delete wait;
-		wait = NULL;
-	}
 };
 
 } // namespace HybridSim
