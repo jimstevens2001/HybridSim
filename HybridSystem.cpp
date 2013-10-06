@@ -801,10 +801,13 @@ namespace HybridSim {
 		}
 
 #if SINGLE_WORD
-		cerr << " num_left=0 (SINGLE_WORD)\n";
+		if (DEBUG_CACHE)
+			cerr << " num_left=0 (SINGLE_WORD)\n";
 #else
 		uint64_t cache_page_addr = p.cache_addr;
-		cerr << " num_left=" << dram_pending_wait[cache_page_addr].size() << "\n"; 
+
+		if (DEBUG_CACHE)
+			cerr << " num_left=" << dram_pending_wait[cache_page_addr].size() << "\n"; 
 
 		// Remove the read that just finished from the wait set.
 		dram_pending_wait[cache_page_addr].erase(addr);
@@ -915,10 +918,13 @@ namespace HybridSim {
 		}
 
 #if SINGLE_WORD
-		cerr << " num_left=0 (SINGLE_WORD)\n";
+		if (DEBUG_CACHE)
+			cerr << " num_left=0 (SINGLE_WORD)\n";
 #else
 		uint64_t page_addr = PAGE_ADDRESS(p.flash_addr);
-		cerr << " num_left=" << dram_pending_wait[page_addr].size() << "\n"; 
+
+		if (DEBUG_CACHE)
+			cerr << " num_left=" << flash_pending_wait[page_addr].size() << "\n"; 
 
 		// Remove the read that just finished from the wait set.
 		flash_pending_wait[page_addr].erase(addr);
@@ -1032,12 +1038,11 @@ namespace HybridSim {
 		p.victim_valid = false;
 		p.callback_sent = false;
 		p.type = DATA_READ;
-		assert(dram_pending.count(cache_addr) == 0);
-		dram_pending[cache_addr] = p;
+		assert(dram_pending.count(data_addr) == 0);
+		dram_pending[data_addr] = p;
 
 		// Assertions for "this can't happen" situations.
-		assert(dram_pending.count(PAGE_ADDRESS(data_addr)) != 0);
-		assert(dram_pending.count(cache_addr) != 0);
+		assert(dram_pending.count(data_addr) != 0);
 	}
 
 	void HybridSystem::CacheReadFinish(uint64_t addr, Pending p)
@@ -1138,14 +1143,29 @@ namespace HybridSim {
 
 	void HybridSystem::DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle)
 	{
-		if (dram_pending.count(PAGE_ADDRESS(addr)) != 0)
+		// Determine which address to look up in the pending table.
+		// If there is an entry for this page in the dram_pending_wait, then that
+		// means this is for a VICTIM_READ operation and we should use the page address.
+		// Otherwise, this is for a CACHE_READ operation and we should use the addr directly.
+		uint64_t pending_addr;
+		if (dram_pending_wait.count(PAGE_ADDRESS(addr)) != 0)
+		{
+			pending_addr = PAGE_ADDRESS(addr);
+		}
+		else
+		{
+			pending_addr = addr;
+		}
+
+
+		if (dram_pending.count(pending_addr) != 0)
 		{
 			// Get the pending object for this transaction.
-			Pending p = dram_pending[PAGE_ADDRESS(addr)];
+			Pending p = dram_pending[pending_addr];
 
 			// Remove this pending object from dram_pending
-			dram_pending.erase(PAGE_ADDRESS(addr));
-			assert(dram_pending.count(PAGE_ADDRESS(addr)) == 0);
+			dram_pending.erase(pending_addr);
+			assert(dram_pending.count(pending_addr) == 0);
 
 			if (p.op == VICTIM_READ)
 			{
