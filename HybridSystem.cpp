@@ -1637,6 +1637,7 @@ namespace HybridSim {
 	{
 		cache_line cur_line = cache[cache_addr];
 		cur_line.locked = true;
+		cur_line.lock_count++;
 		cache[cache_addr] = cur_line;
 
 		uint64_t set_index = SET_INDEX(cache_addr);
@@ -1649,7 +1650,10 @@ namespace HybridSim {
 	void HybridSystem::contention_cache_line_unlock(uint64_t cache_addr)
 	{
 		cache_line cur_line = cache[cache_addr];
-		cur_line.locked = false;
+		cur_line.lock_count--;
+		assert(cur_line.lock_count >= 0);
+		if (cur_line.lock_count == 0)
+			cur_line.locked = false; // Only unlock if the count for outstanding accesses is 0.
 		cache[cache_addr] = cur_line;
 
 		uint64_t set_index = SET_INDEX(cache_addr);
