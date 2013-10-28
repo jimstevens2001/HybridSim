@@ -35,7 +35,7 @@
 #define ENABLE_PERFECT_PREFETCHING 0
 #define PREFETCH_FILE "traces/prefetch_data.txt"
 
-#define SEQUENTIAL_PREFETCHING_WINDOW 16
+#define SEQUENTIAL_PREFETCHING_WINDOW 0
 
 // Debug flags.
 
