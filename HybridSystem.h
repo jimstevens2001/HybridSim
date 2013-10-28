@@ -197,6 +197,10 @@ namespace HybridSim
 		uint64_t tlb_misses;
 		uint64_t tlb_hits;
 
+		// Prefetch tracking.
+		uint64_t unused_prefetches; // Count of unused prefetched pages in the DRAM cache.
+		uint64_t unused_prefetch_victims; // Count of unused prefetched pages that were never used before being evicted.
+
 	};
 
 	HybridSystem *getMemorySystemInstance(uint id, string ini);

@@ -169,6 +169,9 @@ namespace HybridSim {
 		tlb_misses = 0;
 		tlb_hits = 0;
 
+		unused_prefetches = 0;
+		unused_prefetch_victims = 0;
+
 		// Create file descriptors for debugging output (if needed).
 		if (DEBUG_VICTIM) 
 		{
@@ -736,6 +739,14 @@ namespace HybridSim {
 				cerr << currentClockCycle << ": " << "The victim is dirty? " << cur_line.dirty << endl;
 			}
 
+			if ((cur_line.prefetched) && (cur_line.used == false))
+			{
+				// An unused prefetch is being removed from the cache, so transfer the count
+				// to the unused_prefetch_victims counter.
+				unused_prefetches--;
+				unused_prefetch_victims++;
+			}
+
 			Pending p;
 			p.orig_addr = trans.address;
 			p.flash_addr = addr;
@@ -957,6 +968,16 @@ namespace HybridSim {
 		cur_line.dirty = false;
 		cur_line.valid = true;
 		cur_line.ts = currentClockCycle;
+		cur_line.used = false;
+		if (p.type == PREFETCH)
+		{
+			cur_line.prefetched = true;
+			unused_prefetches++;
+		}
+		else
+		{
+			cur_line.prefetched = false;
+		}
 		cache[p.cache_addr] = cur_line;
 
 		// Schedule LineWrite operation to store the line in DRAM.
@@ -1026,6 +1047,9 @@ namespace HybridSim {
 		// It really doesn't matter (AFAICT) as long as it is consistent.
 		cache_line cur_line = cache[cache_addr];
 		cur_line.ts = currentClockCycle;
+		if ((cur_line.prefetched) && (cur_line.used == false)) // Note: this if statement must come before cur_line.used is set to true.
+			unused_prefetches--;
+		cur_line.used = true;
 		cache[cache_addr] = cur_line;
 
 		// Add a record in the DRAM's pending table.
@@ -1097,6 +1121,9 @@ namespace HybridSim {
 		cache_line cur_line = cache[p.cache_addr];
 		cur_line.dirty = true;
 		cur_line.valid = true;
+		if ((cur_line.prefetched) && (cur_line.used == false)) // Note: this if statement must come before cur_line.used is set to true.
+			unused_prefetches--;
+		cur_line.used = true;
 		cur_line.ts = currentClockCycle;
 		cache[p.cache_addr] = cur_line;
 
@@ -1357,6 +1384,8 @@ namespace HybridSim {
 
 		cerr << "TLB Misses: " << tlb_misses << "\n";
 		cerr << "TLB Hits: " << tlb_hits << "\n";
+		cerr << "Unused prefetches in cache: " << unused_prefetches << "\n";
+		cerr << "Unused prefetch victims: " << unused_prefetch_victims << "\n";
 
 		// Print out the log file.
 		if (ENABLE_LOGGER)

@@ -35,7 +35,7 @@
 #define ENABLE_PERFECT_PREFETCHING 0
 #define PREFETCH_FILE "traces/prefetch_data.txt"
 
-#define SEQUENTIAL_PREFETCHING_WINDOW 0
+#define SEQUENTIAL_PREFETCHING_WINDOW 16
 
 // Debug flags.
 
@@ -220,11 +220,17 @@ class cache_line
         uint64_t tag;
         uint64_t data;
         uint64_t ts;
+		bool prefetched; // Set to 1 if a cache_line is brought into DRAM as a prefetch.
+		bool used; // Like dirty, but also set to 1 for reads. Used for tracking prefetch hits vs. misses.
 
-        cache_line() : valid(false), dirty(false), locked(false), lock_count(0), tag(0), data(0), ts(0) {}
-        string str() { stringstream out; out << "tag=" << tag << " data=" << data << " valid=" << valid << " dirty=" << dirty << " locked=" << locked 
-				<< " lock_count=" << lock_count << " ts=" << ts; return out.str(); }
-
+        cache_line() : valid(false), dirty(false), locked(false), lock_count(0), tag(0), data(0), ts(0), prefetched(0), used(0) {}
+        string str() 
+		{ 
+			stringstream out; 
+			out << "tag=" << tag << " data=" << data << " valid=" << valid << " dirty=" << dirty << " locked=" << locked 
+				<< " lock_count=" << lock_count << " ts=" << ts << " prefetched=" << prefetched << " used=" << used;
+			return out.str(); 
+		}
 };
 
 enum PendingOperation
