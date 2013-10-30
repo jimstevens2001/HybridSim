@@ -661,7 +661,7 @@ namespace HybridSim {
 				issue_sequential_prefetches(addr);
 			}
 
-			if (ENABLE_STREAM_BUFFER)
+			if ((ENABLE_STREAM_BUFFER) && (trans.transactionType != PREFETCH))
 			{
 				stream_buffer_miss_handler(PAGE_ADDRESS(addr));
 			}
