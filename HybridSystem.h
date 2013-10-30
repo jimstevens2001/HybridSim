@@ -130,6 +130,10 @@ namespace HybridSim
 
 		// TLB functions
 		void check_tlb(uint64_t page_addr);
+
+		// Stream Buffer Functions
+		void stream_buffer_miss_handler(uint64_t miss_page);
+		void stream_buffer_hit_handler(uint64_t hit_page);
 		
 
 		// State
@@ -198,8 +202,13 @@ namespace HybridSim
 		uint64_t tlb_hits;
 
 		// Prefetch tracking.
+		uint64_t total_prefetches;
 		uint64_t unused_prefetches; // Count of unused prefetched pages in the DRAM cache.
 		uint64_t unused_prefetch_victims; // Count of unused prefetched pages that were never used before being evicted.
+
+		// Stream buffer state.
+		list<pair<uint64_t, uint64_t> > one_miss_table; // pair is (address, cycle)
+		unordered_map<uint64_t, uint64_t> stream_buffers; // address -> cycle
 
 	};
 

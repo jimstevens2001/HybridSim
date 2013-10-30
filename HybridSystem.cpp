@@ -169,6 +169,7 @@ namespace HybridSim {
 		tlb_misses = 0;
 		tlb_hits = 0;
 
+		total_prefetches = 0;
 		unused_prefetches = 0;
 		unused_prefetch_victims = 0;
 
@@ -600,6 +601,12 @@ namespace HybridSim {
 			// Lock the line that was hit (so it cannot be selected as a victim while being processed).
 			contention_cache_line_lock(cache_address);
 
+			if ((ENABLE_STREAM_BUFFER) && 
+					((trans.transactionType == DATA_READ) || (trans.transactionType == DATA_WRITE)))
+			{
+				stream_buffer_hit_handler(PAGE_ADDRESS(addr));
+			}
+
 			// Issue operation to the DRAM.
 			if (trans.transactionType == DATA_READ)
 				CacheRead(trans.address, addr, cache_address);
@@ -652,6 +659,11 @@ namespace HybridSim {
 			if ((SEQUENTIAL_PREFETCHING_WINDOW > 0) && (trans.transactionType != PREFETCH))
 			{
 				issue_sequential_prefetches(addr);
+			}
+
+			if (ENABLE_STREAM_BUFFER)
+			{
+				stream_buffer_miss_handler(PAGE_ADDRESS(addr));
 			}
 
 			// Select a victim offset within the set (LRU)
@@ -972,6 +984,7 @@ namespace HybridSim {
 		if (p.type == PREFETCH)
 		{
 			cur_line.prefetched = true;
+			total_prefetches++;
 			unused_prefetches++;
 		}
 		else
@@ -1384,6 +1397,7 @@ namespace HybridSim {
 
 		cerr << "TLB Misses: " << tlb_misses << "\n";
 		cerr << "TLB Hits: " << tlb_hits << "\n";
+		cerr << "Total prefetches: " << total_prefetches << "\n";
 		cerr << "Unused prefetches in cache: " << unused_prefetches << "\n";
 		cerr << "Unused prefetch victims: " << unused_prefetch_victims << "\n";
 
@@ -1913,6 +1927,93 @@ namespace HybridSim {
 			tlb_hits++;
 			tlb_base_set[tlb_base_addr] = currentClockCycle;
 		}
+	}
+
+	void HybridSystem::stream_buffer_miss_handler(uint64_t miss_page)
+	{
+		uint64_t prior_page = miss_page - PAGE_SIZE;
+		uint64_t next_page = miss_page + PAGE_SIZE;
+
+		// TODO: Handle miss_page == 0 or miss_page == (TOTAL_PAGES * PAGE_SIZE) cases
+
+		bool stream_detected = false;
+		list<pair<uint64_t, uint64_t> >::iterator it;
+		for (it=one_miss_table.begin(); it != one_miss_table.end(); it++)
+		{
+			uint64_t entry_page = (*it).first;
+			//uint64_t entry_cycle = (*it).second;
+
+			if (entry_page == miss_page)
+			{
+				// Somehow we managed to miss the same page twice in a short period of time.
+				// Go ahead and remove this entry to make room for this to be readded.
+				it = one_miss_table.erase(it);
+			}
+			if (entry_page == prior_page)
+			{
+				// Stream detected!
+				stream_detected = true;
+
+				// Remove the entry for the prior page.
+				it = one_miss_table.erase(it);
+
+				// Save the next page in the stream buffer table
+				// This is the address we will detect on a hit to the buffer.
+				stream_buffers[next_page] = currentClockCycle;
+
+				if (stream_buffers.size() > NUM_STREAM_BUFFERS)
+				{
+					// Evict stream buffer with oldest cycle.
+					unordered_map<uint64_t, uint64_t>::iterator sb_it;
+					uint64_t oldest_key = 0;
+					uint64_t oldest_cycle = currentClockCycle;
+					for (sb_it=stream_buffers.begin(); sb_it != stream_buffers.end(); sb_it++)
+					{
+						uint64_t cur_sb_cycle = (*sb_it).second;
+						if (cur_sb_cycle < oldest_cycle)
+						{
+							oldest_key = (*sb_it).first;
+							oldest_cycle = cur_sb_cycle;
+						}
+					}
+					stream_buffers.erase(oldest_key);
+				}
+
+				// Issue prefetches to start the stream.
+				// Count down from the top address. This must be done because addPrefetch puts transactions at the front
+				// of the queue and we want page_addr+PAGE_SIZE to be the first prefetch issued.
+				for (int i=STREAM_BUFFER_LENGTH; i > 0; i--)
+				{
+					// Compute the next prefetch address.
+					uint64_t prefetch_address = miss_page + (i * PAGE_SIZE);
+
+					// If address is above the legal address space for the main memory, then do not issue this prefetch.
+					if (prefetch_address >= (TOTAL_PAGES * PAGE_SIZE))
+						continue;
+
+					// Add the prefetch.
+					addPrefetch(prefetch_address);
+				}
+
+				break;
+			}
+		}
+
+		if (!stream_detected)
+		{
+			// Insert miss address into the one_miss_table.
+			one_miss_table.push_back(make_pair(miss_page, currentClockCycle));
+		}
+
+		// Enforce the size of the one miss table.
+		if (one_miss_table.size() > ONE_MISS_TABLE_SIZE)
+			one_miss_table.pop_front();
+
+	}
+
+	void HybridSystem::stream_buffer_hit_handler(uint64_t hit_page)
+	{
+
 	}
 
 } // Namespace HybridSim

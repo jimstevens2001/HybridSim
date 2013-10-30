@@ -37,6 +37,13 @@
 
 #define SEQUENTIAL_PREFETCHING_WINDOW 0
 
+// Stream Buffer Setup.
+#define ENABLE_STREAM_BUFFER 1
+#define ONE_MISS_TABLE_SIZE 10
+#define NUM_STREAM_BUFFERS 10
+#define STREAM_BUFFER_LENGTH 4
+
+
 // Debug flags.
 
 // Lots of output during cache operations. Goes to stdout.
@@ -120,6 +127,7 @@ const uint64_t FOURGB = 4294967296; // 1024^3 * 4
 #include <ctime>
 #include <stdint.h>
 #include <vector>
+#include <utility>
 #include <assert.h>
 
 // Include external interface for DRAMSim.
