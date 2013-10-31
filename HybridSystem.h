@@ -210,6 +210,10 @@ namespace HybridSim
 		list<pair<uint64_t, uint64_t> > one_miss_table; // pair is (address, cycle)
 		unordered_map<uint64_t, uint64_t> stream_buffers; // address -> cycle
 
+		// Stream buffer tracking.
+		uint64_t unique_one_misses;
+		uint64_t unique_stream_buffers;
+
 	};
 
 	HybridSystem *getMemorySystemInstance(uint id, string ini);

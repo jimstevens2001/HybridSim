@@ -173,6 +173,9 @@ namespace HybridSim {
 		unused_prefetches = 0;
 		unused_prefetch_victims = 0;
 
+		unique_one_misses = 0;
+		unique_stream_buffers = 0;
+
 		// Create file descriptors for debugging output (if needed).
 		if (DEBUG_VICTIM) 
 		{
@@ -1401,6 +1404,12 @@ namespace HybridSim {
 		cerr << "Unused prefetches in cache: " << unused_prefetches << "\n";
 		cerr << "Unused prefetch victims: " << unused_prefetch_victims << "\n";
 
+		if (ENABLE_STREAM_BUFFER)
+		{
+			cerr << "Unique one misses: " << unique_one_misses << "\n";
+			cerr << "Unique stream buffers: " << unique_stream_buffers << "\n";
+		}
+
 		// Print out the log file.
 		if (ENABLE_LOGGER)
 		{
@@ -1948,11 +1957,18 @@ namespace HybridSim {
 				// Somehow we managed to miss the same page twice in a short period of time.
 				// Go ahead and remove this entry to make room for this to be readded.
 				it = one_miss_table.erase(it);
+
+				if (DEBUG_STREAM_BUFFER)
+					cerr << currentClockCycle << " : Stream buffer one miss double hit. miss_page=" << miss_page << "\n";
 			}
 			if (entry_page == prior_page)
 			{
 				// Stream detected!
 				stream_detected = true;
+
+				if (DEBUG_STREAM_BUFFER)
+					cerr << currentClockCycle << " : New stream detected. Allocating stream buffer at addr " << next_page << "\n";
+
 
 				// Remove the entry for the prior page.
 				it = one_miss_table.erase(it);
@@ -1960,6 +1976,7 @@ namespace HybridSim {
 				// Save the next page in the stream buffer table
 				// This is the address we will detect on a hit to the buffer.
 				stream_buffers[next_page] = currentClockCycle;
+				unique_stream_buffers++;
 
 				if (stream_buffers.size() > NUM_STREAM_BUFFERS)
 				{
@@ -1977,6 +1994,9 @@ namespace HybridSim {
 						}
 					}
 					stream_buffers.erase(oldest_key);
+
+					if (DEBUG_STREAM_BUFFER)
+						cerr << currentClockCycle << " : Stream buffer evicted addr=" << oldest_key << "\n";
 				}
 
 				// Issue prefetches to start the stream.
@@ -2003,16 +2023,52 @@ namespace HybridSim {
 		{
 			// Insert miss address into the one_miss_table.
 			one_miss_table.push_back(make_pair(miss_page, currentClockCycle));
+			unique_one_misses++;
+
+			if (DEBUG_STREAM_BUFFER)
+				cerr << currentClockCycle << " : One miss detected addr=" << miss_page << "\n";
 		}
 
 		// Enforce the size of the one miss table.
 		if (one_miss_table.size() > ONE_MISS_TABLE_SIZE)
+		{
+			if (DEBUG_STREAM_BUFFER)
+			{
+				cerr << currentClockCycle << " : One miss evicted addr=" << one_miss_table.front().first << "\n";
+			}
+
 			one_miss_table.pop_front();
+		}
 
 	}
 
 	void HybridSystem::stream_buffer_hit_handler(uint64_t hit_page)
 	{
+		if (stream_buffers.count(hit_page) == 1)
+		{
+			// Stream buffer hit!
+
+			uint64_t next_page = hit_page + PAGE_SIZE;
+			uint64_t prefetch_address = hit_page + (STREAM_BUFFER_LENGTH * PAGE_SIZE);
+
+			if ((DEBUG_STREAM_BUFFER) && (DEBUG_STREAM_BUFFER_HIT))
+			{
+				cerr << currentClockCycle << " : Stream Buffer Hit. hit_page=" << hit_page
+					<< " prior cycle=" << stream_buffers[hit_page] << " next_page=" << next_page 
+					<< " prefetch_addr=" << prefetch_address << "\n";
+			}
+
+			// Remove the current stream buffer entry and replace it with the next page.
+			stream_buffers.erase(hit_page);
+			stream_buffers[next_page] = currentClockCycle;
+
+			// Compute the next prefetch address.
+			// If address is above the legal address space for the main memory, then do not issue this prefetch.
+			if (prefetch_address < (TOTAL_PAGES * PAGE_SIZE))
+			{
+				addPrefetch(prefetch_address);
+			}
+		}
 
 	}
 

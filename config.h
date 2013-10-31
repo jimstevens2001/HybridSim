@@ -42,6 +42,8 @@
 #define ONE_MISS_TABLE_SIZE 10
 #define NUM_STREAM_BUFFERS 10
 #define STREAM_BUFFER_LENGTH 4
+#define DEBUG_STREAM_BUFFER 0
+#define DEBUG_STREAM_BUFFER_HIT 0 // This generates a lot of stuff.
 
 
 // Debug flags.
