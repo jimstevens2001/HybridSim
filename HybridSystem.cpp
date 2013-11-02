@@ -172,9 +172,11 @@ namespace HybridSim {
 		total_prefetches = 0;
 		unused_prefetches = 0;
 		unused_prefetch_victims = 0;
+		prefetch_hit_nops = 0;
 
 		unique_one_misses = 0;
 		unique_stream_buffers = 0;
+		stream_buffer_hits = 0;
 
 		// Create file descriptors for debugging output (if needed).
 		if (DEBUG_VICTIM) 
@@ -621,11 +623,11 @@ namespace HybridSim {
 			}
 			else if(trans.transactionType == PREFETCH)
 			{
-				// We allow PREFETCH to hit the cache because of non-determinism from marss.
+				// Prefetch hits are just NOPs.
 				uint64_t flash_address = addr;
 				contention_unlock(flash_address, flash_address, "PREFETCH (hit)", false, 0, true, cache_address);
 
-				// TODO: Add some logging for this event.
+				prefetch_hit_nops++;
 
 				return; 
 			}
@@ -1403,11 +1405,13 @@ namespace HybridSim {
 		cerr << "Total prefetches: " << total_prefetches << "\n";
 		cerr << "Unused prefetches in cache: " << unused_prefetches << "\n";
 		cerr << "Unused prefetch victims: " << unused_prefetch_victims << "\n";
+		cerr << "Prefetch hit NOPs: " << prefetch_hit_nops << "\n";
 
 		if (ENABLE_STREAM_BUFFER)
 		{
 			cerr << "Unique one misses: " << unique_one_misses << "\n";
 			cerr << "Unique stream buffers: " << unique_stream_buffers << "\n";
+			cerr << "Stream buffers hits: " << stream_buffer_hits << "\n";
 		}
 
 		// Print out the log file.
@@ -1940,11 +1944,15 @@ namespace HybridSim {
 
 	void HybridSystem::stream_buffer_miss_handler(uint64_t miss_page)
 	{
+		// Don't do any miss processing for the first or last pages in memory.
+		if ((miss_page == 0) || (miss_page == (TOTAL_PAGES - 1)*PAGE_SIZE))
+			return;
+
+		// Calculate the neighboring pages.
 		uint64_t prior_page = miss_page - PAGE_SIZE;
 		uint64_t next_page = miss_page + PAGE_SIZE;
 
-		// TODO: Handle miss_page == 0 or miss_page == (TOTAL_PAGES * PAGE_SIZE) cases
-
+		// Look through the one miss table to see if there are any matches.
 		bool stream_detected = false;
 		list<pair<uint64_t, uint64_t> >::iterator it;
 		for (it=one_miss_table.begin(); it != one_miss_table.end(); it++)
@@ -2047,6 +2055,7 @@ namespace HybridSim {
 		if (stream_buffers.count(hit_page) == 1)
 		{
 			// Stream buffer hit!
+			stream_buffer_hits++;
 
 			uint64_t next_page = hit_page + PAGE_SIZE;
 			uint64_t prefetch_address = hit_page + (STREAM_BUFFER_LENGTH * PAGE_SIZE);
@@ -2060,13 +2069,13 @@ namespace HybridSim {
 
 			// Remove the current stream buffer entry and replace it with the next page.
 			stream_buffers.erase(hit_page);
-			stream_buffers[next_page] = currentClockCycle;
 
-			// Compute the next prefetch address.
-			// If address is above the legal address space for the main memory, then do not issue this prefetch.
+			// If the prefetch address is out of range, then do nothing.
 			if (prefetch_address < (TOTAL_PAGES * PAGE_SIZE))
 			{
+				// If it is in range, add the prefetch and readd the stream buffer.
 				addPrefetch(prefetch_address);
+				stream_buffers[next_page] = currentClockCycle;
 			}
 		}
 
