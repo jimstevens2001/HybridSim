@@ -24,3 +24,4 @@ hybridsim.log
 run.sh
 tags
 state/
+untracked_traces/*
