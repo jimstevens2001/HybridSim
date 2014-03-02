@@ -2081,6 +2081,131 @@ namespace HybridSim {
 
 	}
 
+
+// Extra functions for C interface (used by Python front end)
+class HybridSim_C_Callbacks
+{
+	public:
+	// Lists for tracking received callback data.
+	list<uint> done_id;
+	list<uint64_t> done_address;
+	list<uint64_t> done_cycle;
+	list<bool> done_isWrite;
+
+	void read_complete(uint id, uint64_t address, uint64_t cycle)
+	{
+		done_id.push_back(id);
+		done_address.push_back(address);
+		done_cycle.push_back(cycle);
+		done_isWrite.push_back(false);
+	}
+
+	void write_complete(uint id, uint64_t address, uint64_t cycle)
+	{
+		done_id.push_back(id);
+		done_address.push_back(address);
+		done_cycle.push_back(cycle);
+		done_isWrite.push_back(true);
+	}
+
+	void register_cb(HybridSystem *hs)
+	{
+		typedef CallbackBase<void,uint,uint64_t,uint64_t> Callback_t;
+		Callback_t *read_cb = new Callback<HybridSim_C_Callbacks, void, uint, uint64_t, uint64_t>(this, &HybridSim_C_Callbacks::read_complete);
+		Callback_t *write_cb = new Callback<HybridSim_C_Callbacks, void, uint, uint64_t, uint64_t>(this, &HybridSim_C_Callbacks::write_complete);
+		hs->RegisterCallbacks(read_cb, write_cb);
+	}
+
+	bool get_next_result(uint *sysID, uint64_t *addr, uint64_t *cycle, bool *isWrite)
+	{
+		if (done_id.empty())
+		{
+			*sysID = 0;
+			*addr = 0;
+			*cycle = 0;
+			*isWrite = false;
+
+			return false;
+		}
+		else
+		{
+			// Set the result pointers.
+			*sysID = done_id.front();
+			*addr = done_address.front();
+			*cycle = done_cycle.front();
+			*isWrite = done_isWrite.front();
+
+			// Pop the front of each list.
+			done_id.pop_front();
+			done_address.pop_front();
+			done_cycle.pop_front();
+			done_isWrite.pop_front();
+
+			return true;
+		}
+	}
+};
+HybridSim_C_Callbacks c_callbacks;
+
+extern "C"
+{
+	HybridSystem *HybridSim_C_getMemorySystemInstance(uint id, char *ini)
+	{
+		// Note ini is implicitly transformed to C++ string type.
+		HybridSystem *hs = getMemorySystemInstance(id, ini);
+
+		// Register callbacks to the HybridSim_C_callbacks object.
+		c_callbacks.register_cb(hs);
+
+		return hs;
+	}
+
+	bool HybridSim_C_addTransaction(HybridSystem *hs, bool isWrite, uint64_t addr)
+	{
+		return hs->addTransaction(isWrite, addr);
+	}
+
+	bool HybridSim_C_WillAcceptTransaction(HybridSystem *hs)
+	{
+		return hs->WillAcceptTransaction();
+	}
+
+	void HybridSim_C_update(HybridSystem *hs)
+	{
+		hs->update();
+	}
+
+	// use this instead of the callbacks since I can't do callbacks through the Python cdll interface
+	// The protocol is to call this repetitively after each update until it returns false.
+	// When it returns false, the sysID, addr, cycle, and isWrite are don't cares
+	// When it returns true, the output values are set to the completed transaction
+	bool HybridSim_C_PollCompletion(HybridSystem *hs, uint *sysID, uint64_t *addr, uint64_t *cycle, bool *isWrite)
+	{
+		return c_callbacks.get_next_result(sysID, addr, cycle, isWrite);
+	}
+
+	void HybridSim_C_mmio(HybridSystem *hs, uint64_t operation, uint64_t address)
+	{
+		hs->mmio(operation, address);
+	}
+
+	void HybridSim_C_syncAll(HybridSystem *hs)
+	{
+		hs->syncAll();
+	}
+
+	void HybridSim_C_reportPower(HybridSystem *hs)
+	{
+		hs->reportPower();
+	}
+
+	void HybridSim_C_printLogfile(HybridSystem *hs)
+	{
+		hs->printLogfile();
+	}
+
+}
+
 } // Namespace HybridSim
 
 // Extra function needed for Sandia SST.
@@ -2091,4 +2216,6 @@ extern "C"
 	;
     }
 }
+
+
 
