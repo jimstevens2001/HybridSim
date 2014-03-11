@@ -29,6 +29,7 @@ class HybridSimTBS(object):
 
 		if (self.complete % 10000 == 0) or (cycle - self.last_clock > self.CLOCK_DELAY):
 			print 'Complete=',self.complete,'\t\tpending=',self.pending,'\t\tcycle_count=',cycle,'\t\tthrottle_count=',self.throttle_count
+			self.last_clock = cycle
 
 	def run_trace(self, tracefile):
 		mem = hybridsim.HybridSim(1, '')
