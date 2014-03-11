@@ -9,6 +9,7 @@ results/
 *.cpp~
 *.log
 *.png
+*.pyc
 *~
 out
 nohup.out
