@@ -3,16 +3,20 @@ import sys
 import hybridsim
 
 
-class ThreadTrace(object):
-	def __init__(self, trace_id, tracefile, parent):
-		self.trace_id = trace_id
+class TraceThread(object):
+	def __init__(self, thread_id, tracefile, parent):
+		self.thread_id = thread_id
 		self.tracefile = tracefile
 		self.input_file = open(tracefile,'r')
 		self.parent = parent
 
 		self.complete = 0
 		self.pending = 0
-		self.trace_cycles = 0
+		self.trace_cycles = 0 # Cycles in which we made progress in the trace file.
+		self.throttle_count = 0 # Number of times we stalled during the trace execution.
+		self.throttle_cycles = 0 # Number of cycles stalled during trace execution.
+		self.final_cycles = 0 # Cycles passed after trace was done being generated, but while pending transactions were still outstanding.
+		self.done_cycles = 0 # Cycles passed after all the trace was done and pending transactions completed.
 
 		self.trace_done = False
 
@@ -20,13 +24,27 @@ class ThreadTrace(object):
 		self.trans_write = False
 		self.trans_addr = 0
 
+		self.get_next_trans()
+
 	def update(self):
+		if self.trace_done:
+			if self.pending > 0:
+				self.final_cycles += 1
+			else:
+				self.done_cycles += 1
+			return
+
+		# TODO: Add conditions to check before incrementing trace cycles.
+		# Update throttle count and throttle cycles appropriately.
+
+
 		# Called each time a clock cycle runs with this trace active.
 		# This is NOT called when the trace is being stalled.
 		self.trace_cycles += 1
 
 		if self.trace_cycles >= self.trans_cycle:
-			self.parent.addTransaction(self.trace_id, self.trans_write, self.trans_addr)
+			self.parent.addTransaction(self.thread_id, self.trans_write, self.trans_addr)
+			self.pending += 1
 			self.get_next_trans()
 
 
@@ -60,70 +78,91 @@ class ThreadTrace(object):
 			return
 
 		# If we get to here, then there are no more transactions.
-		self.trace_done = True
+		self.done()
 
 	
 	def transaction_complete(self, isWrite, sysID, addr, cycle):
 		self.pending -= 1
 		self.complete += 1
 
-	def close(self):
-		inFile.close()
+		if self.trace_done and self.pending == 0:
+			print 'thread',self.thread_id,'received its last pending transaction.'
+
+	def done(self):
+		print 'thread',self.thread_id,'is done issuing new transactions.'
+		self.trace_done = True
+		self.input_file.close()
+
+	def print_summary(self):
+		print 'thread',self.thread_id,'summary...'
+		print 'tracefile = ',self.tracefile
+		print 'completed transactions =',self.complete
+		print 'trace_cycles =',self.trace_cycles
+		print 'throttle_count =',self.throttle_count
+		print 'throttle_cycles =',self.throttle_cycles
+		print 'final_cycles =',self.final_cycles
+		print 'done_cycles =',self.done_cycles
+		print 'total_cycles = ', (self.trace_cycles + self.throttle_cycles + self.final_cycles + self.done_cycles)
+		print
+
 
 
 class MultiThreadedTBS(object):
 	def __init__(self, config_file):
-		self.MAX_PENDING=36
-		self.MIN_PENDING=36
 		self.complete = 0
 		self.pending = 0
 
-		self.trace_cycles = 0
-		self.throttle_count = 0
-		self.throttle_cycles = 0
-		self.final_cycles = 0
+		self.cycles = 0
+
+		self.done = False
+		self.quantum_cycles_left = 0
+		self.quantum_num = -1
+		self.cur_running = None
+		self.schedule_index = -1
 
 		self.last_clock = 0
 		self.CLOCK_DELAY = 1000000
 
 		self.config_file = config_file
 
-		self.cores = 1
-		self.quantum_cycles = 2666667
-		self.trace_files = ['traces/big_0.txt', 'traces/big_512.txt']
-		self.schedule = {0: [0, 1]}
+		self.cores = 2
+		#self.quantum_cycles = 2666667
+		self.quantum_cycles = 10000
+		self.trace_files = ['traces/big_0.txt', 'traces/big_512.txt', 'traces/big_0.txt', 'traces/big_512.txt']
+		self.base_addresses = [] # TODO: Implement this feature to add base address to all trace addresses (except kernel stuff).
+		self.schedule = [[0,2], [1,2], [2,3], [3,0]]
 
-		self.cur_quantum = 0
-
-		self.cur_cycles = 0
-
-		self.cur_thread = {}
-		for i in range(self.cores):
-			self.cur_thread[i] = self.schedule[i][0]
-
-		self.next_transaction = {}
-		for i in range(self.cores):
-			self.next_transaction[i] = None
+		# Verify the integrity of the schedule...
+		for i in self.schedule:
+			if len(i) != self.cores:
+				print 'Schedule entry does not have length that matches core count %s'%(str(i))
+				sys.exit(1)
+			if len(i) != len(set(i)):
+				print 'Schedule entry has a thread scheduled on more than one core: %s'%(str(i))
+				sys.exit(1)
 
 		self.threads = {}
-		for i in range(len(self.trace_files)):
-			self.threads[i] = ThreadTrace(i, self.trace_files[i], self)
+		for thread_id in range(len(self.trace_files)):
+			self.threads[thread_id] = TraceThread(thread_id, self.trace_files[thread_id], self)
 
 		self.pending_transactions = {}
 
+		# Set up the memory.
 		self.mem = hybridsim.HybridSim(1, '')
+		def read_cb(sysID, addr, cycle):
+			self.transaction_complete(False, sysID, addr, cycle)
+		def write_cb(sysID, addr, cycle):
+			self.transaction_complete(True, sysID, addr, cycle)
+		self.mem.RegisterCallbacks(read_cb, write_cb);
 
-	def addTransaction(self, trace_id, isWrite, addr):
+	def addTransaction(self, thread_id, isWrite, addr):
 		self.mem.addTransaction(isWrite, addr)
 		self.pending += 1
 
-		# TODO: Figure out what happens if two traces request the same address at the same time
-		# Idea: make the pending_transactions value a list of threads.
-		if addr in self.pending_transactions:
-			print 'Error for thread %d: address %d already in pending transactions for thread %d!'%(trace_id, addr, self.pending_transactions[addr])
-			sys.exit(1)
-
-		self.pending_transaction[addr] = trace_id
+		trans_key = (addr, isWrite)
+		if trans_key not in self.pending_transactions:
+			self.pending_transactions[trans_key] = []
+		self.pending_transactions[trans_key].append(thread_id)
 
 		
 
@@ -136,29 +175,65 @@ class MultiThreadedTBS(object):
 		self.pending -= 1
 
 		if (self.complete % 10000 == 0) or (cycle - self.last_clock > self.CLOCK_DELAY):
-			print 'Complete=',self.complete,'\t\tpending=',self.pending,'\t\tcycle_count=',cycle,'\t\tthrottle_count=',self.throttle_count
+			print 'Complete=',self.complete,'\t\tpending=',self.pending,'\t\tcycle_count=',cycle,'/',self.cycles,'\t\tQuantum=',self.quantum_num
 			self.last_clock = cycle
 
-		# TODO: Call the appropriate ThreadTrace object to tell it the transactcion is done.
-		if addr not in self.pending_transactions:
-			print 'Error for thread %d: address %d not in pending transactions during transaction_complete() callback!'%(trace_id, addr)
+		# Call the appropriate TraceThread object to tell it the transactcion is done.
+		trans_key = (addr, isWrite)
+		if trans_key not in self.pending_transactions:
+			print 'Error: (address: %d, isWrite: %d) not in pending transactions during transaction_complete() callback!'%trans_key
 			sys.exit(1)
+		thread_id = self.pending_transactions[trans_key].pop(0)
+		if len(self.pending_transactions[trans_key]) == 0:
+			del self.pending_transactions[trans_key]
 
-		trace_id = self.pending_transactions[addr]
-		del self.pending_transactions[addr]
-
-		self.threads[trace_id].transaction_complete(isWrite, sysID, addr, cycle)
+		self.threads[thread_id].transaction_complete(isWrite, sysID, addr, cycle)
 
 	def run(self):
+		print 'Initialization done. Starting MT-TBS run...'
+		while not self.done:
+			# Handle quantum switches.
+			if self.quantum_cycles_left == 0:
+				# Determine if the simulation is done.
+				tmp_done = True
+				for thread_id in self.threads:
+					if not self.threads[thread_id].trace_done:
+						tmp_done = False # Run another quantum if any thread still has work to do.
+				if tmp_done and self.pending != 0:
+					print 'All threads are done, but there are still pending transactions. Running another quantum.'
+					tmp_done = False # Run another quantum if there are any pending transactions.
+				self.done = tmp_done
+				if self.done:
+					print 'Simulation is done! Here is a summary of what just happened...'
+					print 'Last quantum =',self.quantum_num
+					print 'Completed transactions =',self.complete
+					print
+					for thread_id in self.threads:
+						self.threads[thread_id].print_summary()
+					self.mem.printLogfile()
+					return
 
-		done = False
-		while not done:
+				self.quantum_cycles_left = self.quantum_cycles
+				self.quantum_num += 1
+				self.schedule_index = self.quantum_num % len(self.schedule)
+				self.cur_running = self.schedule[self.schedule_index]
 
-			# Update the threads that are active.
+				print 'Starting quantum %d at cycle count %d. completed=%d cur_running=%s'%(self.quantum_num, self.cycles, self.complete, str(self.cur_running))
 
-			mem.update()
+				# TODO: Pick another thread to run if any of the current threads are done.
 
-			done = True
+
+			# Update all running threads.
+			for thread_id in self.cur_running:
+				self.threads[thread_id].update()
+
+			# Update the HybridSim instance.
+			self.mem.update()
+
+			# Update the cycle counters.
+			self.cycles += 1
+			self.quantum_cycles_left -= 1
+
 			
 		
 
@@ -261,15 +336,8 @@ class HybridSimTBS(object):
 		mem.printLogfile()
 
 def main():
-	tracefile = 'traces/test.txt'
-	if len(sys.argv) > 1:
-		tracefile = sys.argv[1]
-		print 'Using trace file',tracefile
-	else:
-		print 'Using default trace file (traces/test.txt)'
-
-	hs_tbs = HybridSimTBS()
-	hs_tbs.run_trace(tracefile)
+	hs_tbs = MultiThreadedTBS(None)
+	hs_tbs.run()
 
 
 if __name__ == '__main__':
