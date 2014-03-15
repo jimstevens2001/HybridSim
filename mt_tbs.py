@@ -1,6 +1,53 @@
 import sys
+import pprint
+import yaml
+
+pp = pprint.PrettyPrinter()
 
 import hybridsim
+
+PAGE_SIZE = 4096
+
+class SchedulerPrefetcher(object):
+	def __init__(self, mt_tbs):
+		self.mt_tbs = mt_tbs
+		self.thread_pages = {}
+		self.old_thread_pages = {}
+		self.next_threads = None
+
+	def done(self):
+		outFile = open('scheduler_prefetcher.log', 'w')
+		outFile.write(pp.pformat(self.old_thread_pages))
+		outFile.close()
+
+	def new_quantum(self, last_threads, next_threads):
+		self.next_threads = next_threads
+
+		if self.mt_tbs.quantum_num > 0:
+			for thread_id in last_threads:
+				# Save the old thread pages.
+				if thread_id not in self.old_thread_pages:
+					self.old_thread_pages[thread_id] = []
+				self.old_thread_pages[thread_id].append(self.thread_pages[thread_id])
+				
+				# Reset the thread pages.
+				self.thread_pages[thread_id] = {}
+
+	def update(self):
+		# This will generate HybridSim MMIO calls.
+		# Use self.mt_tbs.quantum_cycles_left
+		pass
+
+	def addTransaction(self, thread_id, isWrite, addr):
+		# Compute page number.
+		page_num = addr % PAGE_SIZE
+
+		# Save page in thread pages set.
+		if thread_id not in self.thread_pages:
+			self.thread_pages[thread_id] = {}
+		if page_num not in self.thread_pages[thread_id]:
+			self.thread_pages[thread_id][page_num] = 0
+		self.thread_pages[thread_id][page_num] += 1
 
 
 class TraceThread(object):
@@ -125,12 +172,27 @@ class MultiThreadedTBS(object):
 
 		self.config_file = config_file
 
-		self.cores = 2
-		#self.quantum_cycles = 2666667
-		self.quantum_cycles = 10000
-		self.trace_files = ['traces/big_0.txt', 'traces/big_512.txt', 'traces/big_0.txt', 'traces/big_512.txt']
-		self.base_addresses = [] # TODO: Implement this feature to add base address to all trace addresses (except kernel stuff).
-		self.schedule = [[0,2], [1,2], [2,3], [3,0]]
+
+		try:
+			configFile = open(self.config_file)
+			config_data = yaml.load(configFile)
+			configFile.close()
+
+			self.cores = config_data['cores']
+			self.quantum_cycles = config_data['quantum_cycles']
+			self.trace_files = config_data['trace_files']
+			self.base_addresses = config_data['base_addresses']
+			self.schedule = config_data['schedule']
+		except Exception as e:
+			print 'Failed to parse the config file properly.'
+			raise e
+
+		#self.cores = 2
+		##self.quantum_cycles = 2666667
+		#self.quantum_cycles = 10000
+		#self.trace_files = ['traces/big_0.txt', 'traces/big_512.txt', 'traces/big_0.txt', 'traces/big_512.txt']
+		#self.base_addresses = [] # TODO: Implement this feature to add base address to all trace addresses (except kernel stuff).
+		##self.schedule = [[0,2], [1,2], [2,3], [3,0]]
 
 		# Verify the integrity of the schedule...
 		for i in self.schedule:
@@ -155,6 +217,10 @@ class MultiThreadedTBS(object):
 			self.transaction_complete(True, sysID, addr, cycle)
 		self.mem.RegisterCallbacks(read_cb, write_cb);
 
+		# Set up the scheduler prefetcher.
+		self.scheduler_prefetcher = SchedulerPrefetcher(self)
+
+
 	def addTransaction(self, thread_id, isWrite, addr):
 		self.mem.addTransaction(isWrite, addr)
 		self.pending += 1
@@ -164,6 +230,7 @@ class MultiThreadedTBS(object):
 			self.pending_transactions[trans_key] = []
 		self.pending_transactions[trans_key].append(thread_id)
 
+		self.scheduler_prefetcher.addTransaction(thread_id, isWrite, addr)
 		
 
 	def transaction_complete(self, isWrite, sysID, addr, cycle):
@@ -189,39 +256,53 @@ class MultiThreadedTBS(object):
 
 		self.threads[thread_id].transaction_complete(isWrite, sysID, addr, cycle)
 
+
+	def new_quantum(self):
+		# Determine if the simulation is done.
+		tmp_done = True
+		for thread_id in self.threads:
+			if not self.threads[thread_id].trace_done:
+				tmp_done = False # Run another quantum if any thread still has work to do.
+		if tmp_done and self.pending != 0:
+			print 'All threads are done, but there are still pending transactions. Running another quantum.'
+			tmp_done = False # Run another quantum if there are any pending transactions.
+		self.done = tmp_done
+		if self.done:
+			print 'Simulation is done! Here is a summary of what just happened...'
+			print 'Last quantum =',self.quantum_num
+			print 'Completed transactions =',self.complete
+			print
+			for thread_id in self.threads:
+				self.threads[thread_id].print_summary()
+			self.mem.printLogfile()
+
+			self.scheduler_prefetcher.done()
+
+			return 
+
+		self.quantum_cycles_left = self.quantum_cycles
+		self.quantum_num += 1
+		self.schedule_index = self.quantum_num % len(self.schedule)
+		last_threads = self.cur_running
+		self.cur_running = self.schedule[self.schedule_index]
+
+		print 'Starting quantum %d at cycle count %d. completed=%d cur_running=%s'%(self.quantum_num, self.cycles, self.complete, str(self.cur_running))
+
+		# TODO: Pick another thread to run if any of the current threads are done.
+
+		next_index = (self.schedule_index + 1) % len(self.schedule)
+		next_threads = self.schedule[next_index]
+		self.scheduler_prefetcher.new_quantum(last_threads, next_threads)
+
+
 	def run(self):
 		print 'Initialization done. Starting MT-TBS run...'
 		while not self.done:
 			# Handle quantum switches.
 			if self.quantum_cycles_left == 0:
-				# Determine if the simulation is done.
-				tmp_done = True
-				for thread_id in self.threads:
-					if not self.threads[thread_id].trace_done:
-						tmp_done = False # Run another quantum if any thread still has work to do.
-				if tmp_done and self.pending != 0:
-					print 'All threads are done, but there are still pending transactions. Running another quantum.'
-					tmp_done = False # Run another quantum if there are any pending transactions.
-				self.done = tmp_done
+				self.new_quantum()
 				if self.done:
-					print 'Simulation is done! Here is a summary of what just happened...'
-					print 'Last quantum =',self.quantum_num
-					print 'Completed transactions =',self.complete
-					print
-					for thread_id in self.threads:
-						self.threads[thread_id].print_summary()
-					self.mem.printLogfile()
 					return
-
-				self.quantum_cycles_left = self.quantum_cycles
-				self.quantum_num += 1
-				self.schedule_index = self.quantum_num % len(self.schedule)
-				self.cur_running = self.schedule[self.schedule_index]
-
-				print 'Starting quantum %d at cycle count %d. completed=%d cur_running=%s'%(self.quantum_num, self.cycles, self.complete, str(self.cur_running))
-
-				# TODO: Pick another thread to run if any of the current threads are done.
-
 
 			# Update all running threads.
 			for thread_id in self.cur_running:
@@ -229,6 +310,9 @@ class MultiThreadedTBS(object):
 
 			# Update the HybridSim instance.
 			self.mem.update()
+
+			# Update the scheduler prefetcher.
+			self.scheduler_prefetcher.update()
 
 			# Update the cycle counters.
 			self.cycles += 1
@@ -336,7 +420,7 @@ class HybridSimTBS(object):
 		mem.printLogfile()
 
 def main():
-	hs_tbs = MultiThreadedTBS(None)
+	hs_tbs = MultiThreadedTBS('ini/scheduler_prefetcher.json')
 	hs_tbs.run()
 
 
