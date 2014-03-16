@@ -7,6 +7,7 @@ pp = pprint.PrettyPrinter()
 import hybridsim
 
 PAGE_SIZE = 4096
+THREAD_PENDING_MAX = 8
 
 class SchedulerPrefetcher(object):
 	def __init__(self, mt_tbs):
@@ -81,9 +82,9 @@ class TraceThread(object):
 				self.done_cycles += 1
 			return
 
-		# TODO: Add conditions to check before incrementing trace cycles.
-		# Update throttle count and throttle cycles appropriately.
-
+		if self.pending >= THREAD_PENDING_MAX:
+			self.throttle_cycles += 1
+			return
 
 		# Called each time a clock cycle runs with this trace active.
 		# This is NOT called when the trace is being stalled.
@@ -231,12 +232,16 @@ class MultiThreadedTBS(object):
 		self.pending_transactions[trans_key].append(thread_id)
 
 		self.scheduler_prefetcher.addTransaction(thread_id, isWrite, addr)
+
+		#print 'Added (%d,%d,%d)'%(thread_id, isWrite, addr)
 		
 
 	def transaction_complete(self, isWrite, sysID, addr, cycle):
 		sysID = sysID.value
 		addr = addr.value
 		cycle = cycle.value
+
+		#print 'Complete (%d,%d,%d, %d)'%(isWrite, sysID, addr, cycle)
 
 		self.complete += 1
 		self.pending -= 1
@@ -255,6 +260,8 @@ class MultiThreadedTBS(object):
 			del self.pending_transactions[trans_key]
 
 		self.threads[thread_id].transaction_complete(isWrite, sysID, addr, cycle)
+
+		#print 'Complete thread = %d'%(thread_id)
 
 
 	def new_quantum(self):
@@ -420,7 +427,7 @@ class HybridSimTBS(object):
 		mem.printLogfile()
 
 def main():
-	hs_tbs = MultiThreadedTBS('ini/scheduler_prefetcher.json')
+	hs_tbs = MultiThreadedTBS('ini/scheduler_prefetcher.yaml')
 	hs_tbs.run()
 
 

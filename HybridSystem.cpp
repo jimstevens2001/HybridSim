@@ -387,6 +387,9 @@ namespace HybridSim {
 
 	bool HybridSystem::addTransaction(bool isWrite, uint64_t addr)
 	{
+		if (DEBUG_CACHE)
+			cerr << "\n" << currentClockCycle << ": " << "Adding transaction for address=" << addr << " isWrite=" << isWrite << endl;
+
 		TransactionType type;
 		if (isWrite)
 		{
@@ -2162,6 +2165,7 @@ extern "C"
 
 	bool HybridSim_C_addTransaction(HybridSystem *hs, bool isWrite, uint64_t addr)
 	{
+		//cout << "C interface... addr=" << addr << " isWrite=" << isWrite << "\n";
 		return hs->addTransaction(isWrite, addr);
 	}
 
