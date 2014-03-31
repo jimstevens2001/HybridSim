@@ -1878,6 +1878,26 @@ namespace HybridSim {
 			cerr << "\n" << currentClockCycle << " : HybridSim received MMIO TASK_SWITCH.\n";
 			cerr << "\n" << "Address=" << address << " Accesses=" << log.num_accesses << " Reads=" << log.num_reads << " Writes=" << log.num_writes << "\n";
 		}
+		else if (operation == 3)
+		{
+			// PREFETCH_RANGE
+
+			// Split address into lower 48 bits for base address and upper 16 bits for number of pages to prefetch.
+			uint64_t base_address = address & 0x0000FFFFFFFFFFFF;
+			uint64_t prefetch_pages = (address >> 48) & 0x000000000000FFFF;
+
+			// Add one to prefetch_pages. This means 0 in the upper bits means prefetch a single page.
+			// This allows the caller to prefetch up to 2^16 pages (256 MB when using 4k pages).
+			prefetch_pages += 1;
+
+			cerr << "\n" << currentClockCycle << " : HybridSim received MMIO PREFETCH_RANGE.\n";
+			cerr << "\n" << "base_address=" << base_address << " prefetch_pages=" << prefetch_pages << "\n";
+
+			for (uint64_t i=0; i<prefetch_pages; i++)
+			{
+				addPrefetch(base_address + i*PAGE_SIZE);
+			}
+		}
 		else
 		{
 			cerr << "\n" << currentClockCycle << " : HybridSim received invalid MMIO operation.\n";
