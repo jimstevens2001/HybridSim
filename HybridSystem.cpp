@@ -1890,8 +1890,8 @@ namespace HybridSim {
 			// This allows the caller to prefetch up to 2^16 pages (256 MB when using 4k pages).
 			prefetch_pages += 1;
 
-			cerr << "\n" << currentClockCycle << " : HybridSim received MMIO PREFETCH_RANGE.\n";
-			cerr << "\n" << "base_address=" << base_address << " prefetch_pages=" << prefetch_pages << "\n";
+			cerr << "\n" << currentClockCycle << " : HybridSim received MMIO PREFETCH_RANGE. ";
+			cerr << "base_address=" << base_address << " prefetch_pages=" << prefetch_pages << "\n";
 
 			for (uint64_t i=0; i<prefetch_pages; i++)
 			{

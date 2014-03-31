@@ -16,6 +16,8 @@ class SchedulerPrefetcher(object):
 		self.old_thread_pages = {}
 		self.next_threads = None
 
+		self.halfway_cycles = self.mt_tbs.quantum_cycles / 2
+
 	def done(self):
 		outFile = open('scheduler_prefetcher.log', 'w')
 		outFile.write(pp.pformat(self.old_thread_pages))
@@ -34,10 +36,24 @@ class SchedulerPrefetcher(object):
 				# Reset the thread pages.
 				self.thread_pages[thread_id] = {}
 
+
 	def update(self):
-		# This will generate HybridSim MMIO calls.
-		# Use self.mt_tbs.quantum_cycles_left
-		pass
+		# Issue prefetches when halfway_cycles is reached.
+		# TODO: Combine pages into ranges.
+		# TODO: Use the access counts for each page to prioritize what pages are sent.
+		if (self.mt_tbs.quantum_cycles_left == self.halfway_cycles) and (self.mt_tbs.quantum_num > 0):
+			print 'Issuing prefetches for threads',self.next_threads
+			prefetch_count = 0
+			for thread_id in self.next_threads:
+				if thread_id in self.old_thread_pages:
+					last_thread_pages = self.old_thread_pages[thread_id][-1]
+					page_list = [page_num * PAGE_SIZE for page_num in last_thread_pages.keys()]
+					for page in page_list:
+						self.mt_tbs.mem.mmio(3, page)
+						prefetch_count += 1
+			print 'Issued %d prefetches.'%(prefetch_count)
+
+					
 
 	def addTransaction(self, thread_id, isWrite, addr):
 		# Compute page number.
