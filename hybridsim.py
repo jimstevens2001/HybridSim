@@ -1,5 +1,6 @@
 import ctypes
 from ctypes import byref
+from ctypes import c_ulonglong
 
 lib = ctypes.cdll.LoadLibrary('./libhybridsim.so')
 
@@ -14,7 +15,7 @@ class HybridSim(object):
 		self.write_cb = write_cb
 
 	def addTransaction(self, isWrite, addr):
-		return lib.HybridSim_C_addTransaction(self.hs, isWrite, addr)
+		return lib.HybridSim_C_addTransaction(self.hs, isWrite, c_ulonglong(addr))
 
 	def WillAcceptTransaction(self):
 		return lib.HybridSim_C_WillAcceptTransaction(self.hs)
