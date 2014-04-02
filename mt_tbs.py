@@ -279,6 +279,27 @@ class MultiThreadedTBS(object):
 
 		#print 'Complete thread = %d'%(thread_id)
 
+	def clean_schedule(self):
+		# This method removes done threads from the schedule if there is something else that can run.
+
+		done_threads = []
+		for thread_id in self.threads:
+			if self.threads[thread_id].trace_done:
+				done_threads.append(thread_id)
+		done_threads.sort()
+
+		print 'done_threads =',done_threads
+
+		for quantum in range(len(self.schedule)):
+			for i in range(len(self.schedule[quantum])):
+				thread_id = self.schedule[quantum][i]
+				if thread_id in done_threads:
+					for new_thread_id in self.threads:
+						if (new_thread_id not in self.schedule[quantum]) and (new_thread_id not in done_threads):
+							self.schedule[quantum][i] = new_thread_id
+							print 'Replacing thread %d with thread %d in quantum %d'%(thread_id, new_thread_id, quantum)
+							break
+
 
 	def new_quantum(self):
 		# Determine if the simulation is done.
@@ -303,11 +324,13 @@ class MultiThreadedTBS(object):
 
 			return 
 
+		self.clean_schedule()
+
 		self.quantum_cycles_left = self.quantum_cycles
 		self.quantum_num += 1
 		self.schedule_index = self.quantum_num % len(self.schedule)
 		last_threads = self.cur_running
-		self.cur_running = self.schedule[self.schedule_index]
+		self.cur_running = list(self.schedule[self.schedule_index])
 
 		print 'Starting quantum %d at cycle count %d. completed=%d cur_running=%s'%(self.quantum_num, self.cycles, self.complete, str(self.cur_running))
 
