@@ -6,7 +6,9 @@ pp = pprint.PrettyPrinter()
 
 import hybridsim
 
+TOTAL_PAGES = 8388608
 PAGE_SIZE = 4096
+ADDRESS_SPACE_SIZE = TOTAL_PAGES * PAGE_SIZE
 THREAD_PENDING_MAX = 8
 
 class SchedulerPrefetcher(object):
@@ -68,10 +70,11 @@ class SchedulerPrefetcher(object):
 
 
 class TraceThread(object):
-	def __init__(self, thread_id, tracefile, parent):
+	def __init__(self, thread_id, tracefile, base_address, parent):
 		self.thread_id = thread_id
 		self.tracefile = tracefile
 		self.input_file = open(tracefile,'r')
+		self.base_address = base_address
 		self.parent = parent
 
 		self.complete = 0
@@ -138,6 +141,9 @@ class TraceThread(object):
 			self.trans_cycle = int(split_line[0])
 			self.trans_write = bool(int(split_line[1]) % 2)
 			self.trans_addr = int(split_line[2])
+
+			# Apply base address transformation.
+			self.trans_addr = (self.trans_addr + self.base_address) % ADDRESS_SPACE_SIZE
 
 			return
 
@@ -220,9 +226,13 @@ class MultiThreadedTBS(object):
 				print 'Schedule entry has a thread scheduled on more than one core: %s'%(str(i))
 				sys.exit(1)
 
+		if len(self.trace_files) != len(self.base_addresses):
+			print 'Length of trace_files (%d) does not match length of base_addresses (%d)'%(len(self.trace_files), len(self.base_addresses))
+			sys.exit(1)
+
 		self.threads = {}
 		for thread_id in range(len(self.trace_files)):
-			self.threads[thread_id] = TraceThread(thread_id, self.trace_files[thread_id], self)
+			self.threads[thread_id] = TraceThread(thread_id, self.trace_files[thread_id], self.base_addresses[thread_id], self)
 
 		self.pending_transactions = {}
 
@@ -466,7 +476,11 @@ class HybridSimTBS(object):
 		mem.printLogfile()
 
 def main():
-	hs_tbs = MultiThreadedTBS('ini/scheduler_prefetcher.yaml')
+	if len(sys.argv) > 1:
+		yaml_file = sys.argv[1]
+	else:
+		yaml_file = 'ini/scheduler_prefetcher.yaml'
+	hs_tbs = MultiThreadedTBS(yaml_file)
 	hs_tbs.run()
 
 
