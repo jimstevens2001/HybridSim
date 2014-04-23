@@ -37,9 +37,21 @@ namespace HybridSim {
 	HybridSystem::HybridSystem(uint id, string ini)
 	{
 		if (ini == "")
+		{
 			hybridsim_ini = "../HybridSim/ini/hybridsim.ini";
+		}
 		else
+		{
 			hybridsim_ini = ini;
+		}
+
+		string pattern = "/ini/";
+		string inipathPrefix;
+
+		unsigned found = hybridsim_ini.rfind(pattern); // Find the last occurrence of "/ini/"
+		assert (found != string::npos);
+		inipathPrefix = hybridsim_ini.substr(0,found);
+		inipathPrefix.append("/");
 
 		iniReader.read(hybridsim_ini);
 		if (ENABLE_LOGGER)
@@ -53,10 +65,10 @@ namespace HybridSim {
 		uint64_t dram_size = (CACHE_PAGES * PAGE_SIZE) >> 20;
 		dram_size = (dram_size == 0) ? 1 : dram_size; // DRAMSim requires a minimum of 1 MB, even if HybridSim isn't going to use it.
 		dram_size = (OVERRIDE_DRAM_SIZE == 0) ? dram_size : OVERRIDE_DRAM_SIZE; // If OVERRIDE_DRAM_SIZE is non-zero, then use it.
-		dram = DRAMSim::getMemorySystemInstance(dram_ini, sys_ini, "../HybridSim", "resultsfilename", dram_size);
+		dram = DRAMSim::getMemorySystemInstance(dram_ini, sys_ini, inipathPrefix, "resultsfilename", dram_size);
 
 		cerr << "Creating Flash" << endl;
-		flash = NVDSim::getNVDIMMInstance(1,flash_ini,"ini/def_system.ini","../HybridSim","");
+		flash = NVDSim::getNVDIMMInstance(1,flash_ini,"ini/def_system.ini",inipathPrefix,"");
 		cerr << "Done with creating memories" << endl;
 
 		// Set up the callbacks for DRAM.
