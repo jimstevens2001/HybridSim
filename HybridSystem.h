@@ -107,12 +107,13 @@ namespace HybridSim
 
 
 		// Page Contention Functions
-		void contention_lock(uint64_t page_addr);
+		void contention_lock(uint64_t flash_addr);
+		void contention_page_lock(uint64_t flash_addr);
 		void contention_unlock(uint64_t flash_addr, uint64_t orig_addr, string operation, bool victim_valid, uint64_t victim_page, 
 				bool cache_line_valid, uint64_t cache_addr);
-		bool contention_is_unlocked(uint64_t page_addr);
-		void contention_increment(uint64_t page_addr);
-		void contention_decrement(uint64_t page_addr);
+		bool contention_is_unlocked(uint64_t flash_addr);
+		void contention_increment(uint64_t flash_addr);
+		void contention_decrement(uint64_t flash_addr);
 		void contention_victim_lock(uint64_t page_addr);
 		void contention_victim_unlock(uint64_t page_addr);
 		void contention_cache_line_lock(uint64_t cache_addr);
@@ -127,6 +128,13 @@ namespace HybridSim
 		void syncAllCounter(uint64_t addr, Transaction trans);
 		void addSync(uint64_t addr);
 		void addSyncCounter(uint64_t addr, bool initial);
+
+		// TLB functions
+		void check_tlb(uint64_t page_addr);
+
+		// Stream Buffer Functions
+		void stream_buffer_miss_handler(uint64_t miss_page);
+		void stream_buffer_hit_handler(uint64_t hit_page);
 		
 
 		// State
@@ -146,8 +154,13 @@ namespace HybridSim
 		unordered_map<uint64_t, Pending> dram_pending;
 		unordered_map<uint64_t, Pending> flash_pending;
 
-		unordered_map<uint64_t, uint64_t> pending_pages; // If a page is in the pending set, then skip subsequent transactions to the page.
-		unordered_map<uint64_t, uint64_t> pending_sets; // If a page is in the pending map, then skip subsequent transactions to the page.
+		// Per page wait sets for the VICTIM_READ and LINE_READ operations.
+		unordered_map<uint64_t, unordered_set<uint64_t>> dram_pending_wait;
+		unordered_map<uint64_t, unordered_set<uint64_t>> flash_pending_wait;
+
+		
+		unordered_map<uint64_t, uint64_t> pending_flash_addr; // If a page is in the pending_flash_addr , then skip subsequent transactions to the flash address.
+		unordered_map<uint64_t, uint64_t> pending_pages; // If a page is in the pending_pages, then skip subsequent transactions to the page.
 		unordered_map<uint64_t, uint64_t> set_counter; // Counts the number of outstanding transactions to each set.
 
 		bool check_queue; // If there is nothing to do, don't check the queue until the next event occurs that will make new work.
@@ -160,7 +173,6 @@ namespace HybridSim
 		set<uint64_t> dram_pending_set;
 		list<uint64_t> dram_bad_address;
 		uint64_t max_dram_pending;
-		uint64_t pending_sets_max;
 		uint64_t pending_pages_max;
 		uint64_t trans_queue_max;
 		uint64_t trans_queue_size;
@@ -184,6 +196,26 @@ namespace HybridSim
 		ofstream debug_victim;
 		ofstream debug_nvdimm_trace;
 		ofstream debug_full_trace;
+
+		// TLB state
+		unordered_map<uint64_t, uint64_t> tlb_base_set; 
+		uint64_t tlb_misses;
+		uint64_t tlb_hits;
+
+		// Prefetch tracking.
+		uint64_t total_prefetches;
+		uint64_t unused_prefetches; // Count of unused prefetched pages in the DRAM cache.
+		uint64_t unused_prefetch_victims; // Count of unused prefetched pages that were never used before being evicted.
+		uint64_t prefetch_hit_nops; // Count the number of prefetch hits that are nops.
+
+		// Stream buffer state.
+		list<pair<uint64_t, uint64_t> > one_miss_table; // pair is (address, cycle)
+		unordered_map<uint64_t, uint64_t> stream_buffers; // address -> cycle
+
+		// Stream buffer tracking.
+		uint64_t unique_one_misses;
+		uint64_t unique_stream_buffers;
+		uint64_t stream_buffer_hits;
 
 	};
 

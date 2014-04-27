@@ -37,6 +37,15 @@
 
 #define SEQUENTIAL_PREFETCHING_WINDOW 0
 
+// Stream Buffer Setup.
+#define ENABLE_STREAM_BUFFER 1
+#define ONE_MISS_TABLE_SIZE 10
+#define NUM_STREAM_BUFFERS 10
+#define STREAM_BUFFER_LENGTH 4
+#define DEBUG_STREAM_BUFFER 0
+#define DEBUG_STREAM_BUFFER_HIT 0 // This generates a lot of stuff.
+
+
 // Debug flags.
 
 // Lots of output during cache operations. Goes to stdout.
@@ -94,6 +103,18 @@ const uint64_t FOURGB = 4294967296; // 1024^3 * 4
 #define RESTORE_CLEAN 0
 
 
+// TLB parameters
+
+// All size parameters in bytes (keep to powers of 2)
+// Setting TLB_SIZE to 0 disables TLB simulation.
+#define TAG_SIZE 2
+//#define TLB_SIZE 16384
+#define TLB_SIZE 0 
+
+// TLB miss delay is in memory clock cycles
+#define TLB_MISS_DELAY 30
+
+
 // C standard library and C++ STL includes.
 #include <iostream>
 #include <fstream>
@@ -108,6 +129,7 @@ const uint64_t FOURGB = 4294967296; // 1024^3 * 4
 #include <ctime>
 #include <stdint.h>
 #include <vector>
+#include <utility>
 #include <assert.h>
 
 // Include external interface for DRAMSim.
@@ -190,6 +212,12 @@ extern string NVDIMM_SAVE_FILE;
 #define FLASH_ADDRESS(tag, set) ((tag * NUM_SETS + set) * PAGE_SIZE)
 #define ALIGN(addr) (((addr / BURST_SIZE) * BURST_SIZE) % (TOTAL_PAGES * PAGE_SIZE))
 
+// TLB derived parameters
+#define BYTES_PER_READ 64
+#define TLB_MAX_ENTRIES (TLB_SIZE / BYTES_PER_READ)
+#define TAGS_PER_ENTRY (BYTES_PER_READ / TAG_SIZE)
+#define TLB_ENTRY_SPAN (PAGE_SIZE * TAGS_PER_ENTRY)
+#define TLB_BASE_ADDRESS(addr) ((addr * TLB_ENTRY_SPAN) / TLB_ENTRY_SPAN)
 
 // Declare the cache_line class, which is the table entry used for each line in the cache tag store.
 class cache_line
@@ -198,14 +226,21 @@ class cache_line
         bool valid;
         bool dirty;
 		bool locked;
+		uint64_t lock_count;
         uint64_t tag;
         uint64_t data;
         uint64_t ts;
+		bool prefetched; // Set to 1 if a cache_line is brought into DRAM as a prefetch.
+		bool used; // Like dirty, but also set to 1 for reads. Used for tracking prefetch hits vs. misses.
 
-        cache_line() : valid(false), dirty(false), locked(false), tag(0), data(0), ts(0) {}
-        string str() { stringstream out; out << "tag=" << tag << " data=" << data << " valid=" << valid << " dirty=" << dirty << " locked=" << locked 
-				<< " ts=" << ts; return out.str(); }
-
+        cache_line() : valid(false), dirty(false), locked(false), lock_count(0), tag(0), data(0), ts(0), prefetched(0), used(0) {}
+        string str() 
+		{ 
+			stringstream out; 
+			out << "tag=" << tag << " data=" << data << " valid=" << valid << " dirty=" << dirty << " locked=" << locked 
+				<< " lock_count=" << lock_count << " ts=" << ts << " prefetched=" << prefetched << " used=" << used;
+			return out.str(); 
+		}
 };
 
 enum PendingOperation
@@ -229,28 +264,10 @@ class Pending
 	bool victim_valid;
 	bool callback_sent;
 	TransactionType type; // DATA_READ or DATA_WRITE
-	unordered_set<uint64_t> *wait;
 
-	Pending() : op(VICTIM_READ), flash_addr(0), cache_addr(0), victim_tag(0), type(DATA_READ), wait(0) {};
+	Pending() : op(VICTIM_READ), flash_addr(0), cache_addr(0), victim_tag(0), type(DATA_READ) {};
         string str() { stringstream out; out << "O=" << op << " F=" << flash_addr << " C=" << cache_addr << " V=" << victim_tag 
 		<< " T=" << type; return out.str(); }
-
-	void init_wait()
-	{
-		wait = new unordered_set<uint64_t>;
-
-	}
-
-	void insert_wait(uint64_t n)
-	{
-		wait->insert(n);
-	}
-
-	void delete_wait()
-	{
-		delete wait;
-		wait = NULL;
-	}
 };
 
 } // namespace HybridSim

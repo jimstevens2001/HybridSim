@@ -61,13 +61,13 @@ namespace HybridSim {
 		assert(CACHE_PAGES >= SET_SIZE);
 
 		systemID = id;
-		cerr << "Creating DRAM" << endl;
+		cerr << "Creating DRAM with " << dram_ini << "\n";
 		uint64_t dram_size = (CACHE_PAGES * PAGE_SIZE) >> 20;
 		dram_size = (dram_size == 0) ? 1 : dram_size; // DRAMSim requires a minimum of 1 MB, even if HybridSim isn't going to use it.
 		dram_size = (OVERRIDE_DRAM_SIZE == 0) ? dram_size : OVERRIDE_DRAM_SIZE; // If OVERRIDE_DRAM_SIZE is non-zero, then use it.
 		dram = DRAMSim::getMemorySystemInstance(dram_ini, sys_ini, inipathPrefix, "resultsfilename", dram_size);
 
-		cerr << "Creating Flash" << endl;
+		cerr << "Creating Flash with " << flash_ini << "\n";
 		flash = NVDSim::getNVDIMMInstance(1,flash_ini,"ini/def_system.ini",inipathPrefix,"");
 		cerr << "Done with creating memories" << endl;
 
@@ -174,10 +174,21 @@ namespace HybridSim {
 		// Note: Some of this is just debug info, but I'm keeping it around because it is useful.
 		pending_count = 0; // This is used by TraceBasedSim for MAX_PENDING.
 		max_dram_pending = 0;
-		pending_sets_max = 0;
 		pending_pages_max = 0;
 		trans_queue_max = 0;
 		trans_queue_size = 0; // This is not debugging info.
+
+		tlb_misses = 0;
+		tlb_hits = 0;
+
+		total_prefetches = 0;
+		unused_prefetches = 0;
+		unused_prefetch_victims = 0;
+		prefetch_hit_nops = 0;
+
+		unique_one_misses = 0;
+		unique_stream_buffers = 0;
+		stream_buffer_hits = 0;
 
 		// Create file descriptors for debugging output (if needed).
 		if (DEBUG_VICTIM) 
@@ -237,8 +248,6 @@ namespace HybridSim {
 
 		if (dram_pending.size() > max_dram_pending)
 			max_dram_pending = dram_pending.size();
-		if (pending_sets.size() > pending_sets_max)
-			pending_sets_max = pending_sets.size();
 		if (pending_pages.size() > pending_pages_max)
 			pending_pages_max = pending_pages.size();
 		if (trans_queue_size > trans_queue_max)
@@ -269,14 +278,15 @@ namespace HybridSim {
 		while((it != trans_queue.end()) && (pending_pages.size() < NUM_SETS) && (check_queue) && (delay_counter == 0))
 		{
 			// Compute the page address.
-			uint64_t page_addr = PAGE_ADDRESS(ALIGN((*it).address));
+			uint64_t flash_addr = ALIGN((*it).address);
+			uint64_t page_addr = PAGE_ADDRESS(flash_addr);
 
 
 			// Check to see if this page is open under contention rules.
-			if (contention_is_unlocked(page_addr))
+			if (contention_is_unlocked(flash_addr))
 			{
 				// Lock the page.
-				contention_lock(page_addr);
+				contention_lock(flash_addr);
 
 				// Log the page access.
 				if (ENABLE_LOGGER)
@@ -288,6 +298,12 @@ namespace HybridSim {
 				active_transaction_flag = true;
 				delay_counter = CONTROLLER_DELAY;
 				sent_transaction = true;
+
+				// Check that this page is in the TLB.
+				// Do not do this for SYNC_ALL_COUNTER transactions because the page address refers
+				// to the cache line, not the flash page address, so the TLB isn't needed.
+				if ((*it).transactionType != SYNC_ALL_COUNTER)
+					check_tlb(page_addr);
 
 				// Delete this item and skip to the next.
 				it = trans_queue.erase(it);
@@ -383,6 +399,9 @@ namespace HybridSim {
 
 	bool HybridSystem::addTransaction(bool isWrite, uint64_t addr)
 	{
+		if (DEBUG_CACHE)
+			cerr << "\n" << currentClockCycle << ": " << "Adding transaction for address=" << addr << " isWrite=" << isWrite << endl;
+
 		TransactionType type;
 		if (isWrite)
 		{
@@ -602,6 +621,12 @@ namespace HybridSim {
 			// Lock the line that was hit (so it cannot be selected as a victim while being processed).
 			contention_cache_line_lock(cache_address);
 
+			if ((ENABLE_STREAM_BUFFER) && 
+					((trans.transactionType == DATA_READ) || (trans.transactionType == DATA_WRITE)))
+			{
+				stream_buffer_hit_handler(PAGE_ADDRESS(addr));
+			}
+
 			// Issue operation to the DRAM.
 			if (trans.transactionType == DATA_READ)
 				CacheRead(trans.address, addr, cache_address);
@@ -613,11 +638,11 @@ namespace HybridSim {
 			}
 			else if(trans.transactionType == PREFETCH)
 			{
-				// We allow PREFETCH to hit the cache because of non-determinism from marss.
+				// Prefetch hits are just NOPs.
 				uint64_t flash_address = addr;
 				contention_unlock(flash_address, flash_address, "PREFETCH (hit)", false, 0, true, cache_address);
 
-				// TODO: Add some logging for this event.
+				prefetch_hit_nops++;
 
 				return; 
 			}
@@ -634,6 +659,9 @@ namespace HybridSim {
 
 		if (!hit)
 		{
+			// Lock the whole page.
+			contention_page_lock(addr);
+
 			// Make sure this isn't a FLUSH before proceeding.
 			if(trans.transactionType == FLUSH)
 			{
@@ -651,6 +679,11 @@ namespace HybridSim {
 			if ((SEQUENTIAL_PREFETCHING_WINDOW > 0) && (trans.transactionType != PREFETCH))
 			{
 				issue_sequential_prefetches(addr);
+			}
+
+			if ((ENABLE_STREAM_BUFFER) && (trans.transactionType != PREFETCH))
+			{
+				stream_buffer_miss_handler(PAGE_ADDRESS(addr));
 			}
 
 			// Select a victim offset within the set (LRU)
@@ -738,6 +771,14 @@ namespace HybridSim {
 				cerr << currentClockCycle << ": " << "The victim is dirty? " << cur_line.dirty << endl;
 			}
 
+			if ((cur_line.prefetched) && (cur_line.used == false))
+			{
+				// An unused prefetch is being removed from the cache, so transfer the count
+				// to the unused_prefetch_victims counter.
+				unused_prefetches--;
+				unused_prefetch_victims++;
+			}
+
 			Pending p;
 			p.orig_addr = trans.address;
 			p.flash_addr = addr;
@@ -770,7 +811,7 @@ namespace HybridSim {
 
 		// Increment the pending set/page counter (this is used to ensure that the pending set/page entry isn't removed until both LineRead
 		// and VictimRead (if needed) are completely done.
-		contention_increment(PAGE_ADDRESS(p.flash_addr));
+		contention_increment(p.flash_addr);
 
 #if SINGLE_WORD
 		// Schedule a read from DRAM to get the line being evicted.
@@ -778,11 +819,11 @@ namespace HybridSim {
 		dram_queue.push_back(t);
 #else
 		// Schedule reads for the entire page.
-		p.init_wait();
+		dram_pending_wait[p.cache_addr] = unordered_set<uint64_t>();
 		for(uint64_t i=0; i<PAGE_SIZE/BURST_SIZE; i++)
 		{
 			uint64_t addr = p.cache_addr + i*BURST_SIZE;
-			p.insert_wait(addr);
+			dram_pending_wait[p.cache_addr].insert(addr);
 			Transaction t = Transaction(DATA_READ, addr, NULL);
 			dram_queue.push_back(t);
 		}
@@ -799,30 +840,37 @@ namespace HybridSim {
 		if (DEBUG_CACHE)
 		{
 			cerr << currentClockCycle << ": " << "VICTIM_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ") offset="
-				<< PAGE_OFFSET(addr) << " num_left=" << p.wait->size() << "\n";
+				<< PAGE_OFFSET(addr);
 		}
 
 #if SINGLE_WORD
+		if (DEBUG_CACHE)
+			cerr << " num_left=0 (SINGLE_WORD)\n";
 #else
-		// Remove the read that just finished from the wait set.
-		p.wait->erase(addr);
+		uint64_t cache_page_addr = p.cache_addr;
 
-		if (!p.wait->empty())
+		if (DEBUG_CACHE)
+			cerr << " num_left=" << dram_pending_wait[cache_page_addr].size() << "\n"; 
+
+		// Remove the read that just finished from the wait set.
+		dram_pending_wait[cache_page_addr].erase(addr);
+
+		if (!dram_pending_wait[cache_page_addr].empty())
 		{
 			// If not done with this line, then re-enter pending map.
-			dram_pending[PAGE_ADDRESS(addr)] = p;
+			dram_pending[cache_page_addr] = p;
 			dram_pending_set.erase(addr);
 			return;
 		}
 
 		// The line has completed. Delete the wait set object and move on.
-		p.delete_wait();
+		dram_pending_wait.erase(cache_page_addr);
 #endif
 
 
 		// Decrement the pending set counter (this is used to ensure that the pending set entry isn't removed until both LineRead
 		// and VictimRead (if needed) are completely done.
-		contention_decrement(PAGE_ADDRESS(p.flash_addr));
+		contention_decrement(p.flash_addr);
 
 		if (DEBUG_CACHE)
 		{
@@ -878,7 +926,7 @@ namespace HybridSim {
 
 		// Increment the pending set counter (this is used to ensure that the pending set entry isn't removed until both LineRead
 		// and VictimRead (if needed) are completely done.
-		contention_increment(PAGE_ADDRESS(p.flash_addr));
+		contention_increment(p.flash_addr);
 
 
 #if SINGLE_WORD
@@ -887,11 +935,11 @@ namespace HybridSim {
 		flash_queue.push_back(t);
 #else
 		// Schedule reads for the entire page.
-		p.init_wait();
+		flash_pending_wait[page_addr] = unordered_set<uint64_t>();
 		for(uint64_t i=0; i<PAGE_SIZE/FLASH_BURST_SIZE; i++)
 		{
 			uint64_t addr = page_addr + i*FLASH_BURST_SIZE;
-			p.insert_wait(addr);
+			flash_pending_wait[page_addr].insert(addr);
 			Transaction t = Transaction(DATA_READ, addr, NULL);
 			flash_queue.push_back(t);
 		}
@@ -909,15 +957,22 @@ namespace HybridSim {
 		if (DEBUG_CACHE)
 		{
 			cerr << currentClockCycle << ": " << "LINE_READ callback for (" << p.flash_addr << ", " << p.cache_addr << ") offset="
-				<< PAGE_OFFSET(addr) << " num_left=" << p.wait->size() << "\n";
+				<< PAGE_OFFSET(addr);
 		}
 
 #if SINGLE_WORD
+		if (DEBUG_CACHE)
+			cerr << " num_left=0 (SINGLE_WORD)\n";
 #else
-		// Remove the read that just finished from the wait set.
-		p.wait->erase(addr);
+		uint64_t page_addr = PAGE_ADDRESS(p.flash_addr);
 
-		if (!p.wait->empty())
+		if (DEBUG_CACHE)
+			cerr << " num_left=" << flash_pending_wait[page_addr].size() << "\n"; 
+
+		// Remove the read that just finished from the wait set.
+		flash_pending_wait[page_addr].erase(addr);
+
+		if (!flash_pending_wait[page_addr].empty())
 		{
 			// If not done with this line, then re-enter pending map.
 			flash_pending[PAGE_ADDRESS(addr)] = p;
@@ -925,13 +980,13 @@ namespace HybridSim {
 		}
 
 		// The line has completed. Delete the wait set object and move on.
-		p.delete_wait();
+		flash_pending_wait.erase(page_addr);
 #endif
 
 
 		// Decrement the pending set counter (this is used to ensure that the pending set entry isn't removed until both LineRead
 		// and VictimRead (if needed) are completely done.
-		contention_decrement(PAGE_ADDRESS(p.flash_addr));
+		contention_decrement(p.flash_addr);
 
 		if (DEBUG_CACHE)
 		{
@@ -945,6 +1000,17 @@ namespace HybridSim {
 		cur_line.dirty = false;
 		cur_line.valid = true;
 		cur_line.ts = currentClockCycle;
+		cur_line.used = false;
+		if (p.type == PREFETCH)
+		{
+			cur_line.prefetched = true;
+			total_prefetches++;
+			unused_prefetches++;
+		}
+		else
+		{
+			cur_line.prefetched = false;
+		}
 		cache[p.cache_addr] = cur_line;
 
 		// Schedule LineWrite operation to store the line in DRAM.
@@ -1014,6 +1080,9 @@ namespace HybridSim {
 		// It really doesn't matter (AFAICT) as long as it is consistent.
 		cache_line cur_line = cache[cache_addr];
 		cur_line.ts = currentClockCycle;
+		if ((cur_line.prefetched) && (cur_line.used == false)) // Note: this if statement must come before cur_line.used is set to true.
+			unused_prefetches--;
+		cur_line.used = true;
 		cache[cache_addr] = cur_line;
 
 		// Add a record in the DRAM's pending table.
@@ -1026,12 +1095,11 @@ namespace HybridSim {
 		p.victim_valid = false;
 		p.callback_sent = false;
 		p.type = DATA_READ;
-		assert(dram_pending.count(cache_addr) == 0);
-		dram_pending[cache_addr] = p;
+		assert(dram_pending.count(data_addr) == 0);
+		dram_pending[data_addr] = p;
 
 		// Assertions for "this can't happen" situations.
-		assert(dram_pending.count(PAGE_ADDRESS(data_addr)) != 0);
-		assert(dram_pending.count(cache_addr) != 0);
+		assert(dram_pending.count(data_addr) != 0);
 	}
 
 	void HybridSystem::CacheReadFinish(uint64_t addr, Pending p)
@@ -1086,6 +1154,9 @@ namespace HybridSim {
 		cache_line cur_line = cache[p.cache_addr];
 		cur_line.dirty = true;
 		cur_line.valid = true;
+		if ((cur_line.prefetched) && (cur_line.used == false)) // Note: this if statement must come before cur_line.used is set to true.
+			unused_prefetches--;
+		cur_line.used = true;
 		cur_line.ts = currentClockCycle;
 		cache[p.cache_addr] = cur_line;
 
@@ -1132,14 +1203,29 @@ namespace HybridSim {
 
 	void HybridSystem::DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle)
 	{
-		if (dram_pending.count(PAGE_ADDRESS(addr)) != 0)
+		// Determine which address to look up in the pending table.
+		// If there is an entry for this page in the dram_pending_wait, then that
+		// means this is for a VICTIM_READ operation and we should use the page address.
+		// Otherwise, this is for a CACHE_READ operation and we should use the addr directly.
+		uint64_t pending_addr;
+		if (dram_pending_wait.count(PAGE_ADDRESS(addr)) != 0)
+		{
+			pending_addr = PAGE_ADDRESS(addr);
+		}
+		else
+		{
+			pending_addr = addr;
+		}
+
+
+		if (dram_pending.count(pending_addr) != 0)
 		{
 			// Get the pending object for this transaction.
-			Pending p = dram_pending[PAGE_ADDRESS(addr)];
+			Pending p = dram_pending[pending_addr];
 
 			// Remove this pending object from dram_pending
-			dram_pending.erase(PAGE_ADDRESS(addr));
-			assert(dram_pending.count(PAGE_ADDRESS(addr)) == 0);
+			dram_pending.erase(pending_addr);
+			assert(dram_pending.count(pending_addr) == 0);
 
 			if (p.op == VICTIM_READ)
 			{
@@ -1329,6 +1415,20 @@ namespace HybridSim {
 		// Save the cache table if necessary.
 		saveCacheTable();
 
+		cerr << "TLB Misses: " << tlb_misses << "\n";
+		cerr << "TLB Hits: " << tlb_hits << "\n";
+		cerr << "Total prefetches: " << total_prefetches << "\n";
+		cerr << "Unused prefetches in cache: " << unused_prefetches << "\n";
+		cerr << "Unused prefetch victims: " << unused_prefetch_victims << "\n";
+		cerr << "Prefetch hit NOPs: " << prefetch_hit_nops << "\n";
+
+		if (ENABLE_STREAM_BUFFER)
+		{
+			cerr << "Unique one misses: " << unique_one_misses << "\n";
+			cerr << "Unique stream buffers: " << unique_stream_buffers << "\n";
+			cerr << "Stream buffers hits: " << stream_buffer_hits << "\n";
+		}
+
 		// Print out the log file.
 		if (ENABLE_LOGGER)
 		{
@@ -1479,19 +1579,51 @@ namespace HybridSim {
 
 
 	// Page Contention functions
-	void HybridSystem::contention_lock(uint64_t page_addr)
+	void HybridSystem::contention_lock(uint64_t flash_addr)
+	{
+		pending_flash_addr[flash_addr] = 0;
+	}
+
+	void HybridSystem::contention_page_lock(uint64_t flash_addr)
 	{
 		// Add to the pending pages map. And set the count to 0.
-		pending_pages[page_addr] = 0;
+		pending_pages[PAGE_ADDRESS(flash_addr)] = 0;
 	}
 
 	void HybridSystem::contention_unlock(uint64_t flash_addr, uint64_t orig_addr, string operation, bool victim_valid, uint64_t victim_page, 
 			bool cache_line_valid, uint64_t cache_addr)
 	{
+		uint64_t page_addr = PAGE_ADDRESS(flash_addr);
+
+		// If there is no page entry, then this means only the flash address was locked (i.e. it is a DRAM hit).
+		if (pending_pages.count(page_addr) == 0)
+		{
+			int num = pending_flash_addr.erase(flash_addr);
+			assert(num == 1);
+
+			// Victim should never be valid if we were only servicing a cache hit.
+			assert(victim_valid == false);
+
+			// If the cache line is valid, unlock it.
+			if (cache_line_valid)
+				contention_cache_line_unlock(cache_addr);
+
+			// Restart queue checking.
+			this->check_queue = true;
+			pending_count -= 1;
+
+			return;
+		}
+
+		// At this point, we know that the page_addr is in the pending_pages list.
+		// This implies we also know that there was a cache miss for this access.
+		// If the count for the pending_pages entry is > 0, then we DO NOT unlock
+		// the page yet.
+
 		// Erase the page from the pending page map.
 		// Note: the if statement is needed to ensure that the VictimRead operation (if it was invoked as part of a cache miss)
 		// is already complete. If not, the pending_set removal will be done in VictimReadFinish().
-		if (pending_pages[PAGE_ADDRESS(flash_addr)] == 0)
+		else if (pending_pages[PAGE_ADDRESS(flash_addr)] == 0)
 		{
 			int num = pending_pages.erase(PAGE_ADDRESS(flash_addr));
 			if (num != 1)
@@ -1500,6 +1632,10 @@ namespace HybridSim {
 				cerr << "orig:" << orig_addr << " aligned:" << flash_addr << "\n\n";
 				abort();
 			}
+
+			// Also remove the pending_flash_addr entry.
+			num = pending_flash_addr.erase(flash_addr);
+			assert(num == 1);
 
 			// If the victim page is valid, then unlock it too.
 			if (victim_valid)
@@ -1513,11 +1649,12 @@ namespace HybridSim {
 			this->check_queue = true;
 			pending_count -= 1;
 		}
-
 	}
 
-	bool HybridSystem::contention_is_unlocked(uint64_t page_addr)
+	bool HybridSystem::contention_is_unlocked(uint64_t flash_addr)
 	{
+		uint64_t page_addr = PAGE_ADDRESS(flash_addr);
+
 		// First see if the set is locked. This is done by looking at the set_counter.
 		// If the set counter exists and is equal to the set size, then we should NOT be trying to do any more accesses
 		// to the set, because this means that all of the cache lines are locked.
@@ -1530,24 +1667,26 @@ namespace HybridSim {
 			}
 		}
 
-		// If the page is not in the penting_pages map, then it is unlocked.
-		if (pending_pages.count(page_addr) == 0)
+		// If the page is not in the penting_pages and pending_flash_addr map, then it is unlocked.
+		if ((pending_pages.count(page_addr) == 0) && (pending_flash_addr.count(flash_addr) == 0))
 			return true;
 		else
 			return false;
 	}
 
 
-	void HybridSystem::contention_increment(uint64_t page_addr)
+	void HybridSystem::contention_increment(uint64_t flash_addr)
 	{
+		uint64_t page_addr = PAGE_ADDRESS(flash_addr);
 		// TODO: Add somme error checking here (e.g. make sure page is in pending_pages and make sure count is >= 0)
 
 		// This implements a counting semaphore for the page so that it isn't unlocked until the count is 0.
 		pending_pages[page_addr] += 1;
 	}
 
-	void HybridSystem::contention_decrement(uint64_t page_addr)
+	void HybridSystem::contention_decrement(uint64_t flash_addr)
 	{
+		uint64_t page_addr = PAGE_ADDRESS(flash_addr);
 		// TODO: Add somme error checking here (e.g. make sure page is in pending_pages and make sure count is >= 0)
 
 		// This implements a counting semaphore for the page so that it isn't unlocked until the count is 0.
@@ -1569,6 +1708,7 @@ namespace HybridSim {
 	{
 		cache_line cur_line = cache[cache_addr];
 		cur_line.locked = true;
+		cur_line.lock_count++;
 		cache[cache_addr] = cur_line;
 
 		uint64_t set_index = SET_INDEX(cache_addr);
@@ -1581,7 +1721,10 @@ namespace HybridSim {
 	void HybridSystem::contention_cache_line_unlock(uint64_t cache_addr)
 	{
 		cache_line cur_line = cache[cache_addr];
-		cur_line.locked = false;
+		cur_line.lock_count--;
+		assert(cur_line.lock_count >= 0);
+		if (cur_line.lock_count == 0)
+			cur_line.locked = false; // Only unlock if the count for outstanding accesses is 0.
 		cache[cache_addr] = cur_line;
 
 		uint64_t set_index = SET_INDEX(cache_addr);
@@ -1747,6 +1890,26 @@ namespace HybridSim {
 			cerr << "\n" << currentClockCycle << " : HybridSim received MMIO TASK_SWITCH.\n";
 			cerr << "\n" << "Address=" << address << " Accesses=" << log.num_accesses << " Reads=" << log.num_reads << " Writes=" << log.num_writes << "\n";
 		}
+		else if (operation == 3)
+		{
+			// PREFETCH_RANGE
+
+			// Split address into lower 48 bits for base address and upper 16 bits for number of pages to prefetch.
+			uint64_t base_address = address & 0x0000FFFFFFFFFFFF;
+			uint64_t prefetch_pages = (address >> 48) & 0x000000000000FFFF;
+
+			// Add one to prefetch_pages. This means 0 in the upper bits means prefetch a single page.
+			// This allows the caller to prefetch up to 2^16 pages (256 MB when using 4k pages).
+			prefetch_pages += 1;
+
+			cerr << "\n" << currentClockCycle << " : HybridSim received MMIO PREFETCH_RANGE. ";
+			cerr << "base_address=" << base_address << " prefetch_pages=" << prefetch_pages << "\n";
+
+			for (uint64_t i=0; i<prefetch_pages; i++)
+			{
+				addPrefetch(base_address + i*PAGE_SIZE);
+			}
+		}
 		else
 		{
 			cerr << "\n" << currentClockCycle << " : HybridSim received invalid MMIO operation.\n";
@@ -1760,6 +1923,325 @@ namespace HybridSim {
 		addSyncCounter(0, true);
 	}
 
+	void HybridSystem::check_tlb(uint64_t page_addr)
+	{
+		// A TLB_SIZE of 0 disables the TLB.
+		// This means we always have the tags in SRAM on the CPU.
+		if (TLB_SIZE == 0)
+			return;
+
+		// TLB processing code.
+		uint64_t tlb_base_addr = TLB_BASE_ADDRESS(page_addr);
+		if (tlb_base_set.count(tlb_base_addr) == 0)
+		{
+			//cerr << "TLB miss with address " << page_addr << ".\n";
+			tlb_misses++;
+			// TLB miss.
+			if (tlb_base_set.size() == TLB_MAX_ENTRIES)
+			{
+				// TLB is full, so must pick a victim.
+				uint64_t tlb_victim = (*(tlb_base_set.begin())).first;
+				uint64_t tlb_victim_ts = (*(tlb_base_set.begin())).second;
+				unordered_map<uint64_t, uint64_t>:: iterator tlb_it;
+				for (tlb_it = tlb_base_set.begin(); tlb_it != tlb_base_set.end(); tlb_it++)
+				{
+					uint64_t cur_ts = (*tlb_it).second;
+					if (cur_ts < tlb_victim_ts)
+					{
+						// Found an older entry than the current victim.
+						tlb_victim = (*tlb_it).first;
+						tlb_victim_ts = cur_ts;
+					}
+				}
+
+				// Remove the victim entry.
+				//cerr << "Evicting " << tlb_victim << " from TLB.\n";
+				tlb_base_set.erase(tlb_victim);
+			}
+
+			// At this point, there is at least one empty spot in the TLB.
+			assert(tlb_base_set.size() < TLB_MAX_ENTRIES);
+			
+			// Insert the new page with the current clock cycle.
+			tlb_base_set[tlb_base_addr] = currentClockCycle;
+
+			// Add TLB_MISS_DELAY to the controller delay.
+			delay_counter += TLB_MISS_DELAY;
+		}
+		else
+		{
+			// TLB hit. Just update the timestamp for the LRU algorithm.
+			//cerr << "TLB hit with address " << page_addr << ".\n";
+			tlb_hits++;
+			tlb_base_set[tlb_base_addr] = currentClockCycle;
+		}
+	}
+
+	void HybridSystem::stream_buffer_miss_handler(uint64_t miss_page)
+	{
+		// Don't do any miss processing for the first or last pages in memory.
+		if ((miss_page == 0) || (miss_page == (TOTAL_PAGES - 1)*PAGE_SIZE))
+			return;
+
+		// Calculate the neighboring pages.
+		uint64_t prior_page = miss_page - PAGE_SIZE;
+		uint64_t next_page = miss_page + PAGE_SIZE;
+
+		// Look through the one miss table to see if there are any matches.
+		bool stream_detected = false;
+		list<pair<uint64_t, uint64_t> >::iterator it;
+		for (it=one_miss_table.begin(); it != one_miss_table.end(); it++)
+		{
+			uint64_t entry_page = (*it).first;
+			//uint64_t entry_cycle = (*it).second;
+
+			if (entry_page == miss_page)
+			{
+				// Somehow we managed to miss the same page twice in a short period of time.
+				// Go ahead and remove this entry to make room for this to be readded.
+				it = one_miss_table.erase(it);
+
+				if (DEBUG_STREAM_BUFFER)
+					cerr << currentClockCycle << " : Stream buffer one miss double hit. miss_page=" << miss_page << "\n";
+			}
+			if (entry_page == prior_page)
+			{
+				// Stream detected!
+				stream_detected = true;
+
+				if (DEBUG_STREAM_BUFFER)
+					cerr << currentClockCycle << " : New stream detected. Allocating stream buffer at addr " << next_page << "\n";
+
+
+				// Remove the entry for the prior page.
+				it = one_miss_table.erase(it);
+
+				// Save the next page in the stream buffer table
+				// This is the address we will detect on a hit to the buffer.
+				stream_buffers[next_page] = currentClockCycle;
+				unique_stream_buffers++;
+
+				if (stream_buffers.size() > NUM_STREAM_BUFFERS)
+				{
+					// Evict stream buffer with oldest cycle.
+					unordered_map<uint64_t, uint64_t>::iterator sb_it;
+					uint64_t oldest_key = 0;
+					uint64_t oldest_cycle = currentClockCycle;
+					for (sb_it=stream_buffers.begin(); sb_it != stream_buffers.end(); sb_it++)
+					{
+						uint64_t cur_sb_cycle = (*sb_it).second;
+						if (cur_sb_cycle < oldest_cycle)
+						{
+							oldest_key = (*sb_it).first;
+							oldest_cycle = cur_sb_cycle;
+						}
+					}
+					stream_buffers.erase(oldest_key);
+
+					if (DEBUG_STREAM_BUFFER)
+						cerr << currentClockCycle << " : Stream buffer evicted addr=" << oldest_key << "\n";
+				}
+
+				// Issue prefetches to start the stream.
+				// Count down from the top address. This must be done because addPrefetch puts transactions at the front
+				// of the queue and we want page_addr+PAGE_SIZE to be the first prefetch issued.
+				for (int i=STREAM_BUFFER_LENGTH; i > 0; i--)
+				{
+					// Compute the next prefetch address.
+					uint64_t prefetch_address = miss_page + (i * PAGE_SIZE);
+
+					// If address is above the legal address space for the main memory, then do not issue this prefetch.
+					if (prefetch_address >= (TOTAL_PAGES * PAGE_SIZE))
+						continue;
+
+					// Add the prefetch.
+					addPrefetch(prefetch_address);
+				}
+
+				break;
+			}
+		}
+
+		if (!stream_detected)
+		{
+			// Insert miss address into the one_miss_table.
+			one_miss_table.push_back(make_pair(miss_page, currentClockCycle));
+			unique_one_misses++;
+
+			if (DEBUG_STREAM_BUFFER)
+				cerr << currentClockCycle << " : One miss detected addr=" << miss_page << "\n";
+		}
+
+		// Enforce the size of the one miss table.
+		if (one_miss_table.size() > ONE_MISS_TABLE_SIZE)
+		{
+			if (DEBUG_STREAM_BUFFER)
+			{
+				cerr << currentClockCycle << " : One miss evicted addr=" << one_miss_table.front().first << "\n";
+			}
+
+			one_miss_table.pop_front();
+		}
+
+	}
+
+	void HybridSystem::stream_buffer_hit_handler(uint64_t hit_page)
+	{
+		if (stream_buffers.count(hit_page) == 1)
+		{
+			// Stream buffer hit!
+			stream_buffer_hits++;
+
+			uint64_t next_page = hit_page + PAGE_SIZE;
+			uint64_t prefetch_address = hit_page + (STREAM_BUFFER_LENGTH * PAGE_SIZE);
+
+			if ((DEBUG_STREAM_BUFFER) && (DEBUG_STREAM_BUFFER_HIT))
+			{
+				cerr << currentClockCycle << " : Stream Buffer Hit. hit_page=" << hit_page
+					<< " prior cycle=" << stream_buffers[hit_page] << " next_page=" << next_page 
+					<< " prefetch_addr=" << prefetch_address << "\n";
+			}
+
+			// Remove the current stream buffer entry and replace it with the next page.
+			stream_buffers.erase(hit_page);
+
+			// If the prefetch address is out of range, then do nothing.
+			if (prefetch_address < (TOTAL_PAGES * PAGE_SIZE))
+			{
+				// If it is in range, add the prefetch and readd the stream buffer.
+				addPrefetch(prefetch_address);
+				stream_buffers[next_page] = currentClockCycle;
+			}
+		}
+
+	}
+
+
+// Extra functions for C interface (used by Python front end)
+class HybridSim_C_Callbacks
+{
+	public:
+	// Lists for tracking received callback data.
+	list<uint> done_id;
+	list<uint64_t> done_address;
+	list<uint64_t> done_cycle;
+	list<bool> done_isWrite;
+
+	void read_complete(uint id, uint64_t address, uint64_t cycle)
+	{
+		done_id.push_back(id);
+		done_address.push_back(address);
+		done_cycle.push_back(cycle);
+		done_isWrite.push_back(false);
+	}
+
+	void write_complete(uint id, uint64_t address, uint64_t cycle)
+	{
+		done_id.push_back(id);
+		done_address.push_back(address);
+		done_cycle.push_back(cycle);
+		done_isWrite.push_back(true);
+	}
+
+	void register_cb(HybridSystem *hs)
+	{
+		typedef CallbackBase<void,uint,uint64_t,uint64_t> Callback_t;
+		Callback_t *read_cb = new Callback<HybridSim_C_Callbacks, void, uint, uint64_t, uint64_t>(this, &HybridSim_C_Callbacks::read_complete);
+		Callback_t *write_cb = new Callback<HybridSim_C_Callbacks, void, uint, uint64_t, uint64_t>(this, &HybridSim_C_Callbacks::write_complete);
+		hs->RegisterCallbacks(read_cb, write_cb);
+	}
+
+	bool get_next_result(uint *sysID, uint64_t *addr, uint64_t *cycle, bool *isWrite)
+	{
+		if (done_id.empty())
+		{
+			*sysID = 0;
+			*addr = 0;
+			*cycle = 0;
+			*isWrite = false;
+
+			return false;
+		}
+		else
+		{
+			// Set the result pointers.
+			*sysID = done_id.front();
+			*addr = done_address.front();
+			*cycle = done_cycle.front();
+			*isWrite = done_isWrite.front();
+
+			// Pop the front of each list.
+			done_id.pop_front();
+			done_address.pop_front();
+			done_cycle.pop_front();
+			done_isWrite.pop_front();
+
+			return true;
+		}
+	}
+};
+HybridSim_C_Callbacks c_callbacks;
+
+extern "C"
+{
+	HybridSystem *HybridSim_C_getMemorySystemInstance(uint id, char *ini)
+	{
+		// Note ini is implicitly transformed to C++ string type.
+		HybridSystem *hs = getMemorySystemInstance(id, ini);
+
+		// Register callbacks to the HybridSim_C_callbacks object.
+		c_callbacks.register_cb(hs);
+
+		return hs;
+	}
+
+	bool HybridSim_C_addTransaction(HybridSystem *hs, bool isWrite, uint64_t addr)
+	{
+		//cout << "C interface... addr=" << addr << " isWrite=" << isWrite << "\n";
+		return hs->addTransaction(isWrite, addr);
+	}
+
+	bool HybridSim_C_WillAcceptTransaction(HybridSystem *hs)
+	{
+		return hs->WillAcceptTransaction();
+	}
+
+	void HybridSim_C_update(HybridSystem *hs)
+	{
+		hs->update();
+	}
+
+	// use this instead of the callbacks since I can't do callbacks through the Python cdll interface
+	// The protocol is to call this repetitively after each update until it returns false.
+	// When it returns false, the sysID, addr, cycle, and isWrite are don't cares
+	// When it returns true, the output values are set to the completed transaction
+	bool HybridSim_C_PollCompletion(HybridSystem *hs, uint *sysID, uint64_t *addr, uint64_t *cycle, bool *isWrite)
+	{
+		return c_callbacks.get_next_result(sysID, addr, cycle, isWrite);
+	}
+
+	void HybridSim_C_mmio(HybridSystem *hs, uint64_t operation, uint64_t address)
+	{
+		hs->mmio(operation, address);
+	}
+
+	void HybridSim_C_syncAll(HybridSystem *hs)
+	{
+		hs->syncAll();
+	}
+
+	void HybridSim_C_reportPower(HybridSystem *hs)
+	{
+		hs->reportPower();
+	}
+
+	void HybridSim_C_printLogfile(HybridSystem *hs)
+	{
+		hs->printLogfile();
+	}
+
+}
+
 } // Namespace HybridSim
 
 // Extra function needed for Sandia SST.
@@ -1770,4 +2252,6 @@ extern "C"
 	;
     }
 }
+
+
 

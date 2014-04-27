@@ -53,6 +53,22 @@ The trace file format is an ASCII file with each access in the trace as a separa
 line. Each access consists of a cycle number, an operation type (0 for read, 1 for write),
 and an byte address for the memory access (addresses should be aligned to 64 bytes).
 
+
+Repository Management:
+
+This repo follows a standard git branching scheme.
+
+* master - stable branch
+* dev - unstable development branch
+
+All other branches are feature branches. Some may be orphans and some
+may eventually be merged into dev. The master branch will only merge
+changes from dev after we are satisfied they are stable.
+
+Tags with format vX.Y.Z are considered releases of stable versions.
+All other tags are considered experimental.
+
+
 Software License:
 This software is open-source and is released under the BSD license. Please
 see the file LICENSE for a copy of the license.

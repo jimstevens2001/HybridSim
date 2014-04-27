@@ -41,9 +41,11 @@ const uint64_t MIN_PENDING = 35;
 uint64_t complete = 0;
 uint64_t pending = 0;
 uint64_t throttle_count = 0;
+uint64_t throttle_cycles = 0;
+uint64_t final_cycles = 0;
 
 // The cycle counter is used to keep track of what cycle we are on.
-uint64_t cycle_counter = 0;
+uint64_t trace_cycles = 0;
 
 uint64_t last_clock = 0;
 uint64_t CLOCK_DELAY = 1000000;
@@ -61,7 +63,9 @@ int main(int argc, char *argv[])
 		cout << "Using trace file " << tracefile << "\n";
 	}
 	else
-	cout << "Using default trace file (traces/test.txt)\n";
+	{
+		cout << "Using default trace file (traces/test.txt)\n";
+	}
 
 	obj.run_trace(tracefile);
 }
@@ -169,10 +173,10 @@ int HybridSimTBS::run_trace(string tracefile)
 
 		// increment the counter until >= the clock cycle of cur transaction
 		// for each cycle, call the update() function.
-		while (cycle_counter < trans_cycle)
+		while (trace_cycles < trans_cycle)
 		{
 			mem->update();
-			cycle_counter++;
+			trace_cycles++;
 		}
 
 		// add the transaction and continue
@@ -183,14 +187,14 @@ int HybridSimTBS::run_trace(string tracefile)
 		// transactions. This throttling will prevent the memory system from getting overloaded.
 		if (pending >= MAX_PENDING)
 		{
-			//cout << "MAX_PENDING REACHED! Throttling the trace until pending is back below MIN_PENDING.\t\tcycle= " << cycle_counter << "\n";
+			//cout << "MAX_PENDING REACHED! Throttling the trace until pending is back below MIN_PENDING.\t\tcycle= " << trace_cycles << "\n";
 			throttle_count++;
 			while (pending > MIN_PENDING)
 			{
 				mem->update();
-				cycle_counter++;
+				throttle_cycles++;
 			}
-			//cout << "Back to MIN_PENDING. Allowing transactions to be added again.\t\tcycle= " << cycle_counter << "\n";
+			//cout << "Back to MIN_PENDING. Allowing transactions to be added again.\t\tcycle= " << trace_cycles << "\n";
 		}
 
 	}
@@ -205,11 +209,12 @@ int HybridSimTBS::run_trace(string tracefile)
 	while (pending > 0)
 	{
 		mem->update();
-		cycle_counter++;
+		final_cycles++;
 	}
 
 	// This is a hack for the moment to ensure that a final write completes.
 	// In the future, we need two callbacks to fix this.
+	// This is not counted towards the cycle counts for the run though.
 	for (int i=0; i<1000000; i++)
 		mem->update();
 
@@ -231,17 +236,16 @@ int HybridSimTBS::run_trace(string tracefile)
 		cout << (*it) << " ";
 	}
 	cout << "\n\n";
-	cout << "pending_sets.size() = " << mem->pending_sets.size() << "\n\n";
-	cout << "pending_sets_max = " << mem->pending_sets_max << "\n\n";
 	cout << "pending_pages_max = " << mem->pending_pages_max << "\n\n";
 	cout << "trans_queue_max = " << mem->trans_queue_max << "\n\n";
+
+	cout << "trace_cycles = " << trace_cycles << "\n";
+	cout << "throttle_count = " << throttle_count << "\n";
+	cout << "throttle_cycles = " << throttle_cycles << "\n";
+	cout << "final_cycles = " << final_cycles << "\n";
+	cout << "total_cycles = trace_cycles + throttle_cycles + final_cycles = " << trace_cycles + throttle_cycles + final_cycles << "\n\n";
 	
 	mem->printLogfile();
-
-	for (int i=0; i<500; i++)
-	{
-		mem->update();
-	}
 
 	return 0;
 }

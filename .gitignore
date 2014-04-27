@@ -9,6 +9,7 @@ results/
 *.cpp~
 *.log
 *.png
+*.pyc
 *~
 out
 nohup.out
@@ -24,3 +25,4 @@ hybridsim.log
 run.sh
 tags
 state/
+untracked_traces/*
