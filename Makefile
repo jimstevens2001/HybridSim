@@ -54,7 +54,7 @@ ${LIB_NAME}: ${POBJ}
 
 # build all .cpp files to .o files
 %.o : %.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -std=c++0x -o $@ -c $<
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ -c $<
 
 %.po : %.cpp
 	$(CXX) $(INCLUDES) -std=c++0x -O3 -g -ffast-math -fPIC -DNO_OUTPUT -DNO_STORAGE -o $@ -c $<

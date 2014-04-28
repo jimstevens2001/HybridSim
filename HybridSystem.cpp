@@ -2102,7 +2102,7 @@ namespace HybridSim {
 			uint64_t next_page = hit_page + PAGE_SIZE;
 			uint64_t prefetch_address = hit_page + (STREAM_BUFFER_LENGTH * PAGE_SIZE);
 
-			if ((DEBUG_STREAM_BUFFER) && (DEBUG_STREAM_BUFFER_HIT))
+			if ((DEBUG_STREAM_BUFFER==1) && (DEBUG_STREAM_BUFFER_HIT==1))
 			{
 				cerr << currentClockCycle << " : Stream Buffer Hit. hit_page=" << hit_page
 					<< " prior cycle=" << stream_buffers[hit_page] << " next_page=" << next_page 

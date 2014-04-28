@@ -55,9 +55,9 @@ namespace HybridSim
 			//functions
 			Transaction(TransactionType transType, uint64_t addr, void *data)
 			{
-				transactionType = transType;
-				address = addr;
-				data = data;
+				this->transactionType = transType;
+				this->address = addr;
+				this->data = data;
 			}
 
 			Transaction() {}
