@@ -38,7 +38,14 @@ namespace HybridSim {
 	{
 		if (ini == "")
 		{
-			hybridsim_ini = "../HybridSim/ini/hybridsim.ini";
+			hybridsim_ini = "";
+			char *base_path = getenv("HYBRIDSIM_BASE");
+			if (base_path != NULL)
+			{
+				hybridsim_ini.append(base_path);
+				hybridsim_ini.append("/");
+			}
+			hybridsim_ini.append("../HybridSim/ini/hybridsim.ini");
 		}
 		else
 		{

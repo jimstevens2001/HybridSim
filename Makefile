@@ -13,13 +13,13 @@ endif
 endif
 CXXFLAGS+=$(OPTFLAGS)
 
-
-DRAM_LIB=../DRAMSim2
-NV_LIB=../NVDIMMSim/src
-#NV_LIB=../FNVSim
+CUR_DIRECTORY=$(shell pwd)
+DRAM_LIB=$(CUR_DIRECTORY)/../DRAMSim2
+NV_LIB=$(CUR_DIRECTORY)/../NVDIMMSim/src
+#NV_LIB=$(CUR_DIRECTORY)/../FNVSim
 
 INCLUDES=-I$(DRAM_LIB) -I$(NV_LIB)
-LIBS=-L${DRAM_LIB} -L${NV_LIB} -ldramsim -lnvdsim -Wl,-rpath=${DRAM_LIB} -Wl,-rpath=${NV_LIB}
+LIBS=-L${DRAM_LIB} -L${NV_LIB} -ldramsim -lnvdsim -Wl,-rpath ${DRAM_LIB} -Wl,-rpath ${NV_LIB}
 
 EXE_NAME=HybridSim
 LIB_NAME=libhybridsim.so
