@@ -11,6 +11,8 @@ PAGE_SIZE = 4096
 ADDRESS_SPACE_SIZE = TOTAL_PAGES * PAGE_SIZE
 THREAD_PENDING_MAX = 8
 
+DEBUG_SCHEDULER_PREFETCHER=False
+
 class SchedulerPrefetcher(object):
 	def __init__(self, mt_tbs):
 		self.mt_tbs = mt_tbs
@@ -19,6 +21,9 @@ class SchedulerPrefetcher(object):
 		self.next_threads = None
 
 		self.halfway_cycles = self.mt_tbs.quantum_cycles / 2
+
+		if DEBUG_SCHEDULER_PREFETCHER:
+			self.debug = open('sched_prefetch_debug.log', 'w')
 
 	def done(self):
 		outFile = open('scheduler_prefetcher.log', 'w')
@@ -37,6 +42,15 @@ class SchedulerPrefetcher(object):
 				
 				# Reset the thread pages.
 				self.thread_pages[thread_id] = {}
+
+		if DEBUG_SCHEDULER_PREFETCHER:
+			print >> self.debug, 'quantum:',self.mt_tbs.quantum_num
+			print >> self.debug, 'last_threads:',last_threads
+			print >> self.debug, 'next_threads:',next_threads
+			print >> self.debug, self.old_thread_pages
+			print >> self.debug
+			self.debug.flush()
+			
 
 
 	def update(self):
@@ -59,7 +73,7 @@ class SchedulerPrefetcher(object):
 
 	def addTransaction(self, thread_id, isWrite, addr):
 		# Compute page number.
-		page_num = addr % PAGE_SIZE
+		page_num = addr / PAGE_SIZE
 
 		# Save page in thread pages set.
 		if thread_id not in self.thread_pages:
