@@ -65,9 +65,9 @@ namespace HybridSim
 		void DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle);
 		void DRAMWriteCallback(uint id, uint64_t addr, uint64_t cycle);
 		void DRAMPowerCallback(double a, double b, double c, double d);
-		void FlashReadCallback(uint id, uint64_t addr, uint64_t cycle, bool unmapped);
-		void FlashCriticalLineCallback(uint id, uint64_t addr, uint64_t cycle, bool unmapped);
-		void FlashWriteCallback(uint id, uint64_t addr, uint64_t cycle, bool unmapped);
+		void FlashReadCallback(uint64_t id, uint64_t addr, uint64_t cycle, bool unmapped);
+		void FlashCriticalLineCallback(uint64_t id, uint64_t addr, uint64_t cycle, bool unmapped);
+		void FlashWriteCallback(uint64_t id, uint64_t addr, uint64_t cycle, bool unmapped);
 
 		// Functions to run the callbacks to the module using HybridSim.
 		void ReadDoneCallback(uint systemID, uint64_t orig_addr, uint64_t cycle);

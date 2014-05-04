@@ -43,6 +43,7 @@
 #include "CallbackHybrid.h"
 
 using std::string;
+typedef unsigned int uint;
 
 namespace HybridSim 
 {

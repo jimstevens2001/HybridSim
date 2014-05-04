@@ -85,7 +85,7 @@ namespace HybridSim {
 		dram->RegisterCallbacks(read_cb, write_cb, NULL);
 
 		// Set up the callbacks for NVDIMM.
-		typedef NVDSim::Callback <HybridSystem, void, uint, uint64_t, uint64_t, bool> nvdsim_callback_t;
+		typedef NVDSim::Callback <HybridSystem, void, uint64_t, uint64_t, uint64_t, bool> nvdsim_callback_t;
 		NVDSim::Callback_t *nv_read_cb = new nvdsim_callback_t(this, &HybridSystem::FlashReadCallback);
 		NVDSim::Callback_t *nv_write_cb = new nvdsim_callback_t(this, &HybridSystem::FlashWriteCallback);
 		NVDSim::Callback_t *nv_crit_cb = new nvdsim_callback_t(this, &HybridSystem::FlashCriticalLineCallback);
@@ -1269,7 +1269,7 @@ namespace HybridSim {
 		printf("power callback: %0.3f, %0.3f, %0.3f, %0.3f\n",a,b,c,d);
 	}
 
-	void HybridSystem::FlashReadCallback(uint id, uint64_t addr, uint64_t cycle, bool unmapped)
+	void HybridSystem::FlashReadCallback(uint64_t id, uint64_t addr, uint64_t cycle, bool unmapped)
 	{
 		if (flash_pending.count(PAGE_ADDRESS(addr)) != 0)
 		{
@@ -1298,7 +1298,7 @@ namespace HybridSim {
 		}
 	}
 
-	void HybridSystem::FlashCriticalLineCallback(uint id, uint64_t addr, uint64_t cycle, bool unmapped)
+	void HybridSystem::FlashCriticalLineCallback(uint64_t id, uint64_t addr, uint64_t cycle, bool unmapped)
 	{
 		// This function is called to implement critical line first for reads.
 		// This allows HybridSim to tell the external user it can make progress as soon as the data
@@ -1351,7 +1351,7 @@ namespace HybridSim {
 
 	}
 
-	void HybridSystem::FlashWriteCallback(uint id, uint64_t addr, uint64_t cycle, bool unmapped)
+	void HybridSystem::FlashWriteCallback(uint64_t id, uint64_t addr, uint64_t cycle, bool unmapped)
 	{
 		// Nothing to do (it doesn't matter when the flash write finishes for the cache controller, as long as it happens).
 
