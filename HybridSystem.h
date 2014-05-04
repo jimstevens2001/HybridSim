@@ -207,6 +207,7 @@ namespace HybridSim
 		uint64_t unused_prefetches; // Count of unused prefetched pages in the DRAM cache.
 		uint64_t unused_prefetch_victims; // Count of unused prefetched pages that were never used before being evicted.
 		uint64_t prefetch_hit_nops; // Count the number of prefetch hits that are nops.
+		uint64_t prefetch_cheat_count; // Count the number of cheat prefetches.
 
 		// Stream buffer state.
 		list<pair<uint64_t, uint64_t> > one_miss_table; // pair is (address, cycle)
@@ -216,6 +217,9 @@ namespace HybridSim
 		uint64_t unique_one_misses;
 		uint64_t unique_stream_buffers;
 		uint64_t stream_buffer_hits;
+
+
+		unordered_map<uint64_t, uint64_t> prefetch_cheat_map;
 
 	};
 

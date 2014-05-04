@@ -12,6 +12,7 @@ ADDRESS_SPACE_SIZE = TOTAL_PAGES * PAGE_SIZE
 THREAD_PENDING_MAX = 8
 
 DEBUG_SCHEDULER_PREFETCHER=False
+FAKE_PREFETCHES=True
 
 class SchedulerPrefetcher(object):
 	def __init__(self, mt_tbs):
@@ -65,7 +66,10 @@ class SchedulerPrefetcher(object):
 					last_thread_pages = self.old_thread_pages[thread_id][-1]
 					page_list = [page_num * PAGE_SIZE for page_num in last_thread_pages.keys()]
 					for page in page_list:
-						self.mt_tbs.mem.mmio(3, page)
+						if FAKE_PREFETCHES:
+							self.mt_tbs.mem.mmio(4, page)
+						else:
+							self.mt_tbs.mem.mmio(3, page)
 						prefetch_count += 1
 			print 'Issued %d prefetches.'%(prefetch_count)
 

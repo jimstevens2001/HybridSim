@@ -192,6 +192,7 @@ namespace HybridSim {
 		unused_prefetches = 0;
 		unused_prefetch_victims = 0;
 		prefetch_hit_nops = 0;
+		prefetch_cheat_count = 0;
 
 		unique_one_misses = 0;
 		unique_stream_buffers = 0;
@@ -752,13 +753,61 @@ namespace HybridSim {
 
 			cache_address = victim;
 			cur_line = cache[cache_address];
+			uint64_t victim_flash_addr = FLASH_ADDRESS(cur_line.tag, set_index);
+
+			if ((cur_line.prefetched) && (cur_line.used == false))
+			{
+				// An unused prefetch is being removed from the cache, so transfer the count
+				// to the unused_prefetch_victims counter.
+				unused_prefetches--;
+				unused_prefetch_victims++;
+			}
+
+			// If this is a cheating PREFETCH operation, then we don't actually want to do any work.
+			// Just set the cache tags as if the operation completed and then bail.
+			if (trans.transactionType == PREFETCH)
+			{
+				uint64_t page_address = PAGE_ADDRESS(addr);
+				if (prefetch_cheat_map.count(page_address))
+				{
+					// Remove the page_address from the prefetch_cheat_map.
+					prefetch_cheat_map[page_address] -= 1;
+					if (prefetch_cheat_map[page_address] == 0)
+					{
+						size_t retval = prefetch_cheat_map.erase(page_address);
+						assert(retval == 1);
+					}
+
+					// Set the cache lines as if the transaction was already done.
+					cur_line.tag = TAG(page_address);
+					cur_line.dirty = false;
+					cur_line.valid = true;
+					cur_line.ts = currentClockCycle;
+					cur_line.used = false;
+
+					// Since this is a prefetch, also keep track of that.
+					cur_line.prefetched = true;
+					total_prefetches++;
+					unused_prefetches++;
+					prefetch_cheat_count++;
+
+					cache[cache_address] = cur_line;
+
+					// Unlock the address.
+					contention_unlock(addr, addr, "PREFETCH (cheat)", false, 0, false, 0);
+
+					// Note: No callback is necessary since this is a prefetch operation.
+					return;
+				}
+
+				// TODO: Figure out if the logger or anything else is going to break.
+
+			}
 
 			// Log the victim, set, etc.
 			// THIS MUST HAPPEN AFTER THE CUR_LINE IS SET TO THE VICTIM LINE.
-			uint64_t victim_flash_addr = FLASH_ADDRESS(cur_line.tag, set_index);
 			if ((ENABLE_LOGGER) && ((trans.transactionType == DATA_READ) || (trans.transactionType == DATA_WRITE)))
 				log.access_miss(PAGE_ADDRESS(addr), victim_flash_addr, set_index, victim, cur_line.dirty, cur_line.valid);
-
 
 			// Lock the victim page so it will not be selected for eviction again during the processing of this
 			// transaction's miss and so further transactions to this page cannot happen.
@@ -778,13 +827,6 @@ namespace HybridSim {
 				cerr << currentClockCycle << ": " << "The victim is dirty? " << cur_line.dirty << endl;
 			}
 
-			if ((cur_line.prefetched) && (cur_line.used == false))
-			{
-				// An unused prefetch is being removed from the cache, so transfer the count
-				// to the unused_prefetch_victims counter.
-				unused_prefetches--;
-				unused_prefetch_victims++;
-			}
 
 			Pending p;
 			p.orig_addr = trans.address;
@@ -1428,6 +1470,7 @@ namespace HybridSim {
 		cerr << "Unused prefetches in cache: " << unused_prefetches << "\n";
 		cerr << "Unused prefetch victims: " << unused_prefetch_victims << "\n";
 		cerr << "Prefetch hit NOPs: " << prefetch_hit_nops << "\n";
+		cerr << "Prefetch cheat count: " << prefetch_cheat_count << "\n";
 
 		if (ENABLE_STREAM_BUFFER)
 		{
@@ -1897,24 +1940,40 @@ namespace HybridSim {
 			cerr << "\n" << currentClockCycle << " : HybridSim received MMIO TASK_SWITCH.\n";
 			cerr << "\n" << "Address=" << address << " Accesses=" << log.num_accesses << " Reads=" << log.num_reads << " Writes=" << log.num_writes << "\n";
 		}
-		else if (operation == 3)
+		else if ((operation == 3) || (operation == 4))
 		{
 			// PREFETCH_RANGE
 
 			// Split address into lower 48 bits for base address and upper 16 bits for number of pages to prefetch.
+			// TODO: Rework this so the upper 48 bits are the address and the lower 48 bits are the prefetch_pages count.
 			uint64_t base_address = address & 0x0000FFFFFFFFFFFF;
 			uint64_t prefetch_pages = (address >> 48) & 0x000000000000FFFF;
+			bool cheat = (operation == 4);
 
 			// Add one to prefetch_pages. This means 0 in the upper bits means prefetch a single page.
 			// This allows the caller to prefetch up to 2^16 pages (256 MB when using 4k pages).
 			prefetch_pages += 1;
 
 			cerr << "\n" << currentClockCycle << " : HybridSim received MMIO PREFETCH_RANGE. ";
-			cerr << "base_address=" << base_address << " prefetch_pages=" << prefetch_pages << "\n";
+			cerr << "base_address=" << base_address << " prefetch_pages=" << prefetch_pages << " cheat=" << cheat << "\n";
 
 			for (uint64_t i=0; i<prefetch_pages; i++)
 			{
-				addPrefetch(base_address + i*PAGE_SIZE);
+				uint64_t prefetch_addr = base_address + i*PAGE_SIZE;
+				addPrefetch(prefetch_addr);
+
+				// If using cheat mode, then put this address in the cheat map.
+				if (cheat)
+				{
+					// Create an entry in the cheap map if it already isn't in there.
+					if (prefetch_cheat_map.count(prefetch_addr) == 0)
+					{
+						prefetch_cheat_map[prefetch_addr] = 0;
+					}
+
+					// Increment the number of cheat prefetches are outstanding for this address.
+					prefetch_cheat_map[prefetch_addr] += 1;
+				}
 			}
 		}
 		else
