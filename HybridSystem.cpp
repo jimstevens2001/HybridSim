@@ -733,9 +733,9 @@ namespace HybridSim {
 					min_ts = cur_line.ts;
 					min_init = true;
 
-					victim_set_offset = victim_counter;
 					if (DEBUG_VICTIM)
 					{
+						victim_set_offset = victim_counter;
 						debug_victim << "FOUND NEW MINIMUM!\n\n";
 					}
 				}
