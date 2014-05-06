@@ -317,7 +317,25 @@ namespace HybridSim {
 				it = trans_queue.erase(it);
 				trans_queue_size--;
 
-				break;
+
+				if ((active_transaction.transactionType == PREFETCH) && 
+					(prefetch_cheat_map.count(PAGE_ADDRESS(ALIGN(active_transaction.address)))))
+				{
+					// If this is a cheat prefetch, then just do it now and continue processing.
+					// Cheat prefetches are effectively "free" in terms of clock cycles.
+					//cout << "Issuing cheat prefetch to address " << PAGE_ADDRESS(ALIGN(active_transaction.address))
+					//	<< " on cycle " << currentClockCycle << "\n";
+					ProcessTransaction(active_transaction);
+					active_transaction_flag = false;
+					delay_counter = 0;
+					sent_transaction = false;
+					continue;
+				}
+				else
+				{
+					// We've found the transaction we want.
+					break;
+				}
 			}
 			else
 			{
@@ -768,7 +786,7 @@ namespace HybridSim {
 			if (trans.transactionType == PREFETCH)
 			{
 				uint64_t page_address = PAGE_ADDRESS(addr);
-				if (prefetch_cheat_map.count(page_address))
+				if (prefetch_cheat_map.count(page_address) != 0)
 				{
 					// Remove the page_address from the prefetch_cheat_map.
 					prefetch_cheat_map[page_address] -= 1;
