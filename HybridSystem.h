@@ -42,7 +42,6 @@
 #include "IniReader.h"
 
 using std::string;
-typedef unsigned int uint;
 
 namespace HybridSim
 {

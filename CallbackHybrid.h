@@ -35,6 +35,7 @@
 #include <vector>
 
 using std::vector;
+typedef unsigned int uint;
 
 namespace HybridSim
 {
