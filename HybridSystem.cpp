@@ -416,7 +416,12 @@ namespace HybridSim {
 			log.update();
 
 		// Update the memories.
-		dram->update();
+		for (int i=0; i<10; i++)
+		{
+			// TODO Find a better way to do this. (we have old code that handles it nicely).
+			// TEMPORARY HACK: DRAMSim is clocked 10x faster than HybridSim.
+			dram->update();
+		}
 		flash->update();
 
 		// Increment the cycle count.

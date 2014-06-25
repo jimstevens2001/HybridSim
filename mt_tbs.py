@@ -21,6 +21,18 @@ class SchedulerPrefetcher(object):
 		self.old_thread_pages = {}
 		self.next_threads = None
 
+		# Hack to prefill old thread pages to get rid of bootstrapping problem.
+		for j in range(18):
+			self.old_thread_pages[j] = []
+			tmp = {}
+			base = j*8192
+			for i in range(8192):
+				page_num = i+base
+				tmp[page_num] = 1
+			self.old_thread_pages[j].append(tmp)
+		self.old_thread_pages = {}
+
+
 		self.halfway_cycles = self.mt_tbs.quantum_cycles / 2
 
 		if DEBUG_SCHEDULER_PREFETCHER:
