@@ -11,6 +11,13 @@ PAGE_SIZE = 4096
 ADDRESS_SPACE_SIZE = TOTAL_PAGES * PAGE_SIZE
 THREAD_PENDING_MAX = 8
 
+# Use a basic virtual to physical address translation
+# This should be used for most real traces, since they might stomp on each other.
+VIRTUAL_ADDRESS_TRACES = True
+
+# How many pages should we give to the process when the process runs out of memory
+NUM_PAGES_PER_ALLOC = 512 
+
 DEBUG_SCHEDULER_PREFETCHER=False
 FAKE_PREFETCHES=True
 
@@ -25,6 +32,27 @@ class SchedulerPrefetcher(object):
 
 		if DEBUG_SCHEDULER_PREFETCHER:
 			self.debug = open('sched_prefetch_debug.log', 'w')
+
+	def set_initial_pages(self, thread_id, page_list):
+		for addr in page_list:
+			page_num = addr / PAGE_SIZE
+
+			# Save page in thread pages set.
+			if thread_id not in self.thread_pages:
+				self.thread_pages[thread_id] = {}
+			if page_num not in self.thread_pages[thread_id]:
+				self.thread_pages[thread_id][page_num] = 0
+			self.thread_pages[thread_id][page_num] += 1
+
+		# Save the old thread pages.
+		if thread_id not in self.old_thread_pages:
+			self.old_thread_pages[thread_id] = []
+		self.old_thread_pages[thread_id].append(self.thread_pages[thread_id])
+		
+		# Reset the thread pages.
+		self.thread_pages[thread_id] = {}
+		
+		
 
 	def done(self):
 		outFile = open('scheduler_prefetcher.log', 'w')
@@ -51,7 +79,7 @@ class SchedulerPrefetcher(object):
 			print >> self.debug, self.old_thread_pages
 			print >> self.debug
 			self.debug.flush()
-			
+
 
 
 	def update(self):
@@ -109,6 +137,9 @@ class TraceThread(object):
 		self.trans_write = False
 		self.trans_addr = 0
 
+		self.memory_map = {}
+		self.unallocated_page_addresses = self.parent.new_alloc()
+
 		self.get_next_trans()
 
 	def update(self):
@@ -163,6 +194,31 @@ class TraceThread(object):
 			# Apply base address transformation.
 			self.trans_addr = (self.trans_addr + self.base_address) % ADDRESS_SPACE_SIZE
 
+			if VIRTUAL_ADDRESS_TRACES:
+				# Perform virtual to physical translation.
+
+				page_offset = self.trans_addr % PAGE_SIZE
+				trans_page_address = self.trans_addr - page_offset
+
+				if trans_page_address not in self.memory_map:
+					# Create a new memory mapping for this page.
+					if len(self.unallocated_page_addresses) == 0:
+						# We need to request more pages from the "operating system"
+						self.unallocated_page_addresses = self.parent.new_alloc()
+						print 'Thread %d is requesting more memory. Received pages from %d to %d.'%(self.thread_id, 
+								self.unallocated_page_addresses[0], self.unallocated_page_addresses[-1])
+
+						# TODO: Put these pages into the pages to prefetch?
+
+					# Add it to the memory map.
+					next_page = self.unallocated_page_addresses.pop(0)
+					self.memory_map[trans_page_address] = next_page
+
+				# Perform the translation.
+				trans_physical_page = self.memory_map[trans_page_address]
+				self.trans_addr = trans_physical_page + page_offset
+				
+
 			return
 
 		# If we get to here, then there are no more transactions.
@@ -213,6 +269,7 @@ class MultiThreadedTBS(object):
 
 		self.config_file = config_file
 
+		self.next_alloc_address = 0
 
 		try:
 			configFile = open(self.config_file)
@@ -265,6 +322,23 @@ class MultiThreadedTBS(object):
 		# Set up the scheduler prefetcher.
 		self.scheduler_prefetcher = SchedulerPrefetcher(self)
 
+		# Initialize the prefetch state for all threads.
+		for thread_id in self.threads:
+			self.scheduler_prefetcher.set_initial_pages(thread_id, self.threads[thread_id].unallocated_page_addresses)
+
+	def new_alloc(self):
+		# Used by threads to request more memory
+		new_alloc_pages = []
+
+		for i in range(NUM_PAGES_PER_ALLOC):
+			new_alloc_pages.append(self.next_alloc_address)
+			self.next_alloc_address += PAGE_SIZE
+
+		if self.next_alloc_address >= (PAGE_SIZE * TOTAL_PAGES):
+			print 'ALLOCATOR RAN OUT OF MEMORY!'
+			sys.exit(1)
+			
+		return new_alloc_pages
 
 	def addTransaction(self, thread_id, isWrite, addr):
 		self.mem.addTransaction(isWrite, addr)
