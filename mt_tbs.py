@@ -6,6 +6,7 @@ pp = pprint.PrettyPrinter()
 
 import hybridsim
 
+ENABLE_PREFETCHING = True
 TOTAL_PAGES = 8388608
 PAGE_SIZE = 4096
 ADDRESS_SPACE_SIZE = TOTAL_PAGES * PAGE_SIZE
@@ -460,7 +461,8 @@ class MultiThreadedTBS(object):
 			self.mem.update()
 
 			# Update the scheduler prefetcher.
-			self.scheduler_prefetcher.update()
+			if ENABLE_PREFETCHING:
+				self.scheduler_prefetcher.update()
 
 			# Update the cycle counters.
 			self.cycles += 1
