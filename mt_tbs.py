@@ -12,6 +12,10 @@ PAGE_SIZE = 4096
 ADDRESS_SPACE_SIZE = TOTAL_PAGES * PAGE_SIZE
 THREAD_PENDING_MAX = 8
 
+# Set this to force a thread to stop after N trace cycles
+# 0 means to go until the thread finishes all accesses.
+MAX_TRACE_CYCLES_PER_THREAD = 0
+
 # Use a basic virtual to physical address translation
 # This should be used for most real traces, since they might stomp on each other.
 VIRTUAL_ADDRESS_TRACES = True
@@ -158,6 +162,9 @@ class TraceThread(object):
 		# Called each time a clock cycle runs with this trace active.
 		# This is NOT called when the trace is being stalled.
 		self.trace_cycles += 1
+
+		if (MAX_TRACE_CYCLES_PER_THREAD != 0) and (self.trace_cycles >= MAX_TRACE_CYCLES_PER_THREAD):
+			self.done() 
 
 		if self.trace_cycles >= self.trans_cycle:
 			self.parent.addTransaction(self.thread_id, self.trans_write, self.trans_addr)
