@@ -19,12 +19,19 @@ MAX_TRACE_CYCLES_PER_THREAD = 0
 # Use a basic virtual to physical address translation
 # This should be used for most real traces, since they might stomp on each other.
 VIRTUAL_ADDRESS_TRACES = True
+PREALLOCATE = True
 
 # How many pages should we give to the process when the process runs out of memory
 NUM_PAGES_PER_ALLOC = 512 
 
 DEBUG_SCHEDULER_PREFETCHER=False
 FAKE_PREFETCHES=True
+
+
+# Contains a dictionary for each unique trace file with a memory mapping.
+# Each thread will have to request its own set of physical pages for all virtual pages
+# in this master mapping.
+preallocated_traces = {}
 
 class SchedulerPrefetcher(object):
 	def __init__(self, mt_tbs):
@@ -124,8 +131,11 @@ class TraceThread(object):
 	def __init__(self, thread_id, tracefile, base_address, parent):
 		self.thread_id = thread_id
 		self.tracefile = tracefile
-		self.input_file = open(tracefile,'r')
+		self.input_file = open(self.tracefile,'r')
 		self.base_address = base_address
+		if VIRTUAL_ADDRESS_TRACES and (self.base_address != 0):
+			print >> sys.stderr, 'All base addresses must be 0 when using VIRTUAL_ADDRESS_TRACES mode.'
+			sys.exit(1)
 		self.parent = parent
 
 		self.complete = 0
@@ -145,7 +155,31 @@ class TraceThread(object):
 		self.memory_map = {}
 		self.unallocated_page_addresses = self.parent.new_alloc()
 
+		if VIRTUAL_ADDRESS_TRACES and PREALLOCATE:
+			self.preallocate_memory()
+
 		self.get_next_trans()
+
+	def preallocate_memory(self):
+		if self.tracefile in preallocated_traces:
+			# Call translate_virtual_page for each virtual page in the master map
+			# for this tracefile. That will allocate new physical pages for each
+			# required virtual page.
+			master_map = preallocated_traces[self.tracefile]
+			for virtual_page in master_map:
+				self.translate_virtual_page(virtual_page)
+		else:
+			while not self.trace_done:
+				self.get_next_trans()
+			# At this point, the memory map for this thread is completely specified.
+			# Save it in the 
+			preallocated_traces[self.tracefile] = self.memory_map
+
+			# Simply reinitialize the state that was modified by the above and we are
+			# ready to run.
+			self.trace_done = False
+			self.input_file = open(self.tracefile,'r')
+
 
 	def update(self):
 		if self.trace_done:
@@ -204,33 +238,35 @@ class TraceThread(object):
 
 			if VIRTUAL_ADDRESS_TRACES:
 				# Perform virtual to physical translation.
-
-				page_offset = self.trans_addr % PAGE_SIZE
-				trans_page_address = self.trans_addr - page_offset
-
-				if trans_page_address not in self.memory_map:
-					# Create a new memory mapping for this page.
-					if len(self.unallocated_page_addresses) == 0:
-						# We need to request more pages from the "operating system"
-						self.unallocated_page_addresses = self.parent.new_alloc()
-						print 'Thread %d is requesting more memory. Received pages from %d to %d.'%(self.thread_id, 
-								self.unallocated_page_addresses[0], self.unallocated_page_addresses[-1])
-
-						# TODO: Put these pages into the pages to prefetch?
-
-					# Add it to the memory map.
-					next_page = self.unallocated_page_addresses.pop(0)
-					self.memory_map[trans_page_address] = next_page
-
-				# Perform the translation.
-				trans_physical_page = self.memory_map[trans_page_address]
-				self.trans_addr = trans_physical_page + page_offset
+				self.trans_addr = self.translate_virtual_page(self.trans_addr)
 				
-
 			return
 
 		# If we get to here, then there are no more transactions.
 		self.done()
+
+
+	def translate_virtual_page(self, virtual_address):
+		page_offset = virtual_address % PAGE_SIZE
+		virtual_page_address = virtual_address - page_offset
+
+		if virtual_page_address not in self.memory_map:
+			# Create a new memory mapping for this page.
+			if len(self.unallocated_page_addresses) == 0:
+				# We need to request more pages from the "operating system"
+				self.unallocated_page_addresses = self.parent.new_alloc()
+				print 'Thread %d is requesting more memory. Received pages from %d to %d.'%(self.thread_id, 
+						self.unallocated_page_addresses[0], self.unallocated_page_addresses[-1])
+
+				# TODO: Put these pages into the pages to prefetch?
+
+			# Add it to the memory map.
+			next_page = self.unallocated_page_addresses.pop(0)
+			self.memory_map[virtual_page_address] = next_page
+
+		physical_page_address = self.memory_map[virtual_page_address]
+		physical_address = physical_page_address + page_offset
+		return physical_address
 
 	
 	def transaction_complete(self, isWrite, sysID, addr, cycle):
