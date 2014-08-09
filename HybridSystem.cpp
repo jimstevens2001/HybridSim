@@ -2201,6 +2201,27 @@ namespace HybridSim {
 	}
 
 
+	void HybridSystem::RegisterNotifyCallback(TransactionCompleteCB *notify)
+	{
+		this->notify = notify;
+	}
+
+	void HybridSystem::ConfigureNotify(bool enable, uint64_t operation, uint64_t extra)
+	{
+		if (enable)
+		{
+			// Add operation to the notify map to indicate that this operation's notification
+			// is enabled.
+			notify_map[operation] = extra;
+		}
+		else
+		{
+			notify_map.erase(operation);
+		}
+	}
+
+
+
 // Extra functions for C interface (used by Python front end)
 class HybridSim_C_Callbacks
 {

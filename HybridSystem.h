@@ -61,6 +61,8 @@ namespace HybridSim
 				TransactionCompleteCB *writeDone);
 		void mmio(uint64_t operation, uint64_t address);
 		void syncAll();
+
+
 		void DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle);
 		void DRAMWriteCallback(uint id, uint64_t addr, uint64_t cycle);
 		void DRAMPowerCallback(double a, double b, double c, double d);
@@ -77,6 +79,10 @@ namespace HybridSim
 
 		// Print out the logging data for HybridSim only.
 		void printLogfile();
+
+		// Notify Callback interface
+		void RegisterNotifyCallback(TransactionCompleteCB *notify);
+		void ConfigureNotify(bool enable, uint64_t operation, uint64_t extra);
 
 		// Save/Restore cache table functions
 		void restoreCacheTable();
@@ -219,6 +225,10 @@ namespace HybridSim
 
 
 		unordered_map<uint64_t, uint64_t> prefetch_cheat_map;
+
+		// Notify State
+		TransactionCompleteCB *notify;
+		unordered_map<uint64_t, uint64_t> notify_map;
 
 	};
 
