@@ -55,10 +55,18 @@ namespace HybridSim {
 		string pattern = "/ini/";
 		string inipathPrefix;
 
-		unsigned found = hybridsim_ini.rfind(pattern); // Find the last occurrence of "/ini/"
-		assert (found != string::npos);
-		inipathPrefix = hybridsim_ini.substr(0,found);
-		inipathPrefix.append("/");
+		size_t found = hybridsim_ini.rfind(pattern); // Find the last occurrence of "/ini/"
+		if (found != string::npos)
+		{
+			// Extract the ini path prefix from hybridsim_ini
+			inipathPrefix = hybridsim_ini.substr(0,found);
+			inipathPrefix.append("/");
+		}
+		else
+		{
+			// If /ini/ isn't found, then assume ini path prefix is the following...
+			inipathPrefix.append("../HybridSim/");
+		}
 
 		iniReader.read(hybridsim_ini);
 		if (ENABLE_LOGGER)
