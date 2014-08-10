@@ -1,6 +1,5 @@
 
 #include "HybridSystem.h"
-#include "HybridSim_C_Wrapper.h"
 
 using namespace std;
 

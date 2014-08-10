@@ -64,5 +64,10 @@ ${LIB_NAME_MACOS}: ${POBJ}
 %.po : %.cpp
 	$(CXX) $(INCLUDES) -std=c++0x -O3 -g -ffast-math -fPIC -DNO_OUTPUT -DNO_STORAGE -o $@ -c $<
 
+C_Wrapper_Test.o: C_Wrapper_Test.c
+	gcc -c C_Wrapper_Test.c
+c_test: lib HybridSim_C_Wrapper.o C_Wrapper_Test.o
+	gcc -o c_test C_Wrapper_Test.o -L$(CUR_DIRECTORY) -lhybridsim -Wl,-rpath $(CUR_DIRECTORY)
+
 clean: 
 	rm -rf ${REBUILDABLES} *.dep *.deppo out results *.log callgrind*

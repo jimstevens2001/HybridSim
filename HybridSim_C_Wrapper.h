@@ -1,13 +1,14 @@
-namespace HybridSim 
-{
+// This should only be included by C programs, not C++ programs.
 
-extern "C"
-{
+#include <stdint.h>
+typedef uint32_t uint;
+typedef int bool;
 
-struct HybridSim_C_Wrapper;
-typedef struct HybridSim_C_Wrapper HybridSim_C_Wrapper_t;
+//struct HybridSim_C_Wrapper;
+//typedef struct HybridSim_C_Wrapper HybridSim_C_Wrapper_t;
+typedef void* HybridSim_C_Wrapper_t;
 
-HybridSim_C_Wrapper *HybridSim_C_getMemorySystemInstance(uint id, char *ini);
+HybridSim_C_Wrapper_t *HybridSim_C_getMemorySystemInstance(uint id, char *ini);
 void HybridSim_C_RegisterCallbacks(HybridSim_C_Wrapper_t *hsc, void (*readDone)(uint, uint64_t, uint64_t), void (*writeDone)(uint, uint64_t, uint64_t));
 bool HybridSim_C_addTransaction(HybridSim_C_Wrapper_t *hsc, bool isWrite, uint64_t addr);
 bool HybridSim_C_WillAcceptTransaction(HybridSim_C_Wrapper_t *hsc);
@@ -19,5 +20,3 @@ void HybridSim_C_printLogfile(HybridSim_C_Wrapper_t *hsc);
 void HybridSim_C_delete(HybridSim_C_Wrapper_t *hsc);
 
 
-} // End extern "C"
-} // End namespace HybridSim
