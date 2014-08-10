@@ -9,6 +9,10 @@ void write_cb(uint sysID, uint64_t addr, uint64_t cycle)
 {
 	printf("write_cb() received address %lu at cycle %lu from sysID %d\n", addr, cycle, sysID);
 }
+void notify_cb(uint operation, uint64_t addr, uint64_t cycle)
+{
+	printf("notify_cb() received address %lu at cycle %lu from operation %d\n", addr, cycle, operation);
+}
 
 int main()
 {
@@ -16,6 +20,7 @@ int main()
 
 	HybridSim_C_Wrapper_t *hsc = HybridSim_C_getMemorySystemInstance(0, "");
 	HybridSim_C_RegisterCallbacks(hsc, read_cb, write_cb);
+	HybridSim_C_RegisterNotifyCallback(hsc, notify_cb);
 	HybridSim_C_addTransaction(hsc, 1, 0);
 	HybridSim_C_addTransaction(hsc, 1, 8);
 	HybridSim_C_addTransaction(hsc, 1, 16);

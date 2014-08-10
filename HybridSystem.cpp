@@ -2214,18 +2214,10 @@ namespace HybridSim {
 		this->notify = notify;
 	}
 
-	void HybridSystem::ConfigureNotify(bool enable, uint64_t operation, uint64_t extra)
+	void HybridSystem::ConfigureNotify(uint operation, bool enable)
 	{
-		if (enable)
-		{
-			// Add operation to the notify map to indicate that this operation's notification
-			// is enabled.
-			notify_map[operation] = extra;
-		}
-		else
-		{
-			notify_map.erase(operation);
-		}
+		//TODO: Implement some operations.
+
 	}
 
 } // Namespace HybridSim

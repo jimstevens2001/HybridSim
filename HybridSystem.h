@@ -82,7 +82,7 @@ namespace HybridSim
 
 		// Notify Callback interface
 		void RegisterNotifyCallback(TransactionCompleteCB *notify);
-		void ConfigureNotify(bool enable, uint64_t operation, uint64_t extra);
+		void ConfigureNotify(uint operation, bool enable);
 
 		// Save/Restore cache table functions
 		void restoreCacheTable();
@@ -228,7 +228,7 @@ namespace HybridSim
 
 		// Notify State
 		TransactionCompleteCB *notify;
-		unordered_map<uint64_t, uint64_t> notify_map;
+		unordered_map<uint, bool> notify_map; // TODO: Think about how to store notifications.
 
 	};
 

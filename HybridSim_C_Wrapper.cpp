@@ -14,6 +14,7 @@ struct HybridSim_C_Wrapper
 
 	void (*readDone)(uint, uint64_t, uint64_t);
 	void (*writeDone)(uint, uint64_t, uint64_t);
+	void (*notifyCB)(uint, uint64_t, uint64_t);
 
 	HybridSim_C_Wrapper(uint id, char *ini)
 	{
@@ -30,6 +31,11 @@ struct HybridSim_C_Wrapper
 		// Init external C callback pointers.
 		readDone = NULL;
 		writeDone = NULL;
+
+		// Set up notify callback in the same way.
+		Callback_t *notify_cb = new Callback<HybridSim_C_Wrapper, void, uint, uint64_t, uint64_t>(this, &HybridSim_C_Wrapper::notify_callback);
+		hs->RegisterNotifyCallback(notify_cb);
+		notifyCB = NULL;
 	}
 
 	~HybridSim_C_Wrapper()
@@ -43,6 +49,12 @@ struct HybridSim_C_Wrapper
 		//cout << "Address is " << (uint64_t)readDone << ", " << (uint64_t)writeDone << "\n";
 		this->readDone = readDone;
 		this->writeDone = writeDone;
+	}
+
+	void RegisterNotifyCallback(void (*notifyCB)(uint, uint64_t, uint64_t))
+	{
+		cout << "Registering C notify callback in HybridSim_C_Wrapper::RegisterNotifyCallback\n";
+		this->notifyCB = notifyCB;
 	}
 
 	void read_complete(uint id, uint64_t address, uint64_t cycle)
@@ -62,60 +74,81 @@ struct HybridSim_C_Wrapper
 			writeDone(id, address, cycle);
 		}
 	}
+
+	void notify_callback(uint operation, uint64_t address, uint64_t cycle)
+	{
+		if (notifyCB != NULL)
+		{
+			//cout << "Calling HybridSim C notify callback!\n";
+			notifyCB(operation, address, cycle);
+		}
+	}
 };
+
+typedef struct HybridSim_C_Wrapper HybridSim_C_Wrapper_t;
 
 extern "C"
 {
-	HybridSim_C_Wrapper *HybridSim_C_getMemorySystemInstance(uint id, char *ini)
+	HybridSim_C_Wrapper_t *HybridSim_C_getMemorySystemInstance(uint id, char *ini)
 	{
-		HybridSim_C_Wrapper *hsc = new HybridSim_C_Wrapper(id, ini);
+		HybridSim_C_Wrapper_t *hsc = new HybridSim_C_Wrapper(id, ini);
 
 		return hsc;
 	}
 
-	void HybridSim_C_RegisterCallbacks(HybridSim_C_Wrapper *hsc, void (*readDone)(uint, uint64_t, uint64_t), void (*writeDone)(uint, uint64_t, uint64_t))
+	void HybridSim_C_RegisterCallbacks(HybridSim_C_Wrapper_t *hsc, void (*readDone)(uint, uint64_t, uint64_t), void (*writeDone)(uint, uint64_t, uint64_t))
 	{
 		cout << "Registering C callbacks in HybridSim_C_RegisterCallbacks\n";
 		hsc->RegisterCallbacks(readDone, writeDone);
 	}
 
-	bool HybridSim_C_addTransaction(HybridSim_C_Wrapper *hsc, bool isWrite, uint64_t addr)
+	bool HybridSim_C_addTransaction(HybridSim_C_Wrapper_t *hsc, bool isWrite, uint64_t addr)
 	{
 		//cout << "C interface... addr=" << addr << " isWrite=" << isWrite << "\n";
 		return hsc->hs->addTransaction(isWrite, addr);
 	}
 
-	bool HybridSim_C_WillAcceptTransaction(HybridSim_C_Wrapper *hsc)
+	bool HybridSim_C_WillAcceptTransaction(HybridSim_C_Wrapper_t *hsc)
 	{
 		return hsc->hs->WillAcceptTransaction();
 	}
 
-	void HybridSim_C_update(HybridSim_C_Wrapper *hsc)
+	void HybridSim_C_update(HybridSim_C_Wrapper_t *hsc)
 	{
 		hsc->hs->update();
 	}
 
-	void HybridSim_C_mmio(HybridSim_C_Wrapper *hsc, uint64_t operation, uint64_t address)
+	void HybridSim_C_mmio(HybridSim_C_Wrapper_t *hsc, uint64_t operation, uint64_t address)
 	{
 		hsc->hs->mmio(operation, address);
 	}
 
-	void HybridSim_C_syncAll(HybridSim_C_Wrapper *hsc)
+	void HybridSim_C_syncAll(HybridSim_C_Wrapper_t *hsc)
 	{
 		hsc->hs->syncAll();
 	}
 
-	void HybridSim_C_reportPower(HybridSim_C_Wrapper *hsc)
+	void HybridSim_C_reportPower(HybridSim_C_Wrapper_t *hsc)
 	{
 		hsc->hs->reportPower();
 	}
 
-	void HybridSim_C_printLogfile(HybridSim_C_Wrapper *hsc)
+	void HybridSim_C_printLogfile(HybridSim_C_Wrapper_t *hsc)
 	{
 		hsc->hs->printLogfile();
 	}
 
-	void HybridSim_C_delete(HybridSim_C_Wrapper *hsc)
+	void HybridSim_C_RegisterNotifyCallback(HybridSim_C_Wrapper_t *hsc, void (*notify)(uint, uint64_t, uint64_t))
+	{
+		hsc->RegisterNotifyCallback(notify);
+	}
+
+	void HybridSim_C_ConfigureNotify(HybridSim_C_Wrapper_t *hsc, uint operation, bool enable)
+	{
+		hsc->hs->ConfigureNotify(operation, enable);
+	}
+
+	void HybridSim_C_delete(HybridSim_C_Wrapper_t *hsc)
 	{
 		delete hsc;
 	}

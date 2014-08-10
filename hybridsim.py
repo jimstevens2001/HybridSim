@@ -12,6 +12,7 @@ class HybridSim(object):
 		# External callbacks for Python interface.
 		self.read_cb = None
 		self.write_cb = None
+		self.notify_cb = None
 
 		# Define the callback functions that will receive callbacks from the C interface.
 		def c_read_cb(sysID, addr, cycle):
@@ -22,18 +23,24 @@ class HybridSim(object):
 			#print 'Received C write callback in Python: (%d, %d, %d)'%(sysID, addr, cycle)
 			if self.write_cb != None:
 				self.write_cb(sysID, addr, cycle)
+		def c_notify_cb(operation, addr, cycle):
+			#print 'Received C write callback in Python: (%d, %d, %d)'%(sysID, addr, cycle)
+			if self.notify_cb != None:
+				self.notify_cb(operation, addr, cycle)
 
 		# Save the callbacks in the class
 		# This is essential so the Python garbage collector doesn't nuke these functions
 		# and cause weird internal Python errors at runtime.
 		self.c_read_cb = c_read_cb
 		self.c_write_cb = c_write_cb
+		self.c_notify_cb = c_notify_cb
 
 		# Define the ctypes wrapper for the callbacks.
 		CBFUNC = ctypes.CFUNCTYPE(None, ctypes.c_uint, ctypes.c_ulonglong, ctypes.c_ulonglong)
 
 		# Register the callbacks.
 		lib.HybridSim_C_RegisterCallbacks(self.hs, CBFUNC(self.c_read_cb), CBFUNC(self.c_write_cb))
+		lib.HybridSim_C_RegisterNotifyCallback(self.hs, CBFUNC(self.c_notify_cb))
 		
 
 	def RegisterCallbacks(self, read_cb, write_cb):
@@ -60,6 +67,13 @@ class HybridSim(object):
 
 	def printLogfile(self):
 		lib.HybridSim_C_printLogfile(self.hs)
+
+	def RegisterNotifyCallback(self, notify_cb):
+		self.notify_cb = notify_cb
+
+	def ConfigureNotify(self, operation, enable):
+		lib.HybridSim_C_ConfigureNotify(self.hs, operation, enable)
+		
 
 def read_cb(sysID, addr, cycle):
 	print 'cycle %d: read callback from sysID %d for addr = %d'%(cycle, sysID, addr)
