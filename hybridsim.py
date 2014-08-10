@@ -38,9 +38,14 @@ class HybridSim(object):
 		# Define the ctypes wrapper for the callbacks.
 		CBFUNC = ctypes.CFUNCTYPE(None, ctypes.c_uint, ctypes.c_ulonglong, ctypes.c_ulonglong)
 
+		# Also save all CBFUNC objects, as the ctypes documentation says to do.
+		self.CBFUNC_read = CBFUNC(self.c_read_cb)
+		self.CBFUNC_write = CBFUNC(self.c_write_cb)
+		self.CBFUNC_notify = CBFUNC(self.c_notify_cb)
+
 		# Register the callbacks.
-		lib.HybridSim_C_RegisterCallbacks(self.hs, CBFUNC(self.c_read_cb), CBFUNC(self.c_write_cb))
-		lib.HybridSim_C_RegisterNotifyCallback(self.hs, CBFUNC(self.c_notify_cb))
+		lib.HybridSim_C_RegisterCallbacks(self.hs, self.CBFUNC_read, self.CBFUNC_write)
+		lib.HybridSim_C_RegisterNotifyCallback(self.hs, self.CBFUNC_notify)
 		
 
 	def RegisterCallbacks(self, read_cb, write_cb):
@@ -79,11 +84,14 @@ def read_cb(sysID, addr, cycle):
 	print 'cycle %d: read callback from sysID %d for addr = %d'%(cycle, sysID, addr)
 def write_cb(sysID, addr, cycle):
 	print 'cycle %d: write callback from sysID %d for addr = %d'%(cycle, sysID, addr)
+def notify_cb(operation, addr, cycle):
+	print 'cycle %d: notify callback from operation %d for addr = %d'%(cycle, operation, addr)
 		
 def main():
 	hs = HybridSim(0, '')
 	hs.RegisterCallbacks(read_cb, write_cb)
-
+	hs.RegisterNotifyCallback(notify_cb)
+	hs.ConfigureNotify(0, True)
 
 	hs.addTransaction(1, 0)
 	hs.addTransaction(1, 8)

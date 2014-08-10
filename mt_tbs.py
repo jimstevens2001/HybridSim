@@ -349,12 +349,22 @@ class MultiThreadedTBS(object):
 		self.pending_transactions = {}
 
 		# Set up the memory.
-		self.mem = hybridsim.HybridSim(1, '')
+		self.mem = hybridsim.HybridSim(5, '')
 		def read_cb(sysID, addr, cycle):
 			self.transaction_complete(False, sysID, addr, cycle)
 		def write_cb(sysID, addr, cycle):
 			self.transaction_complete(True, sysID, addr, cycle)
-		self.mem.RegisterCallbacks(read_cb, write_cb);
+		self.read_cb = read_cb
+		self.write_cb = write_cb
+		self.mem.RegisterCallbacks(self.read_cb, self.write_cb);
+
+		self.evict_count = 0
+		def notify_cb(operation, addr, cycle):
+			#print 'Notify callback (operation: %d, addr: %d, cycle: %d)'%(operation, addr, cycle)
+			self.evict_count += 1
+		self.notify_cb = notify_cb
+		self.mem.RegisterNotifyCallback(self.notify_cb)
+		self.mem.ConfigureNotify(0, True)
 
 		# Set up the scheduler prefetcher.
 		self.scheduler_prefetcher = SchedulerPrefetcher(self)
@@ -477,6 +487,8 @@ class MultiThreadedTBS(object):
 		self.cur_running = list(self.schedule[self.schedule_index])
 
 		print 'Starting quantum %d at cycle count %d. completed=%d cur_running=%s'%(self.quantum_num, self.cycles, self.complete, str(self.cur_running))
+		print 'Evictions = ',self.evict_count
+		self.evict_count = 0
 
 		# TODO: Pick another thread to run if any of the current threads are done.
 

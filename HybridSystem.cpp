@@ -99,6 +99,12 @@ namespace HybridSim {
 		NVDSim::Callback_t *nv_crit_cb = new nvdsim_callback_t(this, &HybridSystem::FlashCriticalLineCallback);
 		flash->RegisterCallbacks(nv_read_cb, nv_crit_cb, nv_write_cb, NULL);
 
+		// Set up notify callback config.
+		for (int i=0; i < NUM_NOTIFY_OPERATIONS; i++)
+		{
+			notify_config[i] = false;
+		}
+
 		// Need to check the queue when we start.
 		check_queue = true;
 
@@ -844,6 +850,8 @@ namespace HybridSim {
 			// Lock the cache line so no one else tries to use it while this miss is being serviced.
 			contention_cache_line_lock(cache_address);
 
+			// Send a notification for eviction.
+			NotifyEvict(victim_flash_addr, currentClockCycle);
 
 			if (DEBUG_CACHE)
 			{
@@ -2209,15 +2217,32 @@ namespace HybridSim {
 	}
 
 
-	void HybridSystem::RegisterNotifyCallback(TransactionCompleteCB *notify)
+	void HybridSystem::RegisterNotifyCallback(TransactionCompleteCB *notifyCB)
 	{
-		this->notify = notify;
+		this->notifyCB = notifyCB;
 	}
 
 	void HybridSystem::ConfigureNotify(uint operation, bool enable)
 	{
-		//TODO: Implement some operations.
+		cout << "ConfigureNotify() called with operation = " << operation << " and enable = " << enable << "\n";
+		assert(operation < NUM_NOTIFY_OPERATIONS);
+		notify_config[operation] = enable;
+	}
 
+	void HybridSystem::NotifyCallback(uint operation, uint64_t addr, uint64_t cycle)
+	{
+		if (notifyCB != NULL)
+		{
+			(*notifyCB)(operation, addr, cycle);
+		}
+	}
+
+	void HybridSystem::NotifyEvict(uint64_t addr, uint64_t cycle)
+	{
+		if (notify_config[NOTIFY_EVICT] == true)
+		{
+			NotifyCallback(NOTIFY_EVICT, addr, cycle);
+		}
 	}
 
 } // Namespace HybridSim

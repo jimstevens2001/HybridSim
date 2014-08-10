@@ -81,8 +81,12 @@ namespace HybridSim
 		void printLogfile();
 
 		// Notify Callback interface
-		void RegisterNotifyCallback(TransactionCompleteCB *notify);
+		void RegisterNotifyCallback(TransactionCompleteCB *notifyCB);
 		void ConfigureNotify(uint operation, bool enable);
+
+		// Internal Notify Funtions
+		void NotifyCallback(uint operation, uint64_t addr, uint64_t cycle);
+		void NotifyEvict(uint64_t addr, uint64_t cycle);
 
 		// Save/Restore cache table functions
 		void restoreCacheTable();
@@ -227,8 +231,8 @@ namespace HybridSim
 		unordered_map<uint64_t, uint64_t> prefetch_cheat_map;
 
 		// Notify State
-		TransactionCompleteCB *notify;
-		unordered_map<uint, bool> notify_map; // TODO: Think about how to store notifications.
+		TransactionCompleteCB *notifyCB;
+		bool notify_config[NUM_NOTIFY_OPERATIONS];
 
 	};
 

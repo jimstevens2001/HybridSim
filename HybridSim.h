@@ -60,7 +60,7 @@ namespace HybridSim
 			void syncAll();
 			void reportPower();
 			void printLogfile();
-			void RegisterNotifyCallback(TransactionCompleteCB *notify);
+			void RegisterNotifyCallback(TransactionCompleteCB *notifyCB);
 			void ConfigureNotify(uint operation, bool enable);
 	};
 	HybridSystem *getMemorySystemInstance(uint id, string ini);

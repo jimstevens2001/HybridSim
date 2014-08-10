@@ -198,6 +198,9 @@ extern string HYBRIDSIM_SAVE_FILE;
 extern string NVDIMM_SAVE_FILE;
 
 
+// Notify Callback Operation Definitions
+#define NUM_NOTIFY_OPERATIONS 1
+#define NOTIFY_EVICT 0
 
 
 
