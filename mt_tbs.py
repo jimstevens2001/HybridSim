@@ -329,13 +329,6 @@ class MultiThreadedTBS(object):
 			print 'Failed to parse the config file properly.'
 			raise e
 
-		#self.cores = 2
-		##self.quantum_cycles = 2666667
-		#self.quantum_cycles = 10000
-		#self.trace_files = ['traces/big_0.txt', 'traces/big_512.txt', 'traces/big_0.txt', 'traces/big_512.txt']
-		#self.base_addresses = [] # TODO: Implement this feature to add base address to all trace addresses (except kernel stuff).
-		##self.schedule = [[0,2], [1,2], [2,3], [3,0]]
-
 		# Verify the integrity of the schedule...
 		for i in self.schedule:
 			if len(i) != self.cores:
@@ -368,7 +361,12 @@ class MultiThreadedTBS(object):
 
 		# Initialize the prefetch state for all threads.
 		for thread_id in self.threads:
-			self.scheduler_prefetcher.set_initial_pages(thread_id, self.threads[thread_id].unallocated_page_addresses)
+			if VIRTUAL_ADDRESS_TRACES and PREALLOCATE:
+				# TODO: Figure out the number of pages to use. Using NUM_PAGES_PER_ALLOC for now.
+				first_prefetch_pages = self.threads[thread_id].memory_map.keys()[0:NUM_PAGES_PER_ALLOC]
+			else:
+				first_prefetch_pages = self.threads[thread_id].unallocated_page_addresses
+			self.scheduler_prefetcher.set_initial_pages(thread_id, first_prefetch_pages)
 
 	def new_alloc(self):
 		# Used by threads to request more memory
@@ -399,9 +397,9 @@ class MultiThreadedTBS(object):
 		
 
 	def transaction_complete(self, isWrite, sysID, addr, cycle):
-		sysID = sysID.value
-		addr = addr.value
-		cycle = cycle.value
+#		sysID = sysID.value
+#		addr = addr.value
+#		cycle = cycle.value
 
 		#print 'Complete (%d,%d,%d, %d)'%(isWrite, sysID, addr, cycle)
 

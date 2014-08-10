@@ -2223,126 +2223,118 @@ namespace HybridSim {
 
 
 // Extra functions for C interface (used by Python front end)
-class HybridSim_C_Callbacks
+struct HybridSim_C_Wrapper
 {
 	public:
-	// Lists for tracking received callback data.
-	list<uint> done_id;
-	list<uint64_t> done_address;
-	list<uint64_t> done_cycle;
-	list<bool> done_isWrite;
+
+	HybridSystem *hs;
+
+	void (*readDone)(uint, uint64_t, uint64_t);
+	void (*writeDone)(uint, uint64_t, uint64_t);
+
+	HybridSim_C_Wrapper(uint id, char *ini)
+	{
+		// Create a HybridSystem object.
+		// Note ini is implicitly transformed to C++ string type.
+		hs = getMemorySystemInstance(id, ini);
+
+		// Register callbacks to receive messages from HybridSystem instance.
+		typedef CallbackBase<void,uint,uint64_t,uint64_t> Callback_t;
+		Callback_t *read_cb = new Callback<HybridSim_C_Wrapper, void, uint, uint64_t, uint64_t>(this, &HybridSim_C_Wrapper::read_complete);
+		Callback_t *write_cb = new Callback<HybridSim_C_Wrapper, void, uint, uint64_t, uint64_t>(this, &HybridSim_C_Wrapper::write_complete);
+		hs->RegisterCallbacks(read_cb, write_cb);
+
+		// Init external C callback pointers.
+		readDone = NULL;
+		writeDone = NULL;
+	}
+
+	~HybridSim_C_Wrapper()
+	{
+		delete hs;
+	}
+
+	void RegisterCallbacks(void (*readDone)(uint, uint64_t, uint64_t), void (*writeDone)(uint, uint64_t, uint64_t))
+	{
+		cout << "Registering C callbacks in HybridSim_C_Wrapper::RegisterCallbacks\n";
+		//cout << "Address is " << (uint64_t)readDone << ", " << (uint64_t)writeDone << "\n";
+		this->readDone = readDone;
+		this->writeDone = writeDone;
+	}
 
 	void read_complete(uint id, uint64_t address, uint64_t cycle)
 	{
-		done_id.push_back(id);
-		done_address.push_back(address);
-		done_cycle.push_back(cycle);
-		done_isWrite.push_back(false);
+		if (readDone != NULL)
+		{
+			//cout << "Calling HybridSim C read callback!\n";
+			readDone(id, address, cycle);
+		}
 	}
 
 	void write_complete(uint id, uint64_t address, uint64_t cycle)
 	{
-		done_id.push_back(id);
-		done_address.push_back(address);
-		done_cycle.push_back(cycle);
-		done_isWrite.push_back(true);
-	}
-
-	void register_cb(HybridSystem *hs)
-	{
-		typedef CallbackBase<void,uint,uint64_t,uint64_t> Callback_t;
-		Callback_t *read_cb = new Callback<HybridSim_C_Callbacks, void, uint, uint64_t, uint64_t>(this, &HybridSim_C_Callbacks::read_complete);
-		Callback_t *write_cb = new Callback<HybridSim_C_Callbacks, void, uint, uint64_t, uint64_t>(this, &HybridSim_C_Callbacks::write_complete);
-		hs->RegisterCallbacks(read_cb, write_cb);
-	}
-
-	bool get_next_result(uint *sysID, uint64_t *addr, uint64_t *cycle, bool *isWrite)
-	{
-		if (done_id.empty())
+		if (writeDone != NULL)
 		{
-			*sysID = 0;
-			*addr = 0;
-			*cycle = 0;
-			*isWrite = false;
-
-			return false;
-		}
-		else
-		{
-			// Set the result pointers.
-			*sysID = done_id.front();
-			*addr = done_address.front();
-			*cycle = done_cycle.front();
-			*isWrite = done_isWrite.front();
-
-			// Pop the front of each list.
-			done_id.pop_front();
-			done_address.pop_front();
-			done_cycle.pop_front();
-			done_isWrite.pop_front();
-
-			return true;
+			//cout << "Calling HybridSim C write callback!\n";
+			writeDone(id, address, cycle);
 		}
 	}
 };
-HybridSim_C_Callbacks c_callbacks;
 
 extern "C"
 {
-	HybridSystem *HybridSim_C_getMemorySystemInstance(uint id, char *ini)
+	HybridSim_C_Wrapper *HybridSim_C_getMemorySystemInstance(uint id, char *ini)
 	{
-		// Note ini is implicitly transformed to C++ string type.
-		HybridSystem *hs = getMemorySystemInstance(id, ini);
+		HybridSim_C_Wrapper *hsc = new HybridSim_C_Wrapper(id, ini);
 
-		// Register callbacks to the HybridSim_C_callbacks object.
-		c_callbacks.register_cb(hs);
-
-		return hs;
+		return hsc;
 	}
 
-	bool HybridSim_C_addTransaction(HybridSystem *hs, bool isWrite, uint64_t addr)
+	void HybridSim_C_RegisterCallbacks(HybridSim_C_Wrapper *hsc, void (*readDone)(uint, uint64_t, uint64_t), void (*writeDone)(uint, uint64_t, uint64_t))
+	{
+		cout << "Registering C callbacks in HybridSim_C_RegisterCallbacks\n";
+		hsc->RegisterCallbacks(readDone, writeDone);
+	}
+
+	bool HybridSim_C_addTransaction(HybridSim_C_Wrapper *hsc, bool isWrite, uint64_t addr)
 	{
 		//cout << "C interface... addr=" << addr << " isWrite=" << isWrite << "\n";
-		return hs->addTransaction(isWrite, addr);
+		return hsc->hs->addTransaction(isWrite, addr);
 	}
 
-	bool HybridSim_C_WillAcceptTransaction(HybridSystem *hs)
+	bool HybridSim_C_WillAcceptTransaction(HybridSim_C_Wrapper *hsc)
 	{
-		return hs->WillAcceptTransaction();
+		return hsc->hs->WillAcceptTransaction();
 	}
 
-	void HybridSim_C_update(HybridSystem *hs)
+	void HybridSim_C_update(HybridSim_C_Wrapper *hsc)
 	{
-		hs->update();
+		hsc->hs->update();
 	}
 
-	// use this instead of the callbacks since I can't do callbacks through the Python cdll interface
-	// The protocol is to call this repetitively after each update until it returns false.
-	// When it returns false, the sysID, addr, cycle, and isWrite are don't cares
-	// When it returns true, the output values are set to the completed transaction
-	bool HybridSim_C_PollCompletion(HybridSystem *hs, uint *sysID, uint64_t *addr, uint64_t *cycle, bool *isWrite)
+	void HybridSim_C_mmio(HybridSim_C_Wrapper *hsc, uint64_t operation, uint64_t address)
 	{
-		return c_callbacks.get_next_result(sysID, addr, cycle, isWrite);
+		hsc->hs->mmio(operation, address);
 	}
 
-	void HybridSim_C_mmio(HybridSystem *hs, uint64_t operation, uint64_t address)
+	void HybridSim_C_syncAll(HybridSim_C_Wrapper *hsc)
 	{
-		hs->mmio(operation, address);
+		hsc->hs->syncAll();
 	}
 
-	void HybridSim_C_syncAll(HybridSystem *hs)
+	void HybridSim_C_reportPower(HybridSim_C_Wrapper *hsc)
 	{
-		hs->syncAll();
+		hsc->hs->reportPower();
 	}
 
-	void HybridSim_C_reportPower(HybridSystem *hs)
+	void HybridSim_C_printLogfile(HybridSim_C_Wrapper *hsc)
 	{
-		hs->reportPower();
+		hsc->hs->printLogfile();
 	}
 
-	void HybridSim_C_printLogfile(HybridSystem *hs)
+	void HybridSim_C_delete(HybridSim_C_Wrapper *hsc)
 	{
-		hs->printLogfile();
+		delete hsc;
 	}
 
 }
