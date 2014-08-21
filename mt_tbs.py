@@ -27,11 +27,22 @@ NUM_PAGES_PER_ALLOC = 512
 DEBUG_SCHEDULER_PREFETCHER=False
 FAKE_PREFETCHES=True
 
+# Definitions for page states.
+PAGE_ALLOCATED = 0
+PAGE_PREFETCHED = 1 # It is in the cache and got there by being prefetched.
+PAGE_ACCESSED = 2 # It is in the cached and has been accessed with a read or write.
+PAGE_DIRTY = 4 # It has been written since being brought into the cache.
+PAGE_PREFETCH_ATTEMPTED = 8 # Always set when a page could have been prefetched, even if it wasn't needed.
 
 # Contains a dictionary for each unique trace file with a memory mapping.
 # Each thread will have to request its own set of physical pages for all virtual pages
 # in this master mapping.
 preallocated_traces = {}
+
+def get_page_address(address):
+	page_offset = address % PAGE_SIZE
+	return address - page_offset
+	
 
 class SchedulerPrefetcher(object):
 	def __init__(self, mt_tbs):
@@ -111,11 +122,17 @@ class SchedulerPrefetcher(object):
 						else:
 							self.mt_tbs.mem.mmio(3, page)
 						prefetch_count += 1
+						(thread_id, virtual_page_address, valid) = self.mt_tbs.physical_page_map[page]
+						prefetched, accessed, dirty, prefetch_attempted = self.mt_tbs.threads[thread_id].get_page_state(virtual_page_address)
+						self.mt_tbs.threads[thread_id].set_page_state(virtual_page_address, not accessed, accessed, dirty, True)
 			print 'Issued %d prefetches.'%(prefetch_count)
 
 					
 
 	def addTransaction(self, thread_id, isWrite, addr):
+		# Note: addr is a PHYSICAL address.
+		# That means all sched prefetch state is tracked as physical addresses instead of virtual addresses.
+
 		# Compute page number.
 		page_num = addr / PAGE_SIZE
 
@@ -153,12 +170,64 @@ class TraceThread(object):
 		self.trans_addr = 0
 
 		self.memory_map = {}
-		self.unallocated_page_addresses = self.parent.new_alloc()
+		self.page_state = {}
+		self.unallocated_page_addresses = self.parent.new_alloc(self.thread_id)
+
+		# Stats
+		self.cur_prefetch_hits = 0
+		self.cur_prefetch_cached_hits = 0
+		self.cur_non_prefetch_hits = 0
+		self.cur_page_misses = 0
+		self.cur_evictions = 0
+		self.cur_unused_prefetch = 0 
+		self.cur_dirty_evictions = 0
+		self.cur_clean_evictions = 0
+
+		self.total_prefetch_hits = 0
+		self.total_prefetch_cached_hits = 0
+		self.total_non_prefetch_hits = 0
+		self.total_page_hits = 0
+		self.total_page_misses = 0
+		self.total_evictions = 0
+		self.total_unused_prefetch = 0 
+		self.total_dirty_evictions = 0
+		self.total_clean_evictions = 0
 
 		if VIRTUAL_ADDRESS_TRACES and PREALLOCATE:
 			self.preallocate_memory()
 
 		self.get_next_trans()
+
+	def update_stats(self):
+		print 'thread_id %d stats...'%(self.thread_id)
+		print 'prefetch_hits',self.cur_prefetch_hits
+		print 'prefetch_cached_hits',self.cur_prefetch_cached_hits
+		print 'non_prefetch_hits',self.cur_non_prefetch_hits
+		print 'page_misses', self.cur_page_misses
+		print 'evictions', self.cur_evictions
+		print 'unused_prefetch', self.cur_unused_prefetch
+		print 'dirty_evictions', self.cur_dirty_evictions
+		print 'clean_evictions', self.cur_clean_evictions
+		print
+
+		self.total_prefetch_hits += self.cur_prefetch_hits
+		self.total_prefetch_cached_hits += self.cur_prefetch_cached_hits
+		self.total_non_prefetch_hits += self.cur_non_prefetch_hits
+		self.total_page_misses += self.cur_page_misses
+		self.total_evictions += self.cur_evictions
+		self.total_unused_prefetch += self.cur_unused_prefetch
+		self.total_dirty_evictions += self.cur_dirty_evictions
+		self.total_clean_evictions += self.cur_clean_evictions
+
+		self.cur_prefetch_hits = 0
+		self.cur_prefetch_cached_hits = 0
+		self.cur_page_misses = 0
+		self.cur_evictions = 0
+		self.cur_unused_prefetch = 0 
+		self.cur_dirty_evictions = 0
+		self.cur_clean_evictions = 0
+
+		
 
 	def preallocate_memory(self):
 		if self.tracefile in preallocated_traces:
@@ -238,13 +307,58 @@ class TraceThread(object):
 
 			if VIRTUAL_ADDRESS_TRACES:
 				# Perform virtual to physical translation.
+				self.cur_virtual_address = self.trans_addr
 				self.trans_addr = self.translate_virtual_page(self.trans_addr)
+
+				# Get the page state.
+				page_address = get_page_address(self.cur_virtual_address)
+				prefetched, accessed, dirty, prefetch_attempted = self.get_page_state(page_address)
+
+				# Count non-prefetch hits and non-prefetch misses.
+				if prefetched:
+					self.cur_prefetch_hits += 1 # Count all accessed that hit because of a prefetch
+				elif not prefetched and accessed and prefetch_attempted:
+					self.cur_prefetch_cached_hits += 1
+				elif not prefetch_attempted and accessed:
+					self.cur_non_prefetch_hits += 1 # Count all accesses that hit without a prefetch bringing in that page.
+				elif not prefetch_attempted and not accessed:
+					self.cur_page_misses += 1 # Count all misses. TODO: Deal with PREFILLED_CACHE
+					
+				# Update page state
+				new_accessed = True
+				if self.trans_write:
+					new_dirty = True
+				else:
+					new_dirty = dirty
+
+				self.set_page_state(page_address, prefetched, new_accessed, new_dirty, prefetch_attempted)
+
 				
 			return
 
 		# If we get to here, then there are no more transactions.
 		self.done()
 
+	def get_page_state(self, page_address):
+		page_state = self.page_state[page_address]
+
+		prefetched = bool(page_state & PAGE_PREFETCHED)
+		accessed = bool(page_state & PAGE_ACCESSED)
+		dirty = bool(page_state & PAGE_DIRTY)
+		prefetch_attempted = bool(page_state & PAGE_PREFETCH_ATTEMPTED)
+		return prefetched, accessed, dirty, prefetch_attempted
+		
+	def set_page_state(self, page_address, prefetched, accessed, dirty, prefetch_attempted):
+		new_page_state = PAGE_ALLOCATED 
+		if prefetched:
+			new_page_state |= PAGE_PREFETCHED
+		if accessed:
+			new_page_state |= PAGE_ACCESSED
+		if dirty:
+			new_page_state |= PAGE_DIRTY
+		if prefetch_attempted:
+			new_page_state |= PAGE_PREFETCH_ATTEMPTED
+		self.page_state[page_address] = new_page_state
 
 	def translate_virtual_page(self, virtual_address):
 		page_offset = virtual_address % PAGE_SIZE
@@ -254,7 +368,7 @@ class TraceThread(object):
 			# Create a new memory mapping for this page.
 			if len(self.unallocated_page_addresses) == 0:
 				# We need to request more pages from the "operating system"
-				self.unallocated_page_addresses = self.parent.new_alloc()
+				self.unallocated_page_addresses = self.parent.new_alloc(self.thread_id)
 				print 'Thread %d is requesting more memory. Received pages from %d to %d.'%(self.thread_id, 
 						self.unallocated_page_addresses[0], self.unallocated_page_addresses[-1])
 
@@ -263,6 +377,8 @@ class TraceThread(object):
 			# Add it to the memory map.
 			next_page = self.unallocated_page_addresses.pop(0)
 			self.memory_map[virtual_page_address] = next_page
+			self.page_state[virtual_page_address] = PAGE_ALLOCATED
+			self.parent.register_page(self.thread_id, virtual_page_address, next_page)
 
 		physical_page_address = self.memory_map[virtual_page_address]
 		physical_address = physical_page_address + page_offset
@@ -275,6 +391,21 @@ class TraceThread(object):
 
 		if self.trace_done and self.pending == 0:
 			print 'thread',self.thread_id,'received its last pending transaction.'
+
+	def page_evicted(self, virtual_page_address):
+		prefetched, accessed, dirty, prefetch_attempted = self.get_page_state(virtual_page_address)
+
+		self.cur_evictions += 1
+		if prefetched and not accessed:
+			self.cur_unused_prefetch += 1
+		if dirty:
+			self.cur_dirty_evictions += 1
+		if not dirty:
+			self.cur_clean_evictions += 1
+
+		# Reset page state.
+		self.set_page_state(virtual_page_address, False, False, False, False)
+
 
 	def done(self):
 		print 'thread',self.thread_id,'is done issuing new transactions.'
@@ -291,7 +422,14 @@ class TraceThread(object):
 		print 'final_cycles =',self.final_cycles
 		print 'done_cycles =',self.done_cycles
 		print 'total_cycles = ', (self.trace_cycles + self.throttle_cycles + self.final_cycles + self.done_cycles)
-		print
+
+		print 'prefetch_hits',self.total_prefetch_hits
+		print 'page_hits', self.total_page_hits
+		print 'page_misses', self.total_page_misses
+		print 'evictions', self.total_evictions
+		print 'unused_prefetch', self.total_unused_prefetch
+		print 'dirty_evictions', self.total_dirty_evictions
+		print 'clean_evictions', self.total_clean_evictions
 
 
 
@@ -314,6 +452,10 @@ class MultiThreadedTBS(object):
 		self.config_file = config_file
 
 		self.next_alloc_address = 0
+
+		# Maps each physical page to a thread_id and virtual address.
+		# This is needed to send notify callbacks back to the correct thread.
+		self.physical_page_map = {}
 
 		try:
 			configFile = open(self.config_file)
@@ -358,32 +500,35 @@ class MultiThreadedTBS(object):
 		self.write_cb = write_cb
 		self.mem.RegisterCallbacks(self.read_cb, self.write_cb);
 
+		# Set up the scheduler prefetcher.
+		self.scheduler_prefetcher = SchedulerPrefetcher(self)
+
+		# Set up the notify callback.
 		self.evict_count = 0
 		def notify_cb(operation, addr, cycle):
-			#print 'Notify callback (operation: %d, addr: %d, cycle: %d)'%(operation, addr, cycle)
-			self.evict_count += 1
+			self.handle_notify_cb(operation, addr, cycle)
 		self.notify_cb = notify_cb
 		self.mem.RegisterNotifyCallback(self.notify_cb)
 		self.mem.ConfigureNotify(0, True)
-
-		# Set up the scheduler prefetcher.
-		self.scheduler_prefetcher = SchedulerPrefetcher(self)
 
 		# Initialize the prefetch state for all threads.
 		for thread_id in self.threads:
 			if VIRTUAL_ADDRESS_TRACES and PREALLOCATE:
 				# TODO: Figure out the number of pages to use. Using NUM_PAGES_PER_ALLOC for now.
-				first_prefetch_pages = self.threads[thread_id].memory_map.keys()[0:NUM_PAGES_PER_ALLOC]
+				first_prefetch_pages = [self.threads[thread_id].memory_map[i] for i in sorted(self.threads[thread_id].memory_map.keys())]
+				print 'Thread %d has a memory map of size %d'%(thread_id, len(self.threads[thread_id].memory_map))
+				#first_prefetch_pages = self.threads[thread_id].memory_map.keys()[0:NUM_PAGES_PER_ALLOC]
 			else:
 				first_prefetch_pages = self.threads[thread_id].unallocated_page_addresses
 			self.scheduler_prefetcher.set_initial_pages(thread_id, first_prefetch_pages)
 
-	def new_alloc(self):
+	def new_alloc(self, thread_id):
 		# Used by threads to request more memory
 		new_alloc_pages = []
 
 		for i in range(NUM_PAGES_PER_ALLOC):
 			new_alloc_pages.append(self.next_alloc_address)
+			self.register_page(thread_id, 0, self.next_alloc_address, valid=False)
 			self.next_alloc_address += PAGE_SIZE
 
 		if self.next_alloc_address >= (PAGE_SIZE * TOTAL_PAGES):
@@ -391,6 +536,33 @@ class MultiThreadedTBS(object):
 			sys.exit(1)
 			
 		return new_alloc_pages
+
+	def register_page(self, thread_id, virtual_page_address, physical_page_address, valid=True):
+		self.physical_page_map[physical_page_address] = (thread_id, virtual_page_address, valid)
+
+	def handle_notify_cb(self, operation, addr, cycle):
+		#print 'Notify callback (operation: %d, addr: %d, cycle: %d)'%(operation, addr, cycle)
+		if operation == 0:
+			self.evict_count += 1
+
+			# Look up the physical page that was evicted.
+			if addr not in self.physical_page_map:
+				print 'Error: Notify callback received for address not in physical page map.'
+				print 'Notify callback (operation: %d, addr: %d, cycle: %d)'%(operation, addr, cycle)
+				print self.evict_count
+				sys.exit(1)
+			(thread_id, virtual_page_address, valid) = self.physical_page_map[addr]
+
+			if not valid:
+				return
+
+			# Tell the thread.
+			self.threads[thread_id].page_evicted(virtual_page_address)
+
+		else:
+			print 'Error: Illegal operation returned by notify callback.'
+			print 'Notify callback (operation: %d, addr: %d, cycle: %d)'%(operation, addr, cycle)
+			sys.exit(1)
 
 	def addTransaction(self, thread_id, isWrite, addr):
 		self.mem.addTransaction(isWrite, addr)
@@ -478,6 +650,12 @@ class MultiThreadedTBS(object):
 
 			return 
 
+		print 'Data for threads that just ran...'
+		print
+		if self.quantum_num != -1:
+			for thread_id in self.cur_running:
+				self.threads[thread_id].update_stats()
+
 		self.clean_schedule()
 
 		self.quantum_cycles_left = self.quantum_cycles
@@ -486,9 +664,12 @@ class MultiThreadedTBS(object):
 		last_threads = self.cur_running
 		self.cur_running = list(self.schedule[self.schedule_index])
 
+		print '------------------------------------------------------------------------'
 		print 'Starting quantum %d at cycle count %d. completed=%d cur_running=%s'%(self.quantum_num, self.cycles, self.complete, str(self.cur_running))
-		print 'Evictions = ',self.evict_count
+		print 'Quantum evictions = ',self.evict_count
+		print
 		self.evict_count = 0
+
 
 		# TODO: Pick another thread to run if any of the current threads are done.
 
