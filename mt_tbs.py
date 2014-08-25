@@ -565,15 +565,19 @@ class MultiThreadedTBS(object):
 			sys.exit(1)
 
 	def addTransaction(self, thread_id, isWrite, addr):
-		self.mem.addTransaction(isWrite, addr)
-		self.pending += 1
-
 		trans_key = (addr, isWrite)
 		if trans_key not in self.pending_transactions:
 			self.pending_transactions[trans_key] = []
 		self.pending_transactions[trans_key].append(thread_id)
 
 		self.scheduler_prefetcher.addTransaction(thread_id, isWrite, addr)
+
+		self.pending += 1
+
+		# Note: this must go last due to potential issues with MMIO
+		# That said, REMAP_MMIO should always be turned off with mt_tbs.
+		self.mem.addTransaction(isWrite, addr) 
+
 
 		#print 'Added (%d,%d,%d)'%(thread_id, isWrite, addr)
 		
