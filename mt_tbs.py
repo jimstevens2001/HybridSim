@@ -22,6 +22,12 @@ MAX_TRACE_CYCLES_PER_THREAD = 0
 # Use a basic virtual to physical address translation
 # This should be used for most real traces, since they might stomp on each other.
 VIRTUAL_ADDRESS_TRACES = True
+assert(VIRTUAL_ADDRESS_TRACES) # This must be on due to recent changes in the simulation. This is fine though because it is the "proper" design.
+
+# Preallocate all virtual to physical translations before starting.
+# This should typically be used if we are assuming memory is allocated before
+# the region of interest (which it should be, since otherwise we'd have OS
+# virtual memory activity interfering with the real machine).
 PREALLOCATE = True
 
 # How many pages should we give to the process when the process runs out of memory
@@ -406,6 +412,16 @@ class TraceThread(object):
 			self.page_state[virtual_page_address] = PAGE_ALLOCATED
 			self.parent.register_page(self.thread_id, virtual_page_address, next_page)
 
+			if PREFILL_CACHE and (next_page < CACHE_SIZE) and (next_page not in self.parent.unmapped_page_evictions):
+				# This address is already in the cache due to prefill rules.
+				# This is only not true if the physical page was evicted already by another thread.
+				self.page_state[virtual_page_address] |= PAGE_ACCESSED
+			if next_page in self.parent.unmapped_page_evictions:
+				print 'Physical page %d that was evicted before being mapped is now mapped as virtual page %d in thread %d.'%(
+						next_page, virtual_page_address, self.thread_id)
+				self.parent.unmapped_page_evictions.remove(next_page)
+				
+
 		physical_page_address = self.memory_map[virtual_page_address]
 		physical_address = physical_page_address + page_offset
 		return physical_address
@@ -482,6 +498,9 @@ class MultiThreadedTBS(object):
 		# Maps each physical page to a thread_id and virtual address.
 		# This is needed to send notify callbacks back to the correct thread.
 		self.physical_page_map = {}
+
+		# This is used to track pages that were evicted before they were mapped.
+		self.unmapped_page_evictions = set()
 
 		# Set up the memory.
 		self.mem = hybridsim.HybridSim(5, '')
@@ -600,6 +619,9 @@ class MultiThreadedTBS(object):
 			(thread_id, virtual_page_address, valid) = self.physical_page_map[addr]
 
 			if not valid:
+				assert(PREALLOCATE == False) # When preallocating memory, we should never have any unmapped page evictions.
+				self.unmapped_page_evictions.add(addr)
+				print 'Adding %d to unmapped_page_evictions. There are currently %d unmapped evicted pages.'%(addr, len(self.unmapped_page_evictions))
 				return
 
 			# Tell the thread.
