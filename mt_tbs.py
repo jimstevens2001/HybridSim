@@ -6,10 +6,13 @@ pp = pprint.PrettyPrinter()
 
 import hybridsim
 
+#########################################################################
+# MT_TBS config
+
+# Enable scheuler prefetching algorithm.
 ENABLE_PREFETCHING = True
-TOTAL_PAGES = 8388608
-PAGE_SIZE = 4096
-ADDRESS_SPACE_SIZE = TOTAL_PAGES * PAGE_SIZE
+
+# How many outstanding accesses are allowed from a single thread.
 THREAD_PENDING_MAX = 8
 
 # Set this to force a thread to stop after N trace cycles
@@ -22,10 +25,31 @@ VIRTUAL_ADDRESS_TRACES = True
 PREALLOCATE = True
 
 # How many pages should we give to the process when the process runs out of memory
-NUM_PAGES_PER_ALLOC = 512 
-
+NUM_PAGES_PER_ALLOC = 512
 DEBUG_SCHEDULER_PREFETCHER=False
 FAKE_PREFETCHES=True
+
+#########################################################################
+
+#########################################################################
+# Config info we will get from HybridSim
+
+# The numbers here are just placeholder values
+TOTAL_PAGES = None
+PAGE_SIZE = None
+ADDRESS_SPACE_SIZE = None
+CACHE_PAGES = None
+PREFILL_CACHE = None
+CACHE_SIZE = None
+
+#TOTAL_PAGES = 8388608
+#PAGE_SIZE = 4096
+#ADDRESS_SPACE_SIZE = TOTAL_PAGES * PAGE_SIZE
+
+#########################################################################
+
+#########################################################################
+# Other constants
 
 # Definitions for page states.
 PAGE_ALLOCATED = 0
@@ -33,6 +57,8 @@ PAGE_PREFETCHED = 1 # It is in the cache and got there by being prefetched.
 PAGE_ACCESSED = 2 # It is in the cached and has been accessed with a read or write.
 PAGE_DIRTY = 4 # It has been written since being brought into the cache.
 PAGE_PREFETCH_ATTEMPTED = 8 # Always set when a page could have been prefetched, even if it wasn't needed.
+
+#########################################################################
 
 # Contains a dictionary for each unique trace file with a memory mapping.
 # Each thread will have to request its own set of physical pages for all virtual pages
@@ -457,6 +483,43 @@ class MultiThreadedTBS(object):
 		# This is needed to send notify callbacks back to the correct thread.
 		self.physical_page_map = {}
 
+		# Set up the memory.
+		self.mem = hybridsim.HybridSim(5, '')
+		def read_cb(sysID, addr, cycle):
+			self.transaction_complete(False, sysID, addr, cycle)
+		def write_cb(sysID, addr, cycle):
+			self.transaction_complete(True, sysID, addr, cycle)
+		self.read_cb = read_cb
+		self.write_cb = write_cb
+		self.mem.RegisterCallbacks(self.read_cb, self.write_cb);
+
+		# Query config data we need from HybridSim.
+		global TOTAL_PAGES
+		global PAGE_SIZE
+		global ADDRESS_SPACE_SIZE
+		global CACHE_PAGES
+		global PREFILL_CACHE
+		global CACHE_SIZE
+		TOTAL_PAGES, PAGE_SIZE = self.mem.query(1, 0, 0)
+		ADDRESS_SPACE_SIZE = TOTAL_PAGES * PAGE_SIZE
+		CACHE_PAGES, PREFILL_CACHE = self.mem.query(2, 0, 0)
+		CACHE_SIZE = CACHE_PAGES * PAGE_SIZE
+		print 'TOTAL_PAGES=%d'%(TOTAL_PAGES)
+		print 'CACHE_PAGES=%d'%(CACHE_PAGES)
+		print 'PAGE_SIZE=%d'%(PAGE_SIZE)
+		print 'ADDRESS_SPACE_SIZE=%d'%(ADDRESS_SPACE_SIZE)
+		print 'CACHE_SIZE=%d'%(CACHE_SIZE)
+		print 'PREFILL_CACHE=%d'%(PREFILL_CACHE)
+
+		# Set up the notify callback.
+		self.evict_count = 0
+		def notify_cb(operation, addr, cycle):
+			self.handle_notify_cb(operation, addr, cycle)
+		self.notify_cb = notify_cb
+		self.mem.RegisterNotifyCallback(self.notify_cb)
+		self.mem.ConfigureNotify(0, True)
+
+		# Load the configuration data.
 		try:
 			configFile = open(self.config_file)
 			config_data = yaml.load(configFile)
@@ -490,26 +553,9 @@ class MultiThreadedTBS(object):
 
 		self.pending_transactions = {}
 
-		# Set up the memory.
-		self.mem = hybridsim.HybridSim(5, '')
-		def read_cb(sysID, addr, cycle):
-			self.transaction_complete(False, sysID, addr, cycle)
-		def write_cb(sysID, addr, cycle):
-			self.transaction_complete(True, sysID, addr, cycle)
-		self.read_cb = read_cb
-		self.write_cb = write_cb
-		self.mem.RegisterCallbacks(self.read_cb, self.write_cb);
-
 		# Set up the scheduler prefetcher.
 		self.scheduler_prefetcher = SchedulerPrefetcher(self)
 
-		# Set up the notify callback.
-		self.evict_count = 0
-		def notify_cb(operation, addr, cycle):
-			self.handle_notify_cb(operation, addr, cycle)
-		self.notify_cb = notify_cb
-		self.mem.RegisterNotifyCallback(self.notify_cb)
-		self.mem.ConfigureNotify(0, True)
 
 		# Initialize the prefetch state for all threads.
 		for thread_id in self.threads:

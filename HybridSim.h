@@ -62,6 +62,7 @@ namespace HybridSim
 			void printLogfile();
 			void RegisterNotifyCallback(TransactionCompleteCB *notifyCB);
 			void ConfigureNotify(uint operation, bool enable);
+			void query(uint64_t operation, uint64_t input1, uint64_t input2, uint64_t *output1, uint64_t *output2);
 	};
 	HybridSystem *getMemorySystemInstance(uint id, string ini);
 

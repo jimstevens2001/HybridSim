@@ -78,6 +78,12 @@ class HybridSim(object):
 
 	def ConfigureNotify(self, operation, enable):
 		lib.HybridSim_C_ConfigureNotify(self.hs, operation, enable)
+
+	def query(self, operation, input1, input2):
+		output1 = c_ulonglong()
+		output2 = c_ulonglong()
+		lib.HybridSim_C_query(self.hs, operation, input1, input2, byref(output1), byref(output2))
+		return (output1.value, output2.value)
 		
 
 def read_cb(sysID, addr, cycle):
@@ -104,6 +110,7 @@ def main():
 	hs.WillAcceptTransaction()
 	hs.reportPower()
 	hs.mmio(0,0)
+	print hs.query(0, 1, 2)
 	hs.syncAll()
 
 	hs.printLogfile()

@@ -19,6 +19,7 @@ void HybridSim_C_reportPower(HybridSim_C_Wrapper_t *hsc);
 void HybridSim_C_printLogfile(HybridSim_C_Wrapper_t *hsc);
 void HybridSim_C_RegisterNotifyCallback(HybridSim_C_Wrapper_t *hsc, void (*notify)(uint, uint64_t, uint64_t));
 void HybridSim_C_ConfigureNotify(HybridSim_C_Wrapper_t *hsc, uint operation, bool enable);
+void HybridSim_C_query(HybridSim_C_Wrapper_t *hsc, uint64_t operation, uint64_t input1, uint64_t input2, uint64_t *output1, uint64_t *output2);
 void HybridSim_C_delete(HybridSim_C_Wrapper_t *hsc);
 
 

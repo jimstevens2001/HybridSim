@@ -148,6 +148,11 @@ extern "C"
 		hsc->hs->ConfigureNotify(operation, enable);
 	}
 
+	void HybridSim_C_query(HybridSim_C_Wrapper_t *hsc, uint64_t operation, uint64_t input1, uint64_t input2, uint64_t *output1, uint64_t *output2)
+	{
+		hsc->hs->query(operation, input1, input2, output1, output2);
+	}
+
 	void HybridSim_C_delete(HybridSim_C_Wrapper_t *hsc)
 	{
 		delete hsc;

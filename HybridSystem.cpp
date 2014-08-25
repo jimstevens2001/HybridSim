@@ -2245,6 +2245,29 @@ namespace HybridSim {
 		}
 	}
 
+	void HybridSystem::query(uint64_t operation, uint64_t input1, uint64_t input2, uint64_t *output1, uint64_t *output2)
+	{
+		if (operation == 0)
+		{
+			// NOP operation simply copies inputs to outputs.
+			*output1 = input1;
+			*output2 = input2;
+		}
+		if (operation == 1)
+		{
+			// Return TOTAL_PAGES and PAGE_SIZE
+			*output1 = TOTAL_PAGES;
+			*output2 = PAGE_SIZE;
+		}
+		if (operation == 2)
+		{
+			// Return CACHE_PAGES and PREFILL_CACHE.
+			*output1 = CACHE_PAGES;
+			*output2 = (uint64_t)PREFILL_CACHE;
+		}
+	}
+	
+
 } // Namespace HybridSim
 
 // Extra function needed for Sandia SST.

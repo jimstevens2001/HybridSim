@@ -61,6 +61,7 @@ namespace HybridSim
 				TransactionCompleteCB *writeDone);
 		void mmio(uint64_t operation, uint64_t address);
 		void syncAll();
+		void query(uint64_t operation, uint64_t input1, uint64_t input2, uint64_t *output1, uint64_t *output2);
 
 
 		void DRAMReadCallback(uint id, uint64_t addr, uint64_t cycle);
