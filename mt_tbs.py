@@ -141,7 +141,7 @@ class SchedulerPrefetcher(object):
 		# Issue prefetches when halfway_cycles is reached.
 		# TODO: Combine pages into ranges.
 		# TODO: Use the access counts for each page to prioritize what pages are sent.
-		if (self.mt_tbs.quantum_cycles_left == self.halfway_cycles) and (self.mt_tbs.quantum_num > 0):
+		if (self.mt_tbs.quantum_cycles_left == self.halfway_cycles):
 			print 'Issuing prefetches for threads',self.next_threads
 			prefetch_count = 0
 			for thread_id in self.next_threads:
@@ -177,14 +177,10 @@ class SchedulerPrefetcher(object):
 
 
 class TraceThread(object):
-	def __init__(self, thread_id, tracefile, base_address, parent):
+	def __init__(self, thread_id, tracefile, parent):
 		self.thread_id = thread_id
 		self.tracefile = tracefile
 		self.input_file = open(self.tracefile,'r')
-		self.base_address = base_address
-		if VIRTUAL_ADDRESS_TRACES and (self.base_address != 0):
-			print >> sys.stderr, 'All base addresses must be 0 when using VIRTUAL_ADDRESS_TRACES mode.'
-			sys.exit(1)
 		self.parent = parent
 
 		self.complete = 0
@@ -195,6 +191,7 @@ class TraceThread(object):
 		self.final_cycles = 0 # Cycles passed after trace was done being generated, but while pending transactions were still outstanding.
 		self.done_cycles = 0 # Cycles passed after all the trace was done and pending transactions completed.
 
+		self.preallocate_mode = False
 		self.trace_done = False
 
 		self.trans_cycle = 0
@@ -218,7 +215,7 @@ class TraceThread(object):
 		self.total_prefetch_hits = 0
 		self.total_prefetch_cached_hits = 0
 		self.total_non_prefetch_hits = 0
-		self.total_page_hits = 0
+
 		self.total_page_misses = 0
 		self.total_evictions = 0
 		self.total_unused_prefetch = 0 
@@ -228,24 +225,26 @@ class TraceThread(object):
 		if VIRTUAL_ADDRESS_TRACES and PREALLOCATE:
 			self.preallocate_memory()
 
-		self.get_next_trans()
-
 	def update_stats(self):
 		print 'thread_id %d stats...'%(self.thread_id)
+
 		print 'prefetch_hits',self.cur_prefetch_hits
 		print 'prefetch_cached_hits',self.cur_prefetch_cached_hits
 		print 'non_prefetch_hits',self.cur_non_prefetch_hits
 		print 'page_misses', self.cur_page_misses
+
 		print 'evictions', self.cur_evictions
 		print 'unused_prefetch', self.cur_unused_prefetch
 		print 'dirty_evictions', self.cur_dirty_evictions
 		print 'clean_evictions', self.cur_clean_evictions
+
 		print
 
 		self.total_prefetch_hits += self.cur_prefetch_hits
 		self.total_prefetch_cached_hits += self.cur_prefetch_cached_hits
 		self.total_non_prefetch_hits += self.cur_non_prefetch_hits
 		self.total_page_misses += self.cur_page_misses
+
 		self.total_evictions += self.cur_evictions
 		self.total_unused_prefetch += self.cur_unused_prefetch
 		self.total_dirty_evictions += self.cur_dirty_evictions
@@ -253,7 +252,9 @@ class TraceThread(object):
 
 		self.cur_prefetch_hits = 0
 		self.cur_prefetch_cached_hits = 0
+		self.cur_non_prefetch_hits = 0
 		self.cur_page_misses = 0
+
 		self.cur_evictions = 0
 		self.cur_unused_prefetch = 0 
 		self.cur_dirty_evictions = 0
@@ -262,7 +263,12 @@ class TraceThread(object):
 		
 
 	def preallocate_memory(self):
+		self.preallocate_mode = True
+
+		print 'Preallocating thread',self.thread_id
+
 		if self.tracefile in preallocated_traces:
+			print 'Tracefile %s already available'%(self.tracefile)
 			# Call translate_virtual_page for each virtual page in the master map
 			# for this tracefile. That will allocate new physical pages for each
 			# required virtual page.
@@ -270,6 +276,7 @@ class TraceThread(object):
 			for virtual_page in master_map:
 				self.translate_virtual_page(virtual_page)
 		else:
+			print 'Tracefile %s not available, processing trace.'%(self.tracefile)
 			while not self.trace_done:
 				self.get_next_trans()
 			# At this point, the memory map for this thread is completely specified.
@@ -279,8 +286,10 @@ class TraceThread(object):
 			# Simply reinitialize the state that was modified by the above and we are
 			# ready to run.
 			self.trace_done = False
+			self.trans_cycle = 0
 			self.input_file = open(self.tracefile,'r')
 
+		self.preallocate_mode = False
 
 	def update(self):
 		if self.trace_done:
@@ -302,9 +311,10 @@ class TraceThread(object):
 			self.done() 
 
 		if self.trace_cycles >= self.trans_cycle:
-			self.parent.addTransaction(self.thread_id, self.trans_write, self.trans_addr)
-			self.pending += 1
 			self.get_next_trans()
+			if not self.trace_done:
+				self.parent.addTransaction(self.thread_id, self.trans_write, self.trans_addr)
+				self.pending += 1
 
 
 	def get_next_trans(self):
@@ -335,13 +345,17 @@ class TraceThread(object):
 			self.trans_addr = int(split_line[2])
 
 			# Apply base address transformation.
-			self.trans_addr = (self.trans_addr + self.base_address) % ADDRESS_SPACE_SIZE
+			self.trans_addr = self.trans_addr % ADDRESS_SPACE_SIZE
 
 			if VIRTUAL_ADDRESS_TRACES:
 				# Perform virtual to physical translation.
 				self.cur_virtual_address = self.trans_addr
 				self.trans_addr = self.translate_virtual_page(self.trans_addr)
 
+				if self.preallocate_mode:
+					return # Do not update page state in preallocate mode.
+
+				# TODO: Move this stuff to another function
 				# Get the page state.
 				page_address = get_page_address(self.cur_virtual_address)
 				prefetched, accessed, dirty, prefetch_attempted = self.get_page_state(page_address)
@@ -354,7 +368,7 @@ class TraceThread(object):
 				elif not prefetch_attempted and accessed:
 					self.cur_non_prefetch_hits += 1 # Count all accesses that hit without a prefetch bringing in that page.
 				elif not prefetch_attempted and not accessed:
-					self.cur_page_misses += 1 # Count all misses. TODO: Deal with PREFILLED_CACHE
+					self.cur_page_misses += 1 # Count all misses. 
 					
 				# Update page state
 				new_accessed = True
@@ -466,8 +480,10 @@ class TraceThread(object):
 		print 'total_cycles = ', (self.trace_cycles + self.throttle_cycles + self.final_cycles + self.done_cycles)
 
 		print 'prefetch_hits',self.total_prefetch_hits
-		print 'page_hits', self.total_page_hits
+		print 'prefetch_cached_hits',self.total_prefetch_cached_hits
+		print 'non_prefetch_hits',self.total_non_prefetch_hits
 		print 'page_misses', self.total_page_misses
+
 		print 'evictions', self.total_evictions
 		print 'unused_prefetch', self.total_unused_prefetch
 		print 'dirty_evictions', self.total_dirty_evictions
@@ -547,7 +563,6 @@ class MultiThreadedTBS(object):
 			self.cores = config_data['cores']
 			self.quantum_cycles = config_data['quantum_cycles']
 			self.trace_files = config_data['trace_files']
-			self.base_addresses = config_data['base_addresses']
 			self.schedule = config_data['schedule']
 		except Exception as e:
 			print 'Failed to parse the config file properly.'
@@ -562,13 +577,9 @@ class MultiThreadedTBS(object):
 				print 'Schedule entry has a thread scheduled on more than one core: %s'%(str(i))
 				sys.exit(1)
 
-		if len(self.trace_files) != len(self.base_addresses):
-			print 'Length of trace_files (%d) does not match length of base_addresses (%d)'%(len(self.trace_files), len(self.base_addresses))
-			sys.exit(1)
-
 		self.threads = {}
 		for thread_id in range(len(self.trace_files)):
-			self.threads[thread_id] = TraceThread(thread_id, self.trace_files[thread_id], self.base_addresses[thread_id], self)
+			self.threads[thread_id] = TraceThread(thread_id, self.trace_files[thread_id], self)
 
 		self.pending_transactions = {}
 
@@ -651,10 +662,6 @@ class MultiThreadedTBS(object):
 		
 
 	def transaction_complete(self, isWrite, sysID, addr, cycle):
-#		sysID = sysID.value
-#		addr = addr.value
-#		cycle = cycle.value
-
 		#print 'Complete (%d,%d,%d, %d)'%(isWrite, sysID, addr, cycle)
 
 		self.complete += 1
