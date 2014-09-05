@@ -787,6 +787,9 @@ namespace HybridSim {
 			cur_line = cache[cache_address];
 			uint64_t victim_flash_addr = FLASH_ADDRESS(cur_line.tag, set_index);
 
+			// Send a notification for eviction.
+			NotifyEvict(victim_flash_addr, currentClockCycle);
+
 			if ((cur_line.prefetched) && (cur_line.used == false))
 			{
 				// An unused prefetch is being removed from the cache, so transfer the count
@@ -850,8 +853,6 @@ namespace HybridSim {
 			// Lock the cache line so no one else tries to use it while this miss is being serviced.
 			contention_cache_line_lock(cache_address);
 
-			// Send a notification for eviction.
-			NotifyEvict(victim_flash_addr, currentClockCycle);
 
 			if (DEBUG_CACHE)
 			{
