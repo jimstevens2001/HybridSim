@@ -157,7 +157,15 @@ class SchedulerPrefetcher(object):
 						(thread_id, virtual_page_address, valid) = self.mt_tbs.physical_page_map[page]
 						prefetched, accessed, dirty, prefetch_attempted = self.mt_tbs.threads[thread_id].get_page_state(virtual_page_address)
 						self.mt_tbs.threads[thread_id].set_page_state(virtual_page_address, not accessed, accessed, dirty, True)
-			print 'Issued %d prefetches.'%(prefetch_count)
+
+						# Increment the appropriate counter for prefetches.
+						if accessed:
+							self.mt_tbs.threads[thread_id].prefetch_cached_count += 1
+						else:
+							self.mt_tbs.threads[thread_id].prefetch_count += 1
+							self.mt_tbs.threads[thread_id].unused_prefetch_in_cache_count += 1
+
+			print 'Issued %d prefetches.'%(prefetch_count) # TODO: Update to show both types of prefetches
 
 					
 
@@ -174,6 +182,13 @@ class SchedulerPrefetcher(object):
 		if page_num not in self.thread_pages[thread_id]:
 			self.thread_pages[thread_id][page_num] = 0
 		self.thread_pages[thread_id][page_num] += 1
+
+	def check_page_accessed(self, thread_id, addr):
+		if thread_id not in self.thread_pages:
+			return False
+		else:
+			page_num = addr / PAGE_SIZE
+			return (page_num in self.thread_pages[thread_id])
 
 
 class TraceThread(object):
@@ -203,14 +218,23 @@ class TraceThread(object):
 		self.unallocated_page_addresses = self.parent.new_alloc(self.thread_id)
 
 		# Stats
+		self.prefetch_count = 0
+		self.unused_prefetch_in_cache_count = 0
+		self.prefetch_cached_count = 0 
+
 		self.cur_prefetch_hits = 0
 		self.cur_prefetch_cached_hits = 0
 		self.cur_non_prefetch_hits = 0
 		self.cur_page_misses = 0
+
 		self.cur_evictions = 0
 		self.cur_unused_prefetch = 0 
 		self.cur_dirty_evictions = 0
 		self.cur_clean_evictions = 0
+
+		self.cur_first_page_access_prefetch_hits = 0
+		self.cur_first_page_access_prefetch_cached_hits = 0
+		self.cur_first_page_access_non_prefetch_hits = 0
 
 		self.total_prefetch_hits = 0
 		self.total_prefetch_cached_hits = 0
@@ -221,6 +245,11 @@ class TraceThread(object):
 		self.total_unused_prefetch = 0 
 		self.total_dirty_evictions = 0
 		self.total_clean_evictions = 0
+
+		self.total_first_page_access_prefetch_hits = 0
+		self.total_first_page_access_prefetch_cached_hits = 0
+		self.total_first_page_access_non_prefetch_hits = 0
+
 
 		if VIRTUAL_ADDRESS_TRACES and PREALLOCATE:
 			self.preallocate_memory()
@@ -233,11 +262,26 @@ class TraceThread(object):
 		print 'non_prefetch_hits',self.cur_non_prefetch_hits
 		print 'page_misses', self.cur_page_misses
 
+		print 'prefetch_count (cumulative)',self.prefetch_count
+		print 'unused_prefetch_in_cache_count (cumulative)',self.unused_prefetch_in_cache_count
+		print 'prefetch_cached_count (cumulative)',self.prefetch_cached_count
 		print 'evictions', self.cur_evictions
 		print 'unused_prefetch', self.cur_unused_prefetch
 		print 'dirty_evictions', self.cur_dirty_evictions
 		print 'clean_evictions', self.cur_clean_evictions
 
+		print 'first_page_access_prefetch_hits', self.cur_first_page_access_prefetch_hits
+		print 'first_page_access_prefetch_cached_hits', self.cur_first_page_access_prefetch_cached_hits
+		print 'first_page_access_non_prefetch_hits', self.cur_first_page_access_non_prefetch_hits
+
+		cur_accesses = self.cur_prefetch_hits + self.cur_prefetch_cached_hits + self.cur_non_prefetch_hits + self.cur_page_misses
+		cur_page_accesses = self.cur_first_page_access_prefetch_hits + self.cur_first_page_access_prefetch_cached_hits + \
+				self.cur_first_page_access_non_prefetch_hits + self.cur_page_misses
+		access_miss_ratio = self.cur_page_misses / float(cur_accesses)
+		page_access_miss_ratio = self.cur_page_misses / float(cur_page_accesses)
+
+		print 'access_miss_ratio', access_miss_ratio
+		print 'page_access_miss_ratio', page_access_miss_ratio
 		print
 
 		self.total_prefetch_hits += self.cur_prefetch_hits
@@ -250,6 +294,10 @@ class TraceThread(object):
 		self.total_dirty_evictions += self.cur_dirty_evictions
 		self.total_clean_evictions += self.cur_clean_evictions
 
+		self.total_first_page_access_prefetch_hits += self.cur_first_page_access_prefetch_hits
+		self.total_first_page_access_prefetch_cached_hits += self.cur_first_page_access_prefetch_cached_hits
+		self.total_first_page_access_non_prefetch_hits += self.cur_first_page_access_non_prefetch_hits
+
 		self.cur_prefetch_hits = 0
 		self.cur_prefetch_cached_hits = 0
 		self.cur_non_prefetch_hits = 0
@@ -259,6 +307,10 @@ class TraceThread(object):
 		self.cur_unused_prefetch = 0 
 		self.cur_dirty_evictions = 0
 		self.cur_clean_evictions = 0
+
+		self.cur_first_page_access_prefetch_hits = 0
+		self.cur_first_page_access_prefetch_cached_hits = 0
+		self.cur_first_page_access_non_prefetch_hits = 0
 
 		
 
@@ -360,16 +412,29 @@ class TraceThread(object):
 				page_address = get_page_address(self.cur_virtual_address)
 				prefetched, accessed, dirty, prefetch_attempted = self.get_page_state(page_address)
 
+				if self.parent.scheduler_prefetcher.check_page_accessed(self.thread_id, self.trans_addr):
+					page_accessed_this_quantum = True
+				else:
+					page_accessed_this_quantum = False
+
 				# Count non-prefetch hits and non-prefetch misses.
 				if prefetched:
 					self.cur_prefetch_hits += 1 # Count all accessed that hit because of a prefetch
+					if not page_accessed_this_quantum:
+						self.cur_first_page_access_prefetch_hits += 1
+					if not accessed:
+						self.unused_prefetch_in_cache_count -= 1
 				elif not prefetched and accessed and prefetch_attempted:
 					self.cur_prefetch_cached_hits += 1
+					if not page_accessed_this_quantum:
+						self.cur_first_page_access_prefetch_cached_hits += 1
 				elif not prefetch_attempted and accessed:
 					self.cur_non_prefetch_hits += 1 # Count all accesses that hit without a prefetch bringing in that page.
+					if not page_accessed_this_quantum:
+						self.cur_first_page_access_non_prefetch_hits += 1
 				elif not prefetch_attempted and not accessed:
 					self.cur_page_misses += 1 # Count all misses. 
-					
+
 				# Update page state
 				new_accessed = True
 				if self.trans_write:
@@ -454,6 +519,7 @@ class TraceThread(object):
 		self.cur_evictions += 1
 		if prefetched and not accessed:
 			self.cur_unused_prefetch += 1
+			self.unused_prefetch_in_cache_count -= 1
 		if dirty:
 			self.cur_dirty_evictions += 1
 		if not dirty:
@@ -484,11 +550,29 @@ class TraceThread(object):
 		print 'non_prefetch_hits',self.total_non_prefetch_hits
 		print 'page_misses', self.total_page_misses
 
+		print 'prefetch_count',self.prefetch_count
+		print 'unused_prefetch_in_cache_count',self.unused_prefetch_in_cache_count
+		print 'prefetch_cached_count',self.prefetch_cached_count
 		print 'evictions', self.total_evictions
 		print 'unused_prefetch', self.total_unused_prefetch
 		print 'dirty_evictions', self.total_dirty_evictions
 		print 'clean_evictions', self.total_clean_evictions
 
+		print 'first_page_access_prefetch_hits', self.total_first_page_access_prefetch_hits
+		print 'first_page_access_prefetch_cached_hits', self.total_first_page_access_prefetch_cached_hits
+		print 'first_page_access_non_prefetch_hits', self.total_first_page_access_non_prefetch_hits
+
+		print 'unused_prefetch ratio',self.cur_unused_prefetch / float(self.prefetch_count)
+
+		total_accesses = self.total_prefetch_hits + self.total_prefetch_cached_hits + self.total_non_prefetch_hits + self.total_page_misses
+		total_page_accesses = self.total_first_page_access_prefetch_hits + self.total_first_page_access_prefetch_cached_hits + \
+				self.total_first_page_access_non_prefetch_hits + self.total_page_misses
+		access_miss_ratio = self.total_page_misses / float(total_accesses)
+		page_access_miss_ratio = self.total_page_misses / float(total_page_accesses)
+
+		print 'access_miss_ratio', access_miss_ratio
+		print 'page_access_miss_ratio', page_access_miss_ratio
+		print
 
 
 class MultiThreadedTBS(object):
@@ -780,9 +864,6 @@ class MultiThreadedTBS(object):
 			# Update the cycle counters.
 			self.cycles += 1
 			self.quantum_cycles_left -= 1
-
-			
-		
 
 
 class HybridSimTBS(object):
