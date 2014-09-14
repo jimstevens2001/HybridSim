@@ -2072,7 +2072,7 @@ namespace HybridSim {
 
 			if (DEBUG_CACHE)
 			{
-				cerr << "Pinning page " << page << " in set " << set_index << ". Set has " << cur_set_pinned_count - 1 << " pinned pages.\n";
+				cerr << "Unpinning page " << page << " in set " << set_index << ". Set has " << cur_set_pinned_count - 1 << " pinned pages.\n";
 			}
 			
 			size_t num_erased = pinned_pages.erase(page);
