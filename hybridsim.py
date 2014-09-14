@@ -115,7 +115,30 @@ def main():
 
 	hs.printLogfile()
 
+def test_pinning():
+	hs = HybridSim(0, '')
+	hs.RegisterCallbacks(read_cb, write_cb)
+	hs.RegisterNotifyCallback(notify_cb)
+	hs.ConfigureNotify(0, True)
+
+	num_sets = 2048
+	for i in range(128):
+		address = num_sets * i * 4096
+		if i < 100:
+			hs.mmio(5, address) # Pin page 
+		hs.addTransaction(0, address)
+		for j in range(1000):
+			hs.update()
+
+	print 'Done issuing transactions. Unpinning page 0.'
+	hs.mmio(6, 0)
+
+	for i in range(2000000):
+		hs.update()
+	
+
 
 if __name__ == '__main__':
 	main()
+	#test_pinning()
 

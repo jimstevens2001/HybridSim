@@ -146,6 +146,8 @@ namespace HybridSim
 		void stream_buffer_miss_handler(uint64_t miss_page);
 		void stream_buffer_hit_handler(uint64_t hit_page);
 		
+		// Page pinning helper functions.
+		uint64_t get_set_pinned_count(uint64_t set_index);
 
 		// State
 		string hybridsim_ini;
@@ -234,6 +236,10 @@ namespace HybridSim
 		// Notify State
 		TransactionCompleteCB *notifyCB;
 		bool notify_config[NUM_NOTIFY_OPERATIONS];
+
+		// State to track pinned pages.
+		unordered_set<uint64_t> pinned_pages;
+		unordered_map<uint64_t, uint64_t> set_pinned_count;
 
 	};
 

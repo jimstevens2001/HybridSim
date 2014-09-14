@@ -758,9 +758,13 @@ namespace HybridSim {
 					debug_victim << "min_ts= " << min_ts << "\n\n";
 				}
 
+				// Check to see if this page is pinned.
+				uint64_t cur_flash_address = FLASH_ADDRESS(cur_line.tag, set_index);
+				bool pinned_page = (pinned_pages.count(PAGE_ADDRESS(cur_flash_address)) != 0);
+
 				// If the current line is the least recent we've seen so far, then select it.
 				// But do not select it if the line is locked.
-				if (((cur_line.ts < min_ts) || (!min_init)) && (!cur_line.locked))
+				if (((cur_line.ts < min_ts) || (!min_init)) && (!cur_line.locked) && (!pinned_page))
 				{
 					victim = cur_address;	
 					min_ts = cur_line.ts;
@@ -1746,7 +1750,13 @@ namespace HybridSim {
 		uint64_t set_index = SET_INDEX(page_addr);
 		if (set_counter.count(set_index) > 0)
 		{
-			if (set_counter[set_index] == SET_SIZE)
+			// Get the current number of pinned pages in this set.
+			// This must be subtracted from the set size to determine the number of allowed outstanding
+			// accesses to this set. For example, if we have 10 pinned pages in a set size of 16, then we
+			// really only have 6 pages to pick from.
+			uint64_t cur_set_pinned_count = get_set_pinned_count(set_index);
+			
+			if (set_counter[set_index] == SET_SIZE - cur_set_pinned_count)
 			{
 				return false;
 			}
@@ -2011,6 +2021,64 @@ namespace HybridSim {
 				}
 			}
 		}
+		else if (operation == 5)
+		{
+			// PIN PAGE
+			uint64_t page = PAGE_ADDRESS(address);
+			uint64_t set_index = SET_INDEX(address);
+
+			uint64_t cur_set_pinned_count = get_set_pinned_count(set_index);
+
+			if (cur_set_pinned_count >= (SET_SIZE - 1))
+			{
+				// Do not pin the page if it will use up the last unpinned location in this cache set.
+				return;
+			}
+
+			if (pinned_pages.count(page) != 0)
+			{
+				// Already pinned.
+				return;
+			}
+
+			if (DEBUG_CACHE)
+			{
+				cerr << "Pinning page " << page << " in set " << set_index << ". Set has " << cur_set_pinned_count + 1 << " pinned pages.\n";
+			}
+
+			// Add the page to the pinned_pages set and updated the set_pinned_count.
+			pinned_pages.insert(page);
+			set_pinned_count[set_index] = cur_set_pinned_count + 1;
+		}
+		else if (operation == 6)
+		{
+			// UNPIN PAGE
+			uint64_t page = PAGE_ADDRESS(address);
+			uint64_t set_index = SET_INDEX(address);
+
+			if (set_pinned_count.count(set_index) == 0)
+			{
+				// Nothing to unpin.
+				return;
+			}
+
+			if (pinned_pages.count(page) == 0)
+			{
+				// Already unpinned.
+				return;
+			}
+			
+			uint64_t cur_set_pinned_count = set_pinned_count[set_index];
+
+			if (DEBUG_CACHE)
+			{
+				cerr << "Pinning page " << page << " in set " << set_index << ". Set has " << cur_set_pinned_count - 1 << " pinned pages.\n";
+			}
+			
+			size_t num_erased = pinned_pages.erase(page);
+			set_pinned_count[set_index] = cur_set_pinned_count - num_erased;
+
+		}
 		else
 		{
 			cerr << "\n" << currentClockCycle << " : HybridSim received invalid MMIO operation.\n";
@@ -2266,6 +2334,23 @@ namespace HybridSim {
 			*output1 = CACHE_PAGES;
 			*output2 = (uint64_t)PREFILL_CACHE;
 		}
+	}
+
+	uint64_t HybridSystem::get_set_pinned_count(uint64_t set_index)
+	{
+		// Note: This will return 0 if set_index is not in set_pinned_count;
+		uint64_t cur_set_pinned_count;
+		if (set_pinned_count.count(set_index) == 0)
+		{
+			cur_set_pinned_count = 0;
+		}
+		else
+		{
+			cur_set_pinned_count = set_pinned_count[set_index];
+		}
+
+		return cur_set_pinned_count;
+		
 	}
 	
 
