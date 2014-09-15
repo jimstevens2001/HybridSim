@@ -2,6 +2,7 @@
 "cores": 1,
 
 "quantum_cycles": 2666667,
+"quantum_repeat": 2,
 
 "trace_files": [ "traces/loop.txt", "traces/loop.txt", "traces/loop.txt", "traces/loop.txt", "traces/loop.txt", "traces/loop.txt", "traces/loop.txt", "traces/loop.txt", "traces/loop.txt", "traces/loop.txt", "traces/loop.txt", "traces/loop.txt", "traces/loop.txt", "traces/loop.txt", "traces/loop.txt", "traces/loop.txt", "traces/loop.txt", "traces/loop.txt"],
 

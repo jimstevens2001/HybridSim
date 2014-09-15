@@ -646,6 +646,7 @@ class MultiThreadedTBS(object):
 
 			self.cores = config_data['cores']
 			self.quantum_cycles = config_data['quantum_cycles']
+			self.quantum_repeat = config_data['quantum_repeat']
 			self.trace_files = config_data['trace_files']
 			self.schedule = config_data['schedule']
 		except Exception as e:
@@ -823,7 +824,7 @@ class MultiThreadedTBS(object):
 
 		self.quantum_cycles_left = self.quantum_cycles
 		self.quantum_num += 1
-		self.schedule_index = self.quantum_num % len(self.schedule)
+		self.schedule_index = (self.quantum_num / self.quantum_repeat) % len(self.schedule)
 		last_threads = self.cur_running
 		self.cur_running = list(self.schedule[self.schedule_index])
 
