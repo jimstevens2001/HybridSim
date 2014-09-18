@@ -277,8 +277,14 @@ class TraceThread(object):
 		cur_accesses = self.cur_prefetch_hits + self.cur_prefetch_cached_hits + self.cur_non_prefetch_hits + self.cur_page_misses
 		cur_page_accesses = self.cur_first_page_access_prefetch_hits + self.cur_first_page_access_prefetch_cached_hits + \
 				self.cur_first_page_access_non_prefetch_hits + self.cur_page_misses
-		access_miss_ratio = self.cur_page_misses / float(cur_accesses)
-		page_access_miss_ratio = self.cur_page_misses / float(cur_page_accesses)
+		try:
+			access_miss_ratio = self.cur_page_misses / float(cur_accesses)
+		except:
+			access_miss_ratio = 0
+		try:
+			page_access_miss_ratio = self.cur_page_misses / float(cur_page_accesses)
+		except:
+			access_miss_ratio = 0
 
 		print 'access_miss_ratio', access_miss_ratio
 		print 'page_access_miss_ratio', page_access_miss_ratio
@@ -562,13 +568,23 @@ class TraceThread(object):
 		print 'first_page_access_prefetch_cached_hits', self.total_first_page_access_prefetch_cached_hits
 		print 'first_page_access_non_prefetch_hits', self.total_first_page_access_non_prefetch_hits
 
-		print 'unused_prefetch ratio',self.cur_unused_prefetch / float(self.prefetch_count)
+		try:
+			unused_prefetch_ratio = self.cur_unused_prefetch / float(self.prefetch_count)
+		except:
+			unused_prefetch_ratio = 0
+		print 'unused_prefetch ratio',unused_prefetch_ratio
 
 		total_accesses = self.total_prefetch_hits + self.total_prefetch_cached_hits + self.total_non_prefetch_hits + self.total_page_misses
 		total_page_accesses = self.total_first_page_access_prefetch_hits + self.total_first_page_access_prefetch_cached_hits + \
 				self.total_first_page_access_non_prefetch_hits + self.total_page_misses
-		access_miss_ratio = self.total_page_misses / float(total_accesses)
-		page_access_miss_ratio = self.total_page_misses / float(total_page_accesses)
+		try:
+			access_miss_ratio = self.total_page_misses / float(total_accesses)
+		except:
+			access_miss_ratio = 0 
+		try:
+			page_access_miss_ratio = self.total_page_misses / float(total_page_accesses)
+		except:
+			page_access_miss_ratio = 0
 
 		print 'access_miss_ratio', access_miss_ratio
 		print 'page_access_miss_ratio', page_access_miss_ratio
@@ -715,9 +731,8 @@ class MultiThreadedTBS(object):
 			(thread_id, virtual_page_address, valid) = self.physical_page_map[addr]
 
 			if not valid:
-				assert(PREALLOCATE == False) # When preallocating memory, we should never have any unmapped page evictions.
 				self.unmapped_page_evictions.add(addr)
-				print 'Adding %d to unmapped_page_evictions. There are currently %d unmapped evicted pages.'%(addr, len(self.unmapped_page_evictions))
+				#print 'Adding %d to unmapped_page_evictions. There are currently %d unmapped evicted pages.'%(addr, len(self.unmapped_page_evictions))
 				return
 
 			# Tell the thread.
