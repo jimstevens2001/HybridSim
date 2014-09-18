@@ -284,7 +284,7 @@ class TraceThread(object):
 		try:
 			page_access_miss_ratio = self.cur_page_misses / float(cur_page_accesses)
 		except:
-			access_miss_ratio = 0
+			page_access_miss_ratio = 0
 
 		print 'access_miss_ratio', access_miss_ratio
 		print 'page_access_miss_ratio', page_access_miss_ratio
