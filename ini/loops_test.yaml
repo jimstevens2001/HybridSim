@@ -1,6 +1,8 @@
 {
 "cores": 1,
 "quantum_cycles": 2666667,
+"quantum_repeat": 1,
+"quantum_max": 0,
 "trace_files": [ "traces/loop.txt", "traces/loop.txt"],
 "base_addresses": [0, 33554432],
 #"schedule": [[0,1,8,9], [2,3,10,11], [4,5,12,13], [6,7,14,15]]

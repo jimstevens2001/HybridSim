@@ -663,6 +663,7 @@ class MultiThreadedTBS(object):
 			self.cores = config_data['cores']
 			self.quantum_cycles = config_data['quantum_cycles']
 			self.quantum_repeat = config_data['quantum_repeat']
+			self.quantum_max = config_data['quantum_max']
 			self.trace_files = config_data['trace_files']
 			self.schedule = config_data['schedule']
 		except Exception as e:
@@ -815,6 +816,8 @@ class MultiThreadedTBS(object):
 		if tmp_done and self.pending != 0:
 			print 'All threads are done, but there are still pending transactions. Running another quantum.'
 			tmp_done = False # Run another quantum if there are any pending transactions.
+		if (self.quantum_max != 0) and (self.quantum_num + 1 == self.quantum_max):
+			tmp_done = True
 		self.done = tmp_done
 		if self.done:
 			print 'Simulation is done! Here is a summary of what just happened...'
