@@ -1,0 +1,15 @@
+{
+"cores": 1,
+
+"quantum_cycles": 2666667,
+"quantum_repeat": 1,
+"quantum_max": 0,
+
+"trace_files": [ "traces/loop.txt", "traces/empty.txt"],
+
+"schedule": [ [0], [1] ],
+
+"trash_thread": 1,
+"trash_percentage": 10
+}
+

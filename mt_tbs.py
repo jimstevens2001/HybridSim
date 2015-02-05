@@ -117,6 +117,12 @@ class SchedulerPrefetcher(object):
 	def new_quantum(self, last_threads, next_threads):
 		self.next_threads = next_threads
 
+		if self.mt_tbs.trash_thread in self.mt_tbs.cur_running:
+			print 'Issuing trash thread prefetches to clear the cache.'
+			self.prefetch_count = 0
+			self.issue_prefetches(self.mt_tbs.trash_thread)
+			print 'Issued %d prefetches.'%(self.prefetch_count)
+
 		if self.mt_tbs.quantum_num > 0:
 			for thread_id in last_threads:
 				# Save the old thread pages.
@@ -143,29 +149,40 @@ class SchedulerPrefetcher(object):
 		# TODO: Use the access counts for each page to prioritize what pages are sent.
 		if (self.mt_tbs.quantum_cycles_left == self.halfway_cycles):
 			print 'Issuing prefetches for threads',self.next_threads
-			prefetch_count = 0
+			self.prefetch_count = 0
 			for thread_id in self.next_threads:
-				if thread_id in self.old_thread_pages:
-					last_thread_pages = self.old_thread_pages[thread_id][-1]
-					page_list = [page_num * PAGE_SIZE for page_num in last_thread_pages.keys()]
-					for page in page_list:
-						if FAKE_PREFETCHES:
-							self.mt_tbs.mem.mmio(4, page)
-						else:
-							self.mt_tbs.mem.mmio(3, page)
-						prefetch_count += 1
-						(thread_id, virtual_page_address, valid) = self.mt_tbs.physical_page_map[page]
-						prefetched, accessed, dirty, prefetch_attempted = self.mt_tbs.threads[thread_id].get_page_state(virtual_page_address)
-						self.mt_tbs.threads[thread_id].set_page_state(virtual_page_address, not accessed, accessed, dirty, True)
+				if thread_id != self.mt_tbs.trash_thread:
+					self.issue_prefetches(thread_id)
+			print 'Issued %d prefetches.'%(self.prefetch_count) # TODO: Update to show both types of prefetches
 
-						# Increment the appropriate counter for prefetches.
-						if accessed:
-							self.mt_tbs.threads[thread_id].prefetch_cached_count += 1
-						else:
-							self.mt_tbs.threads[thread_id].prefetch_count += 1
-							self.mt_tbs.threads[thread_id].unused_prefetch_in_cache_count += 1
+	def issue_prefetches(self, thread_id):
+		# Trash is a bool to indicate that the trash thread is now prefetching.
+		trash = (thread_id == self.mt_tbs.trash_thread)
 
-			print 'Issued %d prefetches.'%(prefetch_count) # TODO: Update to show both types of prefetches
+		if thread_id in self.old_thread_pages:
+			if trash:
+				# Use ALL pages for the trash thread.
+				last_thread_pages = self.old_thread_pages[thread_id][0]
+			else:
+				last_thread_pages = self.old_thread_pages[thread_id][-1]
+			page_list = [page_num * PAGE_SIZE for page_num in last_thread_pages.keys()]
+			for page in page_list:
+				if FAKE_PREFETCHES or trash:
+					self.mt_tbs.mem.mmio(4, page)
+				else:
+					self.mt_tbs.mem.mmio(3, page)
+				self.prefetch_count += 1
+				(thread_id, virtual_page_address, valid) = self.mt_tbs.physical_page_map[page]
+				prefetched, accessed, dirty, prefetch_attempted = self.mt_tbs.threads[thread_id].get_page_state(virtual_page_address)
+				self.mt_tbs.threads[thread_id].set_page_state(virtual_page_address, not accessed, accessed, dirty, True)
+
+				# Increment the appropriate counter for prefetches.
+				if accessed:
+					self.mt_tbs.threads[thread_id].prefetch_cached_count += 1
+				else:
+					self.mt_tbs.threads[thread_id].prefetch_count += 1
+					self.mt_tbs.threads[thread_id].unused_prefetch_in_cache_count += 1
+
 
 					
 
@@ -197,6 +214,8 @@ class TraceThread(object):
 		self.tracefile = tracefile
 		self.input_file = open(self.tracefile,'r')
 		self.parent = parent
+
+		self.trash_thread = (self.thread_id == self.parent.trash_thread)
 
 		self.complete = 0
 		self.pending = 0
@@ -325,7 +344,17 @@ class TraceThread(object):
 
 		print 'Preallocating thread',self.thread_id
 
-		if self.tracefile in preallocated_traces:
+		if self.trash_thread:
+			print 'Setting up thread %d as the trash thread.'%(self.thread_id)
+			# This thread is the trash thread.
+			# Preallocate CACHE_PAGES pages. These should be sequential, so loading
+			# this into the cache should nuke 
+			trash_thread_pages = int(round((self.parent.trash_percentage / float(100)) * CACHE_PAGES))
+			for virtual_page_number in range(trash_thread_pages):
+				virtual_page = virtual_page_number * PAGE_SIZE
+				self.translate_virtual_page(virtual_page)
+
+		elif self.tracefile in preallocated_traces:
 			print 'Tracefile %s already available'%(self.tracefile)
 			# Call translate_virtual_page for each virtual page in the master map
 			# for this tracefile. That will allocate new physical pages for each
@@ -666,6 +695,25 @@ class MultiThreadedTBS(object):
 			self.quantum_max = config_data['quantum_max']
 			self.trace_files = config_data['trace_files']
 			self.schedule = config_data['schedule']
+
+			try:
+				self.trash_percentage = int(config_data['trash_percentage'])
+				self.trash_thread = int(config_data['trash_thread'])
+
+				if not (1 <= self.trash_percentage <= 100):
+					raise Exception
+				if self.trash_thread not in range(len(self.trace_files)):
+					raise Exception
+				# Note: 0 means do nothing.
+				# This runs automatically in between the second to last quantum and the last quantum 
+				# It takes ZERO time.
+				# This ensure that the trash percentage number of pages are kicked
+				# out of the cache. And it will NOT interfere with the foreground memory operations.
+			except:
+				print 'Defaulting to no trash thread'
+				self.trash_percentage = 0
+				self.trash_thread = -1
+				
 		except Exception as e:
 			print 'Failed to parse the config file properly.'
 			raise e
@@ -846,6 +894,12 @@ class MultiThreadedTBS(object):
 		last_threads = self.cur_running
 		self.cur_running = list(self.schedule[self.schedule_index])
 
+		# TODO: Pick another thread to run if any of the current threads are done.
+
+		next_index = (self.schedule_index + 1) % len(self.schedule)
+		next_threads = self.schedule[next_index]
+		self.scheduler_prefetcher.new_quantum(last_threads, next_threads)
+
 		print '------------------------------------------------------------------------'
 		print 'Starting quantum %d at cycle count %d. completed=%d cur_running=%s'%(self.quantum_num, self.cycles, self.complete, str(self.cur_running))
 		print 'Quantum evictions = ',self.evict_count
@@ -853,11 +907,6 @@ class MultiThreadedTBS(object):
 		self.evict_count = 0
 
 
-		# TODO: Pick another thread to run if any of the current threads are done.
-
-		next_index = (self.schedule_index + 1) % len(self.schedule)
-		next_threads = self.schedule[next_index]
-		self.scheduler_prefetcher.new_quantum(last_threads, next_threads)
 
 
 	def run(self):
