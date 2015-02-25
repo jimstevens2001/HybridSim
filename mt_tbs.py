@@ -234,7 +234,7 @@ class TraceThread(object):
 
 		self.memory_map = {}
 		self.page_state = {}
-		self.unallocated_page_addresses = self.parent.new_alloc(self.thread_id)
+		self.unallocated_page_addresses = []
 
 		# Stats
 		self.prefetch_count = 0
