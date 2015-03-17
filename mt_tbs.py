@@ -172,6 +172,9 @@ class SchedulerPrefetcher(object):
 				else:
 					self.mt_tbs.mem.mmio(3, page)
 				self.prefetch_count += 1
+
+
+				# Stats collection
 				(thread_id, virtual_page_address, valid) = self.mt_tbs.physical_page_map[page]
 				prefetched, accessed, dirty, prefetch_attempted = self.mt_tbs.threads[thread_id].get_page_state(virtual_page_address)
 				self.mt_tbs.threads[thread_id].set_page_state(virtual_page_address, not accessed, accessed, dirty, True)
@@ -563,6 +566,10 @@ class TraceThread(object):
 		# Reset page state.
 		self.set_page_state(virtual_page_address, False, False, False, False)
 
+	def page_missed(self, virtual_page_address):
+		# TODO: Implement me
+		pass
+
 
 	def done(self):
 		print 'thread',self.thread_id,'is done issuing new transactions.'
@@ -677,11 +684,13 @@ class MultiThreadedTBS(object):
 
 		# Set up the notify callback.
 		self.evict_count = 0
+		self.miss_count = 0
 		def notify_cb(operation, addr, cycle):
 			self.handle_notify_cb(operation, addr, cycle)
 		self.notify_cb = notify_cb
 		self.mem.RegisterNotifyCallback(self.notify_cb)
 		self.mem.ConfigureNotify(0, True)
+		self.mem.ConfigureNotify(1, True)
 
 		# Load the configuration data.
 		try:
@@ -773,7 +782,7 @@ class MultiThreadedTBS(object):
 
 			# Look up the physical page that was evicted.
 			if addr not in self.physical_page_map:
-				print 'Error: Notify callback received for address not in physical page map.'
+				print 'Error: Notify evict callback received for address not in physical page map.'
 				print 'Notify callback (operation: %d, addr: %d, cycle: %d)'%(operation, addr, cycle)
 				print self.evict_count
 				sys.exit(1)
@@ -786,6 +795,28 @@ class MultiThreadedTBS(object):
 
 			# Tell the thread.
 			self.threads[thread_id].page_evicted(virtual_page_address)
+
+		elif operation == 1:
+			self.miss_count += 1
+
+			page_addr = get_page_address(addr)
+
+			# Look up the physical page that was evicted.
+			if page_addr not in self.physical_page_map:
+				print 'Error: Notify miss callback received for address not in physical page map.'
+				print 'Notify callback (operation: %d, addr: %d, page_addr: %d, cycle: %d)'%(operation, addr, page_addr, cycle)
+				print self.miss_count
+				sys.exit(1)
+			(thread_id, virtual_page_address, valid) = self.physical_page_map[addr]
+
+			if not valid:
+				print 'Error: Notify miss callback received for invalid page address.'
+				print 'Notify callback (operation: %d, addr: %d, page_addr: %d, cycle: %d)'%(operation, addr, page_addr, cycle)
+				sys.exit(1)
+				
+			# Tell the thread.
+			page_offset = addr % PAGE_SIZE
+			self.threads[thread_id].page_missed(virtual_page_address + page_offset)
 
 		else:
 			print 'Error: Illegal operation returned by notify callback.'

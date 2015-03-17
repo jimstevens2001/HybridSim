@@ -87,7 +87,6 @@ namespace HybridSim
 
 		// Internal Notify Funtions
 		void NotifyCallback(uint operation, uint64_t addr, uint64_t cycle);
-		void NotifyEvict(uint64_t addr, uint64_t cycle);
 
 		// Save/Restore cache table functions
 		void restoreCacheTable();

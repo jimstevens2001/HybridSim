@@ -716,6 +716,9 @@ namespace HybridSim {
 
 			assert(trans.transactionType != SYNC);
 
+			// Send a notification for the miss.
+			NotifyCallback(NOTIFY_MISS, addr, currentClockCycle);
+
 			if ((SEQUENTIAL_PREFETCHING_WINDOW > 0) && (trans.transactionType != PREFETCH))
 			{
 				issue_sequential_prefetches(addr);
@@ -792,7 +795,8 @@ namespace HybridSim {
 			uint64_t victim_flash_addr = FLASH_ADDRESS(cur_line.tag, set_index);
 
 			// Send a notification for eviction.
-			NotifyEvict(victim_flash_addr, currentClockCycle);
+			NotifyCallback(NOTIFY_EVICT, victim_flash_addr, currentClockCycle);
+
 
 			if ((cur_line.prefetched) && (cur_line.used == false))
 			{
@@ -2300,17 +2304,9 @@ namespace HybridSim {
 
 	void HybridSystem::NotifyCallback(uint operation, uint64_t addr, uint64_t cycle)
 	{
-		if (notifyCB != NULL)
+		if ((notify_config[operation] == true) && (notifyCB != NULL))
 		{
 			(*notifyCB)(operation, addr, cycle);
-		}
-	}
-
-	void HybridSystem::NotifyEvict(uint64_t addr, uint64_t cycle)
-	{
-		if (notify_config[NOTIFY_EVICT] == true)
-		{
-			NotifyCallback(NOTIFY_EVICT, addr, cycle);
 		}
 	}
 

@@ -199,8 +199,12 @@ extern string NVDIMM_SAVE_FILE;
 
 
 // Notify Callback Operation Definitions
-#define NUM_NOTIFY_OPERATIONS 1
+#define NUM_NOTIFY_OPERATIONS 5
 #define NOTIFY_EVICT 0
+#define NOTIFY_MISS 1
+#define NOTIFY_HIT 2
+#define NOTIFY_PREFETCH_HIT 3
+#define NOTIFY_PREFETCH_MISS 4
 
 
 
