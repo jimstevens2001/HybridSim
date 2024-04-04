@@ -31,6 +31,8 @@
 #ifndef HYBRIDSYSTEM_CONFIG_H
 #define HYBRIDSYSTEM_CONFIG_H
 
+#include <cstdint>
+
 // Temporary prefetch flags.
 #define ENABLE_PERFECT_PREFETCHING 0
 #define PREFETCH_FILE "traces/prefetch_data.txt"
